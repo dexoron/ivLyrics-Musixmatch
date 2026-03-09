@@ -295,10 +295,33 @@ function decodeServerBackupContent(rawContent) {
   return JSON.parse(rawContent);
 }
 
+function getAboutAccountThemeTokens() {
+  const isLightTheme = getSettingsUiTheme() === "light";
+
+  return {
+    textPrimary: "var(--text-primary, #f6f8fb)",
+    textSecondary: "var(--text-secondary, rgba(246, 248, 251, 0.72))",
+    textTertiary: "var(--text-tertiary, rgba(246, 248, 251, 0.48))",
+    panelBackground: isLightTheme ? "rgba(15, 23, 42, 0.04)" : "rgba(255, 255, 255, 0.03)",
+    panelBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.1)",
+    inputBackground: isLightTheme ? "rgba(255, 255, 255, 0.82)" : "rgba(0, 0, 0, 0.2)",
+    inputBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.1)",
+    subtleButtonBackground: isLightTheme ? "rgba(15, 23, 42, 0.06)" : "rgba(255, 255, 255, 0.05)",
+    subtleButtonBackgroundHover: isLightTheme ? "rgba(15, 23, 42, 0.1)" : "rgba(255, 255, 255, 0.1)",
+    subtleButtonBorder: isLightTheme ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.15)",
+    subtleButtonBorderHover: isLightTheme ? "rgba(15, 23, 42, 0.2)" : "rgba(255, 255, 255, 0.25)",
+    subtleButtonText: isLightTheme ? "rgba(15, 23, 42, 0.82)" : "rgba(255, 255, 255, 0.8)",
+    subtleButtonTextHover: "var(--text-primary, #f6f8fb)",
+    emptyText: isLightTheme ? "rgba(15, 23, 42, 0.46)" : "#888",
+    sectionDivider: isLightTheme ? "rgba(15, 23, 42, 0.1)" : "rgba(255, 255, 255, 0.1)",
+  };
+}
+
 const SettingsBackup = ({ userHash }) => {
   const [settingsList, setSettingsList] = useState([]);
   const [backupName, setBackupName] = useState("");
   const [loading, setLoading] = useState(false);
+  const themeTokens = getAboutAccountThemeTokens();
 
   const fetchSettings = async () => {
     try {
@@ -399,8 +422,8 @@ const SettingsBackup = ({ userHash }) => {
     }
   };
 
-  return react.createElement("div", { className: "settings-backup-section", style: { marginTop: "20px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "20px" } },
-    react.createElement("h3", { style: { fontSize: "14px", marginBottom: "12px", color: "#fff" } }, I18n.t("settingsAdvanced.aboutTab.account.backup.title")),
+  return react.createElement("div", { className: "settings-backup-section", style: { marginTop: "20px", borderTop: `1px solid ${themeTokens.sectionDivider}`, paddingTop: "20px" } },
+    react.createElement("h3", { style: { fontSize: "14px", marginBottom: "12px", color: themeTokens.textPrimary } }, I18n.t("settingsAdvanced.aboutTab.account.backup.title")),
 
     // 업로드 폼
     react.createElement("div", { style: { display: "flex", gap: "8px", marginBottom: "16px" } },
@@ -413,9 +436,9 @@ const SettingsBackup = ({ userHash }) => {
           flex: 1,
           padding: "8px 12px",
           borderRadius: "6px",
-          border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(0,0,0,0.2)",
-          color: "#fff",
+          border: `1px solid ${themeTokens.inputBorder}`,
+          background: themeTokens.inputBackground,
+          color: themeTokens.textPrimary,
           fontSize: "13px"
         }
       }),
@@ -438,17 +461,17 @@ const SettingsBackup = ({ userHash }) => {
     // 목록
     react.createElement("div", { className: "backup-list", style: { display: "flex", flexDirection: "column", gap: "8px" } },
       settingsList.length === 0 ?
-        react.createElement("div", { style: { color: "#888", fontSize: "12px", textAlign: "center", padding: "10px" } }, I18n.t("settingsAdvanced.aboutTab.account.backup.noBackups")) :
+        react.createElement("div", { style: { color: themeTokens.emptyText, fontSize: "12px", textAlign: "center", padding: "10px" } }, I18n.t("settingsAdvanced.aboutTab.account.backup.noBackups")) :
         settingsList.map(item =>
           react.createElement("div", {
             key: item.id, style: {
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 12px", background: "rgba(255,255,255,0.05)", borderRadius: "8px"
+              padding: "10px 12px", background: themeTokens.panelBackground, border: `1px solid ${themeTokens.panelBorder}`, borderRadius: "8px"
             }
           },
             react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
-              react.createElement("span", { style: { color: "#fff", fontSize: "13px", fontWeight: "500" } }, item.settings_name),
-              react.createElement("span", { style: { color: "#888", fontSize: "11px" } }, new Date(item.updated_at).toLocaleString())
+              react.createElement("span", { style: { color: themeTokens.textPrimary, fontSize: "13px", fontWeight: "500" } }, item.settings_name),
+              react.createElement("span", { style: { color: themeTokens.emptyText, fontSize: "11px" } }, new Date(item.updated_at).toLocaleString())
             ),
             react.createElement("div", { style: { display: "flex", gap: "8px" } },
               react.createElement("button", {
@@ -472,6 +495,7 @@ const NicknameSection = ({ userHash }) => {
   const [inputNickname, setInputNickname] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const themeTokens = getAboutAccountThemeTokens();
 
   const fetchNickname = async () => {
     try {
@@ -525,16 +549,16 @@ const NicknameSection = ({ userHash }) => {
   return react.createElement("div", {
     style: {
       padding: "16px",
-      background: "rgba(255, 255, 255, 0.03)",
+      background: themeTokens.panelBackground,
       borderRadius: "12px",
-      border: "1px solid rgba(255, 255, 255, 0.1)",
+      border: `1px solid ${themeTokens.panelBorder}`,
       marginTop: "16px",
       marginBottom: "16px"
     }
   },
     react.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
       react.createElement("div", null,
-        react.createElement("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "4px" } }, I18n.t("settingsAdvanced.aboutTab.account.nickname.label")),
+        react.createElement("div", { style: { fontSize: "12px", color: themeTokens.textTertiary, marginBottom: "4px" } }, I18n.t("settingsAdvanced.aboutTab.account.nickname.label")),
         editing ?
           react.createElement("input", {
             type: "text",
@@ -543,16 +567,16 @@ const NicknameSection = ({ userHash }) => {
             placeholder: I18n.t("settingsAdvanced.aboutTab.account.nickname.placeholder"),
             autoFocus: true,
             style: {
-              background: "rgba(0,0,0,0.2)",
+              background: themeTokens.inputBackground,
               border: "1px solid #6366f1",
               borderRadius: "4px",
-              color: "#fff",
+              color: themeTokens.textPrimary,
               padding: "4px 8px",
               fontSize: "14px",
               width: "150px"
             }
           }) :
-          react.createElement("div", { style: { fontSize: "16px", fontWeight: "600", color: "#fff" } }, nickname || I18n.t("settingsAdvanced.aboutTab.account.nickname.none"))
+          react.createElement("div", { style: { fontSize: "16px", fontWeight: "600", color: themeTokens.textPrimary } }, nickname || I18n.t("settingsAdvanced.aboutTab.account.nickname.none"))
       ),
       react.createElement("button", {
         onClick: editing ? handleSave : () => setEditing(true),
@@ -560,8 +584,8 @@ const NicknameSection = ({ userHash }) => {
         style: {
           padding: "6px 12px",
           borderRadius: "6px",
-          background: editing ? "#6366f1" : "rgba(255,255,255,0.1)",
-          color: "#fff",
+          background: editing ? "#6366f1" : themeTokens.subtleButtonBackground,
+          color: editing ? "#fff" : themeTokens.subtleButtonText,
           border: "none",
           fontSize: "12px",
           cursor: "pointer",
@@ -577,6 +601,7 @@ const AccountSection = () => {
   const [accountInfo, setAccountInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const themeTokens = getAboutAccountThemeTokens();
 
   /* polling state added */
   const [isPolling, setIsPolling] = useState(false);
@@ -690,7 +715,7 @@ const AccountSection = () => {
               style: {
                 margin: "0 0 4px",
                 fontSize: "16px",
-                color: "#ffffff",
+                color: themeTokens.textPrimary,
                 fontWeight: "600",
               },
             },
@@ -702,7 +727,7 @@ const AccountSection = () => {
               style: {
                 margin: 0,
                 fontSize: "13px",
-                color: "rgba(255,255,255,0.6)",
+                color: themeTokens.textSecondary,
               },
             },
             I18n.t("settingsAdvanced.aboutTab.account.description")
@@ -715,7 +740,7 @@ const AccountSection = () => {
           style: {
             margin: "0 0 16px",
             fontSize: "13px",
-            color: "rgba(255,255,255,0.7)",
+            color: themeTokens.textSecondary,
             lineHeight: "1.6",
           },
         },
@@ -791,7 +816,7 @@ const AccountSection = () => {
       },
       react.createElement(
         "span",
-        { style: { color: "rgba(255,255,255,0.6)", fontSize: "14px" } },
+        { style: { color: themeTokens.textSecondary, fontSize: "14px" } },
         I18n.t("settingsAdvanced.aboutTab.account.loading") || "Loading..."
       )
     );
@@ -874,7 +899,7 @@ const AccountSection = () => {
               style: {
                 margin: 0,
                 fontSize: "16px",
-                color: "#ffffff",
+                color: themeTokens.textPrimary,
                 fontWeight: "600",
               },
             },
@@ -899,13 +924,13 @@ const AccountSection = () => {
         react.createElement(
           "p",
           {
-            style: {
-              margin: 0,
-              fontSize: "13px",
-              color: "rgba(255,255,255,0.6)",
+              style: {
+                margin: 0,
+                fontSize: "13px",
+                color: themeTokens.textSecondary,
+              },
             },
-          },
-          accountInfo.email
+            accountInfo.email
         )
       ),
       // 새로고침 버튼
@@ -915,10 +940,10 @@ const AccountSection = () => {
           onClick: handleRefresh,
           style: {
             padding: "8px",
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: themeTokens.subtleButtonBackground,
+            border: `1px solid ${themeTokens.subtleButtonBorder}`,
             borderRadius: "8px",
-            color: "rgba(255,255,255,0.7)",
+            color: themeTokens.subtleButtonText,
             cursor: "pointer",
             transition: "all 0.2s",
             display: "flex",
@@ -926,12 +951,14 @@ const AccountSection = () => {
             justifyContent: "center",
           },
           onMouseEnter: (e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-            e.currentTarget.style.color = "#ffffff";
+            e.currentTarget.style.background = themeTokens.subtleButtonBackgroundHover;
+            e.currentTarget.style.borderColor = themeTokens.subtleButtonBorderHover;
+            e.currentTarget.style.color = themeTokens.subtleButtonTextHover;
           },
           onMouseLeave: (e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+            e.currentTarget.style.background = themeTokens.subtleButtonBackground;
+            e.currentTarget.style.borderColor = themeTokens.subtleButtonBorder;
+            e.currentTarget.style.color = themeTokens.subtleButtonText;
           },
           title: I18n.t("settingsAdvanced.aboutTab.account.refresh") || "Refresh",
         },
@@ -958,7 +985,7 @@ const AccountSection = () => {
           display: "flex",
           gap: "16px",
           fontSize: "12px",
-          color: "rgba(255,255,255,0.5)",
+          color: themeTokens.textTertiary,
           marginBottom: "16px",
         },
       },
@@ -983,10 +1010,10 @@ const AccountSection = () => {
         style: {
           width: "100%",
           padding: "10px 16px",
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.15)",
+          background: themeTokens.subtleButtonBackground,
+          border: `1px solid ${themeTokens.subtleButtonBorder}`,
           borderRadius: "8px",
-          color: "rgba(255,255,255,0.8)",
+          color: themeTokens.subtleButtonText,
           fontSize: "13px",
           fontWeight: "500",
           cursor: "pointer",
@@ -997,12 +1024,14 @@ const AccountSection = () => {
           gap: "8px",
         },
         onMouseEnter: (e) => {
-          e.target.style.background = "rgba(255,255,255,0.1)";
-          e.target.style.borderColor = "rgba(255,255,255,0.25)";
+          e.currentTarget.style.background = themeTokens.subtleButtonBackgroundHover;
+          e.currentTarget.style.borderColor = themeTokens.subtleButtonBorderHover;
+          e.currentTarget.style.color = themeTokens.subtleButtonTextHover;
         },
         onMouseLeave: (e) => {
-          e.target.style.background = "rgba(255,255,255,0.05)";
-          e.target.style.borderColor = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.background = themeTokens.subtleButtonBackground;
+          e.currentTarget.style.borderColor = themeTokens.subtleButtonBorder;
+          e.currentTarget.style.color = themeTokens.subtleButtonText;
         },
       },
       react.createElement(
@@ -4740,7 +4769,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
         }
       }, 50);
     }
-  }, [activeTab]);
+	  }, [activeTab]);
 
   // 패치노트 불러오기
   useEffect(() => {
@@ -4883,7 +4912,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
       // 짧은 지연 후 로드 (DOM이 준비되도록)
       setTimeout(loadPatchNotes, 100);
     }
-  }, [activeTab]);
+	  }, [activeTab, uiTheme]);
 
   const HeaderSection = () => {
     return react.createElement(
@@ -8798,6 +8827,41 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 #${APP_NAME}-config-container[data-ui-theme="light"] .about-info-card {
     background: rgba(255, 255, 255, 0.64) !important;
     border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container {
+    background: rgba(255, 255, 255, 0.64) !important;
+    border-color: rgba(15, 23, 42, 0.08) !important;
+    color: var(--text-secondary) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container :where(div, p, li, ul, ol, strong, em, code, pre, blockquote, h2, h3, h4, h5, a) {
+    color: var(--text-secondary) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container :where(h2, h3, h4, h5, strong, a) {
+    color: var(--text-primary) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container pre,
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container code {
+    background: rgba(15, 23, 42, 0.06) !important;
+    border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container code {
+    color: #0f6cbd !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container blockquote,
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container hr,
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container > div > div:first-child {
+    border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+#${APP_NAME}-config-container[data-ui-theme="light"] #patch-notes-container a[href] {
+    background: rgba(15, 23, 42, 0.06) !important;
+    border: 1px solid rgba(15, 23, 42, 0.12) !important;
 }
 
 #${APP_NAME}-config-container[data-ui-theme="light"] .about-client-copy-btn {
@@ -12752,23 +12816,23 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
         }),
         react.createElement(
           "div",
-          {
-            id: "patch-notes-container",
-            style: {
-              padding: "20px",
-              background: "rgba(255, 255, 255, 0.03)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "0 0 12px 12px",
-              backdropFilter: "blur(30px) saturate(150%)",
-              WebkitBackdropFilter: "blur(30px) saturate(150%)",
+	          {
+	            id: "patch-notes-container",
+	            style: {
+	              padding: "20px",
+	              background: "var(--glass-bg)",
+	              border: "1px solid var(--glass-border)",
+	              borderRadius: "0 0 12px 12px",
+	              backdropFilter: "blur(30px) saturate(150%)",
+	              WebkitBackdropFilter: "blur(30px) saturate(150%)",
               marginBottom: "24px",
               minHeight: "100px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "rgba(255,255,255,0.5)",
-            },
-          },
+	              color: "var(--text-secondary)",
+	            },
+	          },
           I18n.t("settingsAdvanced.aboutTab.patchNotes.loading")
         )
       )
