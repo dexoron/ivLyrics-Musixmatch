@@ -3536,6 +3536,10 @@ const OptionList = ({ type, items, onChange }) => {
   const [, forceUpdate] = useState();
 
   useEffect(() => {
+    setItemList(items);
+  }, [items]);
+
+  useEffect(() => {
     if (!type) return;
 
     const eventListener = (event) => {
