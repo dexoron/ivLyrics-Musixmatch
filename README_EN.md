@@ -11,7 +11,7 @@
 
 ### ivLyrics - Enjoy music in your language.
 
-A lyrics extension for Spicetify. It supports pronunciation guides and translations for multiple languages using the Google Gemini API.
+A lyrics extension for Spicetify. It supports pronunciation guides and translations for multiple languages using the AI API.
 
 For bug reports and feature suggestions, please contact us through GitHub Issues or [Discord](https://discord.gg/2fu36fUzdE).
 
