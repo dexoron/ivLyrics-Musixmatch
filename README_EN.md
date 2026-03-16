@@ -1,4 +1,4 @@
-<img width="2208" height="512" alt="en" src="https://github.com/user-attachments/assets/8441680c-68a3-435c-b22a-d674948807a3" />
+<img width="2208" height="512" alt="en" src="https://github.com/ivLis-Studio/ivLyrics/blob/main/preview_readme_en.png?raw=true" />
 
 ---
 
