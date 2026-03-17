@@ -1232,7 +1232,7 @@ const FullscreenOverlay = (() => {
             ),
             // Bottom-left: TV Mode Song Info OR Context info
             tvModeEnabled ? react.createElement("div", {
-                className: `fullscreen-tv-song-info ${!uiVisible ? 'hidden' : ''}`
+                className: "fullscreen-tv-song-info"
             },
                 // Album art (clickable for TMI)
                 react.createElement("div", {
@@ -1349,7 +1349,7 @@ const FullscreenOverlay = (() => {
                 ),
                 // TV Mode Controls & Progress (right side)
                 (tvShowControls || tvShowProgress) && react.createElement("div", {
-                    className: "fullscreen-tv-controls-wrapper"
+                    className: `fullscreen-tv-controls-wrapper ${!uiVisible ? 'hidden' : ''}`
                 },
                     // TV Mode Controls
                     tvShowControls && react.createElement("div", {

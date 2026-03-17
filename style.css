@@ -5982,10 +5982,20 @@ ruby rt {
   transition: width var(--iv-motion-duration-medium) var(--iv-motion-ease-emphasis);
 }
 
-.fullscreen-tv-song-info.hidden .fullscreen-tv-title,
-.fullscreen-tv-song-info.hidden .fullscreen-tv-artist,
-.fullscreen-tv-song-info.hidden .fullscreen-tv-progress {
+.fullscreen-tv-controls-wrapper {
+  transition:
+    opacity var(--iv-motion-duration-medium) var(--iv-motion-ease-standard),
+    transform var(--iv-motion-duration-medium) var(--iv-motion-ease-emphasis);
+}
+
+.fullscreen-tv-controls-wrapper.hidden {
+  opacity: 0;
   transform: translateY(8px);
+  pointer-events: none;
+}
+
+.fullscreen-tv-controls-wrapper.hidden .fullscreen-tv-controls,
+.fullscreen-tv-controls-wrapper.hidden .fullscreen-tv-progress {
   opacity: 0;
 }
 
