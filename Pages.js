@@ -167,6 +167,8 @@ const SyncCreatorProfileModal = react.memo(({
 	const totalContributionCount = Number(profileData.pagination?.totalCount || trackCount || 0);
 	const loadedContributionCount = Array.isArray(profileData.contributions) ? profileData.contributions.length : 0;
 	const hasMoreContributions = !!profileData.pagination?.hasMore;
+	const bodyRef = react.useRef(null);
+	const loadMoreLockRef = react.useRef(false);
 	const canLike = !!profileData.viewer?.canLike;
 	const liked = !!profileData.viewer?.liked;
 	const isOwnProfile = !!profileData.viewer?.isOwnProfile;
@@ -204,6 +206,31 @@ const SyncCreatorProfileModal = react.memo(({
 		},
 		react.createElement("path", { d: "M8 13.4 2.9 8.6a3.2 3.2 0 0 1 4.5-4.5L8 4.7l.6-.6a3.2 3.2 0 1 1 4.5 4.5L8 13.4Z" })
 	);
+
+	const maybeLoadMore = react.useCallback(() => {
+		const body = bodyRef.current;
+		if (!body || !hasMoreContributions || loadMorePending || loading || error || typeof onLoadMore !== "function") {
+			return;
+		}
+
+		const remaining = body.scrollHeight - body.scrollTop - body.clientHeight;
+		if (remaining > 160 || loadMoreLockRef.current) {
+			return;
+		}
+
+		loadMoreLockRef.current = true;
+		onLoadMore();
+	}, [error, hasMoreContributions, loadMorePending, loading, onLoadMore]);
+
+	react.useEffect(() => {
+		if (!loadMorePending) {
+			loadMoreLockRef.current = false;
+		}
+	}, [loadMorePending, loadedContributionCount]);
+
+	react.useEffect(() => {
+		maybeLoadMore();
+	}, [maybeLoadMore, loadedContributionCount]);
 
 	const content = loading
 		? react.createElement(
@@ -304,13 +331,17 @@ const SyncCreatorProfileModal = react.memo(({
 										className: "lyrics-creator-profile-track",
 										onClick: () => onTrackClick(item.trackId)
 									},
-									react.createElement("div", { className: "lyrics-creator-profile-track-title" }, item.trackName || copy.unknownTrack),
-									react.createElement("div", { className: "lyrics-creator-profile-track-artist" }, item.artists || item.trackId),
 									react.createElement(
 										"div",
-										{ className: "lyrics-creator-profile-track-meta" },
+										{ className: "lyrics-creator-profile-track-main" },
+										react.createElement("div", { className: "lyrics-creator-profile-track-title" }, item.trackName || copy.unknownTrack),
+										react.createElement("div", { className: "lyrics-creator-profile-track-artist" }, item.artists || item.trackId)
+									),
+									react.createElement(
+										"div",
+										{ className: "lyrics-creator-profile-track-side" },
 										react.createElement("span", { className: "lyrics-creator-profile-track-provider" }, item.provider),
-										updatedLabel && react.createElement("span", null, `${copy.updated} ${updatedLabel}`)
+										updatedLabel && react.createElement("span", { className: "lyrics-creator-profile-track-updated" }, `${copy.updated} ${updatedLabel}`)
 									)
 								);
 							})
@@ -318,16 +349,13 @@ const SyncCreatorProfileModal = react.memo(({
 						hasMoreContributions && react.createElement(
 							"div",
 							{ className: "lyrics-creator-profile-grid-footer" },
-							react.createElement(
-								"button",
-								{
-									type: "button",
-									className: "lyrics-creator-profile-load-more",
-									onClick: onLoadMore,
-									disabled: loadMorePending
-								},
-								loadMorePending ? copy.loadingMore : copy.loadMore
-							)
+							loadMorePending
+								? react.createElement(
+									"div",
+									{ className: "lyrics-creator-profile-load-more is-loading" },
+									copy.loadingMore
+								)
+								: null
 						)
 					)
 					: react.createElement(
@@ -372,7 +400,11 @@ const SyncCreatorProfileModal = react.memo(({
 			),
 			react.createElement(
 				"div",
-				{ className: "lyrics-creator-profile-body" },
+				{
+					className: "lyrics-creator-profile-body",
+					ref: bodyRef,
+					onScroll: maybeLoadMore
+				},
 				content
 			),
 			react.createElement(
@@ -592,43 +624,68 @@ const CreditFooter = react.memo(({ provider, contributors }) => {
 				onClick: (event) => event.stopPropagation(),
 				onMouseDown: (event) => event.stopPropagation()
 			},
-			react.createElement("span", null, `${I18n.t("misc.lyricsProvider") || "Lyrics Provider"} : ${provider}`),
+			react.createElement(
+				"span",
+				{ className: "lyrics-credit-footer-group" },
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-label" },
+					I18n.t("misc.lyricsProvider") || "Lyrics Provider"
+				),
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-value" },
+					provider
+				)
+			),
 			visibleContributors.length > 0 && react.createElement(
 				react.Fragment,
 				null,
-				react.createElement("span", { className: "lyrics-credit-footer-divider" }, " | "),
-				react.createElement("span", null, `${I18n.t("misc.syncContributor") || "Sync Contributor"} : `),
-				...visibleContributors.flatMap((contributor, index) => {
-					const node = contributor.profileAvailable
-						? react.createElement(
-							"button",
-							{
-								type: "button",
-								key: contributor.key,
-								className: "lyrics-credit-footer-link",
-								onPointerDown: (event) => event.stopPropagation(),
-								onMouseDown: (event) => event.stopPropagation(),
-								onClick: (event) => {
-									event.stopPropagation();
-									openCreatorProfile(contributor);
-								},
-								title: copy.openProfile
-							},
-							contributor.name
-						)
-						: react.createElement(
-							"span",
-							{
-								key: contributor.key,
-								className: "lyrics-credit-footer-name"
-							},
-							contributor.name
-						);
+				react.createElement("span", { className: "lyrics-credit-footer-divider", "aria-hidden": "true" }, "•"),
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-group" },
+					react.createElement(
+						"span",
+						{ className: "lyrics-credit-footer-label" },
+						I18n.t("misc.syncContributor") || "Sync Contributor"
+					),
+					react.createElement(
+						"span",
+						{ className: "lyrics-credit-footer-value lyrics-credit-footer-contributors" },
+						...visibleContributors.flatMap((contributor, index) => {
+							const node = contributor.profileAvailable
+								? react.createElement(
+									"button",
+									{
+										type: "button",
+										key: contributor.key,
+										className: "lyrics-credit-footer-link",
+										onPointerDown: (event) => event.stopPropagation(),
+										onMouseDown: (event) => event.stopPropagation(),
+										onClick: (event) => {
+											event.stopPropagation();
+											openCreatorProfile(contributor);
+										},
+										title: copy.openProfile
+									},
+									contributor.name
+								)
+								: react.createElement(
+									"span",
+									{
+										key: contributor.key,
+										className: "lyrics-credit-footer-name"
+									},
+									contributor.name
+								);
 
-					return index < visibleContributors.length - 1
-						? [node, react.createElement("span", { key: `${contributor.key}:comma` }, ", ")]
-						: [node];
-				})
+							return index < visibleContributors.length - 1
+								? [node, react.createElement("span", { key: `${contributor.key}:comma`, className: "lyrics-credit-footer-separator" }, ", ")]
+								: [node];
+						})
+					)
+				)
 			)
 		)
 	);
