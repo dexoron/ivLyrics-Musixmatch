@@ -535,9 +535,11 @@
                     if (trackId && window.LyricsService?.getCachedLyrics) {
                         try {
                             const cached = await window.LyricsService.getCachedLyrics(trackId, provider.id);
-                            if (cached) {
+                            if (cached && (!provider.cacheVersion || cached.cacheVersion === provider.cacheVersion)) {
                                 result = cached;
                                 window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Cache hit for ${provider.id}`);
+                            } else if (cached) {
+                                window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Cache version mismatch for ${provider.id}, refetching...`);
                             }
                         } catch (e) {
                             console.warn(`[LyricsAddonManager] Cache lookup failed for ${provider.id}:`, e);

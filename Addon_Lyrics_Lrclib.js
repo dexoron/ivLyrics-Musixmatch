@@ -7,16 +7,16 @@
  * 가사를 검색하고 가져오는 Spicetify 애드온입니다.
  * 
  * 【주요 기능】
- * - 3-Tier 하이브리드 검색 시스템 (구조화 → 제목 → 아티스트 순차 폴백)
+ * - 제목 + 가수 구조화 검색만 사용
+ * - 재생 시간(Duration) ±3초 이내 결과만 채택
  * - Jaro-Winkler 알고리즘 기반 문자열 유사도 매칭
- * - 재생 시간(Duration) 기반 정확도 검증
  * - 싱크 가사(LRC 형식) 및 일반 텍스트 가사 지원
  * - 네트워크 오류 시 자동 재시도 메커니즘
  * 
  * 【검색 전략】
- * - Tier 1: track_name + artist_name 파라미터 사용 (가장 정확, CJK 문자 최적화)
- * - Tier 2: q=title 파라미터 사용 (번역된 제목, 로마자 표기 대응)
- * - Tier 3: q=artist 파라미터 사용 (최후의 수단)
+ * - track_name + artist_name 파라미터 사용
+ * - duration은 클라이언트에서 ±3초로 엄격 검증
+ * - 제목/가수 자유검색 폴백 없음
  *
  * @addon-type lyrics        - 가사 제공자 타입의 애드온
  * @id lrclib               - 고유 식별자
@@ -47,6 +47,7 @@
         name: 'LRCLIB',         // 【표시 이름】 UI에 표시되는 애드온 이름
         author: 'ivLis STUDIO', // 【제작자】 애드온 개발자 정보
         version: '1.0.0',       // 【버전】 시맨틱 버저닝 (Major.Minor.Patch)
+        cacheVersion: '2026-03-17-duration-3s',
 
         // 【다국어 설명】 사용자 언어 설정에 따라 표시
         description: {
@@ -80,6 +81,9 @@
     // - GET /api/get?...      : 특정 가사 직접 조회
 
     const LRCLIB_API_BASE = 'https://lrclib.net/api';
+    const LRCLIB_DURATION_TOLERANCE_SEC = 3;
+    const LRCLIB_MIN_TITLE_SCORE = 0.72;
+    const LRCLIB_MIN_ARTIST_SCORE = 0.55;
 
     // ============================================
     // Helper Functions (헬퍼 함수)
@@ -444,498 +448,190 @@
          *   - error: 에러 메시지 또는 null
          * 
          * 【검색 전략】
-         * 3-Tier 하이브리드 검색 + Best-of-N 선택 알고리즘 적용
+         * 구조화 검색 1회 + duration ±3초 필터만 적용
          */
         async getLyrics(info) {
-            // ════════════════════════════════════════════════════════════════
-            // 성능 측정용 변수 초기화
-            // ════════════════════════════════════════════════════════════════
-            const startTotal = performance.now();  // 전체 소요 시간 측정 시작
-            let startServer = 0, endServer = 0;    // 서버 API 호출 시간
-            let startLogic = 0, endLogic = 0;      // 매칭 로직 처리 시간
-            let bestScore = 0, bestSync = 0, bestTitle = 0, bestArtist = 0;  // 최종 선택된 결과의 점수들
+            const startTotal = performance.now();
+            const result = {
+                uri: info.uri,
+                provider: 'lrclib',
+                cacheVersion: ADDON_INFO.cacheVersion,
+                karaoke: null,
+                synced: null,
+                unsynced: null,
+                copyright: null,
+                error: null
+            };
 
-            /**
-             * 【디버그 로깅 함수】
-             * 검색 결과와 성능 지표를 콘솔에 출력합니다.
-             * 개발 및 디버깅 시 유용한 정보를 제공합니다.
-             * 
-             * @param {string} msg - 상태 메시지 (Success, Failed 등)
-             * @param {string|null} error - 에러 메시지 (있는 경우)
-             */
-            const logDebug = (msg, error = null) => {
+            const logDebug = (status, extra = {}) => {
                 const endTotal = performance.now();
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] ========================================`);
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] Track: ${info.title} - ${info.artist}`);
-                if (msg) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Status: ${msg}`);
-                if (error) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Error: ${error}`);
-                if (bestScore > 0) {
-                    // 매칭 점수 상세 출력 (디버깅용)
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] Match Score: ${bestScore.toFixed(2)} (Sync: ${bestSync.toFixed(2)}, Title: ${bestTitle.toFixed(2)}, Artist: ${bestArtist.toFixed(2)})`);
-                }
-                // 성능 지표 출력
-                if (startServer > 0 && endServer > 0) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Server: ${(endServer - startServer).toFixed(2)}ms`);
-                if (startLogic > 0 && endLogic > 0) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Logic: ${(endLogic - startLogic).toFixed(2)}ms`);
+                window.__ivLyricsDebugLog?.(`[LR-DEBUG] Status: ${status}`);
+                Object.entries(extra).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null) {
+                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${key}: ${value}`);
+                    }
+                });
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Total: ${(endTotal - startTotal).toFixed(2)}ms`);
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] ========================================`);
             };
 
-            // ════════════════════════════════════════════════════════════════
-            // 결과 객체 초기화
-            // ════════════════════════════════════════════════════════════════
-            // 모든 필드를 null로 초기화하고, 성공/실패에 따라 채워나감
-            const result = {
-                uri: info.uri,         // 요청한 트랙의 Spotify URI
-                provider: 'lrclib',    // 가사 제공자 식별자
-                karaoke: null,         // 노래방 가사 (단어별 하이라이트) - 미지원
-                synced: null,          // 싱크 가사 배열 [{startTime, text}, ...]
-                unsynced: null,        // 일반 가사 배열 [{text}, ...]
-                copyright: null,       // 저작권 정보 - LRCLIB은 제공 안 함
-                error: null            // 에러 발생 시 메시지
-            };
-
-            // 트랙 ID 추출 (현재는 사용하지 않지만 향후 캐싱 등에 활용 가능)
-            const trackId = info.uri.split(':')[2];
-
-            // ════════════════════════════════════════════════════════════════
-            // 3-Tier 하이브리드 검색 (Elite Engineering)
-            // ════════════════════════════════════════════════════════════════
-            // 【검색 전략 개요】
-            // LRCLIB API의 특성과 다양한 메타데이터 표기 방식에 대응하기 위해
-            // 3단계 폴백 검색 전략을 사용합니다.
-            //
-            // Tier 1: 구조화 검색 (track_name + artist_name)
-            //   - 가장 정확한 검색 방식
-            //   - 일본어/한국어/중국어(CJK) 문자에 최적화
-            //   - API가 제목과 아티스트를 별도 필드로 인식
-            //
-            // Tier 2: 제목 기반 폴백 (q=title)
-            //   - Tier 1 실패 시 사용
-            //   - 번역된 제목이나 로마자 표기(romaji) 대응
-            //   - Spotify 제목이 LRCLIB과 다른 형식일 때 유용
-            //
-            // Tier 3: 아티스트 기반 폴백 (q=artist)
-            //   - 최후의 수단
-            //   - 아티스트 전체 곡 목록에서 Duration 매칭으로 찾기
-            // ════════════════════════════════════════════════════════════════
             try {
-                let tier = 1;  // 현재 검색 Tier (1, 2, 3)
+                const title = info?.title?.trim?.();
+                const artist = info?.artist?.trim?.();
+                const trackDurationMs = Number(info?.duration || 0);
+                const trackDurationSec = trackDurationMs > 0 ? trackDurationMs / 1000 : 0;
+                const normalizedTitle = normalize(title);
+                const normalizedArtist = normalize(artist);
 
-                // API 요청 헤더: Spicetify 버전 정보 포함 (서버 분석용)
+                if (!title || !artist || !trackDurationSec) {
+                    result.error = 'Missing track metadata';
+                    logDebug('Failed', { error: result.error });
+                    return result;
+                }
+
                 const headers = { 'x-user-agent': `spicetify v${Spicetify.Config?.version || 'unknown'}` };
-                let data = [];  // API 응답 데이터 (검색 결과 배열)
+                const searchUrl = `${LRCLIB_API_BASE}/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}&duration=${encodeURIComponent(Math.round(trackDurationSec))}`;
+                const response = await fetchWithTimeout(searchUrl, { headers }, 35000);
 
-                startServer = performance.now();  // 서버 응답 시간 측정 시작
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 1】 구조화 검색 (가장 정확, 일본어/CJK 최적)
-                // ─────────────────────────────────────────────────────────────
-                // track_name과 artist_name을 별도 파라미터로 전달
-                // 서버가 각 필드를 개별적으로 매칭하여 정확도가 높음
-                let searchUrl = `${LRCLIB_API_BASE}/search?track_name=${encodeURIComponent(info.title)}&artist_name=${encodeURIComponent(info.artist)}`;
-                let response = await fetchWithTimeout(searchUrl, { headers }, 35000);
-
-                // 네트워크 재시도 실패 시 (fetchWithTimeout이 null 반환)
                 if (!response) {
-                    data = [];  // 빈 결과로 다음 Tier 진행
-                } else if (!response.ok) {
-                    // HTTP 에러 코드 처리
+                    result.error = 'Network request failed';
+                    logDebug('Failed', { error: result.error });
+                    return result;
+                }
+
+                if (!response.ok) {
                     if (response.status === 429) {
-                        // Rate Limit: 너무 많은 요청 → 즉시 반환
                         result.error = 'Rate limit exceeded (429)';
-                        logDebug('Failed', result.error);
-                        return result;
-                    }
-                    if (response.status === 404) {
-                        // 404는 "결과 없음"으로 간주 → Tier 2로 폴백
-                        data = [];
+                    } else if (response.status === 404) {
+                        result.error = 'No lyrics found';
                     } else {
-                        // 기타 서버 에러 → 예외 발생
-                        throw new Error(`API error: ${response.status}`);
+                        result.error = `API error: ${response.status}`;
                     }
-                } else {
-                    // 성공: JSON 파싱
-                    data = await response.json();
+                    logDebug('Failed', { error: result.error });
+                    return result;
                 }
 
-                window.__ivLyricsDebugLog?.(`[LR-DEBUG] T${tier}: 구조화 검색 → ${Array.isArray(data) ? data.length : 0}개 결과`);
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 2】 제목 기반 폴백 (번역 제목, 로마자 표기 대응)
-                // ─────────────────────────────────────────────────────────────
-                // Tier 1에서 결과가 없으면 제목만으로 검색
-                // 예: Spotify "花に亡霊" → LRCLIB "Hana ni Bourei"
-                if (!Array.isArray(data) || data.length === 0) {
-                    tier = 2;
-                    searchUrl = `${LRCLIB_API_BASE}/search?q=${encodeURIComponent(info.title)}`;
-                    response = await fetchWithTimeout(searchUrl, { headers }, 35000);
-
-                    if (response && response.ok) {
-                        data = await response.json();
-                    }
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] T${tier}: 제목 검색 → ${Array.isArray(data) ? data.length : 0}개 결과`);
-                }
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 3】 아티스트 기반 폴백 (최후의 수단)
-                // ─────────────────────────────────────────────────────────────
-                // T3 검색 + 토큰 필터 공통 함수 (T2 필터 후 폴백에서도 재사용)
-                // q=artist 검색 후 결과의 artistName에 입력 토큰이 포함된 항목만 유지
-                const searchT3WithTokenFilter = async (label) => {
-                    const url = `${LRCLIB_API_BASE}/search?q=${encodeURIComponent(info.artist)}`;
-                    const res = await fetchWithTimeout(url, { headers }, 35000);
-                    let results = [];
-                    if (res && res.ok) results = await res.json();
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${label}: 아티스트 검색 → ${Array.isArray(results) ? results.length : 0}개 결과`);
-
-                    if (Array.isArray(results) && results.length > 0) {
-                        const tokens = info.artist.split(/[,、&·/\s]+/).map(s => s.trim().toLowerCase()).filter(t => t.length >= 2);
-                        const before = results.length;
-                        results = results.filter(item => {
-                            const ra = (item.artistName || '').toLowerCase();
-                            return tokens.some(t => ra.includes(t));
-                        });
-                        if (results.length !== before) {
-                            window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${label}: 토큰 필터 → ${before}개 → ${results.length}개 (토큰: ${tokens.join(', ')})`);
-                        }
-                    }
-                    return Array.isArray(results) ? results : [];
-                };
-
-                if (!Array.isArray(data) || data.length === 0) {
-                    tier = 3;
-                    data = await searchT3WithTokenFilter('T3');
-                }
-
-                // ─────────────────────────────────────────────────────────────
-                // 【T2 스크립트 인식 아티스트 필터】 (pear-desktop 참고)
-                // ─────────────────────────────────────────────────────────────
-                // T2는 q=제목으로 검색하므로 동명곡이 다른 아티스트와 함께 반환됨
-                // 해결: 아티스트를 분리 후 파트별로 스크립트 체크 + JW 비교
-                //   - 같은 스크립트 파트 → JW > 0.85 필요
-                //   - 이종 스크립트 파트 → 비교 불가 (무시)
-                //   - 같은 스크립트 파트가 없으면 → 필터 스킵 (CJK↔라틴 보호)
-                if (tier === 2 && Array.isArray(data) && data.length > 1) {
-                    const hasNonLatin = (str) => /[^\u0000-\u024F\u1E00-\u1EFF\u2000-\u206F\u0300-\u036F]/.test(str);
-                    const normFeat = (s) => s.replace(/\s+feat(?:uring)?\.?\s+|\s+ft\.?\s+/gi, ',');
-                    // 악센트 제거: é→e, ñ→n, ö→o 등 (NFD 분해 후 결합 문자 제거)
-                    const stripAccent = (s) => s.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
-
-                    const inputArtists = normFeat(info.artist).split(/[,&、·/]+/g).map(s => s.trim().toLowerCase()).filter(s => s);
-                    const beforeCount = data.length;
-
-                    data = data.filter(item => {
-                        const resultArtist = (item.artistName || '');
-                        const resultArtists = normFeat(resultArtist).split(/[,&、·/]+/g).map(s => s.trim().toLowerCase()).filter(s => s);
-
-                        // 파트별 스크립트 인식 JW 비교
-                        let hasSameScriptPair = false;
-                        let anySameScriptMatch = false;
-
-                        for (const a of inputArtists) {
-                            for (const b of resultArtists) {
-                                if (hasNonLatin(a) === hasNonLatin(b)) {
-                                    // 같은 스크립트 → JW 비교 (악센트 정규화 적용)
-                                    hasSameScriptPair = true;
-                                    if (jaroWinkler(stripAccent(a), stripAccent(b)) > 0.85) {
-                                        anySameScriptMatch = true;
-                                    }
-                                }
-                                // 이종 스크립트 → 비교 불가, 무시
-                            }
-                        }
-
-                        // 같은 스크립트 파트가 하나도 없으면 → 비교 불가 → 통과 (CJK↔라틴 보호)
-                        // 같은 스크립트 파트가 있으면 → 하나라도 JW > 0.85 필요
-                        return !hasSameScriptPair || anySameScriptMatch;
-                    });
-
-                    if (data.length !== beforeCount) {
-                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] T2: 아티스트 필터 적용 → ${beforeCount}개 → ${data.length}개`);
-                    }
-
-                    // 【T2 필터 후 T3 폴백】
-                    // T2 필터가 모든 결과를 제거한 경우 T3로 재시도
-                    if (data.length === 0) {
-                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] T2: 필터 후 결과 없음 → T3 폴백 시도`);
-                        tier = 3;
-                        data = await searchT3WithTokenFilter('T3(폴백)');
-                    }
-                }
-
-
-                // 【TODO: instrumental 트랙 명시적 처리】
-                // 현재는 instrumental 곡이 syncedLyrics/plainLyrics = null이므로
-                // 자연스럽게 "No lyrics found"로 처리됨.
-                // 만약 향후 instrumental인데 가짜 가사가 등록된 케이스가 빈번해지면:
-                //   - pear-desktop 참고: item.instrumental === true → null 반환
-                //   - 주의: LRCLIB의 instrumental 플래그가 항상 정확하지는 않음
-                //   - 현재 densityRatio 필터가 스팸 가사를 어느 정도 잡아줌
-
-                endServer = performance.now();  // 서버 응답 시간 측정 종료
-
-                // 모든 Tier에서 결과 없음 → 가사 없음으로 처리
+                const data = await response.json();
                 if (!Array.isArray(data) || data.length === 0) {
                     result.error = 'No lyrics found';
-                    logDebug('Failed', result.error);
+                    logDebug('Failed', { error: result.error });
                     return result;
                 }
 
-                // ════════════════════════════════════════════════════════════════
-                // Best-of-N 선택 로직 (매칭 알고리즘)
-                // ════════════════════════════════════════════════════════════════
-                // API에서 여러 결과가 반환되면, 가장 적합한 가사를 선택해야 합니다.
-                // 다음 기준으로 각 결과에 점수를 부여하고 최고점을 선택합니다:
-                // - Duration 일치도 (곡 길이)
-                // - Title 유사도 (Jaro-Winkler)
-                // - Artist 유사도 (Jaro-Winkler)
-                // - 가사 밀도 (시간당 줄 수)
-                // - Sync 가사 여부 (보너스)
-                // ════════════════════════════════════════════════════════════════
-                startLogic = performance.now();  // 매칭 로직 시간 측정 시작
+                const candidates = data
+                    .filter(item => {
+                        const candidateDuration = Number(item?.duration);
+                        if (!Number.isFinite(candidateDuration)) return false;
+                        if (Math.abs(candidateDuration - trackDurationSec) > LRCLIB_DURATION_TOLERANCE_SEC) return false;
+                        if (!item?.syncedLyrics && !item?.plainLyrics && !item?.instrumental) return false;
+                        return true;
+                    })
+                    .map(item => {
+                        const durationDiff = Math.abs(Number(item.duration) - trackDurationSec);
+                        const titleScore = jaroWinkler(title, item.trackName || '');
+                        const artistScore = jaroWinkler(artist, item.artistName || '');
+                        const normalizedCandidateTitle = normalize(item.trackName || '');
+                        const normalizedCandidateArtist = normalize(item.artistName || '');
+                        const titleContains = normalizedCandidateTitle.includes(normalizedTitle) || normalizedTitle.includes(normalizedCandidateTitle);
+                        const artistContains = normalizedCandidateArtist.includes(normalizedArtist) || normalizedArtist.includes(normalizedCandidateArtist);
+                        const syncCoverage = getLyricCoverage(item.syncedLyrics, trackDurationMs);
+                        const score = (titleScore * 0.58) + (artistScore * 0.32) + ((LRCLIB_DURATION_TOLERANCE_SEC - durationDiff) / LRCLIB_DURATION_TOLERANCE_SEC * 0.08) + (item.syncedLyrics ? 0.02 : 0);
 
-                const songDurationMs = info.duration || 0;       // 곡 길이 (밀리초)
-                const songDurationSec = songDurationMs / 1000;   // 곡 길이 (초) - API 응답과 비교용
+                        return {
+                            ...item,
+                            durationDiff,
+                            titleScore,
+                            artistScore,
+                            titleContains,
+                            artistContains,
+                            syncCoverage,
+                            score
+                        };
+                    })
+                    .sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score;
+                        if (a.durationDiff !== b.durationDiff) return a.durationDiff - b.durationDiff;
+                        if (!!b.syncedLyrics !== !!a.syncedLyrics) return Number(!!b.syncedLyrics) - Number(!!a.syncedLyrics);
+                        return (b.syncCoverage || 0) - (a.syncCoverage || 0);
+                    });
 
-                // ─────────────────────────────────────────────────────────────
-                // 【1단계】 데이터 전처리 및 품질 지표 계산
-                // ─────────────────────────────────────────────────────────────
-                // 각 검색 결과에 대해 품질 지표를 계산하여 확장된 객체 생성
-                // 이 단계에서 "점수를 매기기 위한 기초 데이터"를 준비함
-                const processed = data.map(item => {
-                    // 【Duration 차이】 요청 곡 길이와 결과 곡 길이의 차이 (초)
-                    // 절댓값으로 계산하여 길고 짧음 모두 동일하게 처리
-                    const durationDiff = Math.abs(item.duration - songDurationSec);
-
-                    // 【Sync 커버리지】 싱크 가사가 곡의 몇 %를 커버하는지
-                    // 0.0 = 커버 안 함, 1.0 = 100% 커버
-                    const syncCoverage = getLyricCoverage(item.syncedLyrics, songDurationMs);
-
-                    // 【가사 밀도】 시간 대비 줄 수로 가사 완성도 추정
-                    // 일반적인 가사는 1분당 약 10~15줄 정도
-                    const actualLines = item.plainLyrics?.split('\n').filter(l => l.trim()).length || 0;
-                    const expectedLines = (item.duration / 60) * 12; // 1분당 12줄 기준
-                    const densityRatio = expectedLines > 0 ? actualLines / expectedLines : 0;
-
-                    // 【쓰레기 판별】 명백히 불량한 가사 식별
-                    // 1. 싱크 가사인데 커버리지가 50% 미만 → 짤린 가사
-                    const isShortSynced = item.syncedLyrics && syncCoverage < 0.5;
-                    // 2. 일반 가사인데 밀도가 극단적 (0.1 미만 또는 5 초과)
-                    //    - 너무 적음: 가사 일부만 있음
-                    //    - 너무 많음: 스팸이나 메타데이터 오염
-                    const isDensityTrash = !item.syncedLyrics && (densityRatio < 0.1 || densityRatio > 5);
-                    const isTrash = isShortSynced || isDensityTrash;
-
-                    // 【문자열 유사도】 Jaro-Winkler로 제목/아티스트 비교
-                    // 아직 스케일링 전의 "원시 점수" (0.0 ~ 1.0)
-                    const rawTitleScore = jaroWinkler(info.title, item.trackName);
-                    const rawArtistScore = jaroWinkler(info.artist, item.artistName);
-
-                    // 원본 데이터에 계산된 지표를 추가하여 반환
-                    return {
-                        ...item,          // 원본 API 응답 데이터 유지
-                        durationDiff,     // Duration 차이 (초)
-                        syncCoverage,     // Sync 커버리지 (0.0~1.2)
-                        densityRatio,     // 밀도 비율
-                        rawTitleScore,    // 제목 유사도 (원시)
-                        rawArtistScore,   // 아티스트 유사도 (원시)
-                        isTrash           // 쓰레기 여부
-                    };
-                });
-
-                // ─────────────────────────────────────────────────────────────
-                // 【2단계】 쓰레기 제거 (극단적인 경우만 필터링)
-                // ─────────────────────────────────────────────────────────────
-                // isTrash가 true인 항목은 점수 평가 대상에서 제외
-                // 이는 명백히 불량한 가사만 제거하므로 과도한 필터링 방지
-                const qualityPassed = processed.filter(item => !item.isTrash);
-
-                // 모든 결과가 쓰레기로 판정되면 실패 처리
-                if (qualityPassed.length === 0) {
-                    result.error = 'No quality lyrics found';
-                    logDebug('Failed', result.error);
+                if (candidates.length === 0) {
+                    result.error = `No LRCLIB results within ±${LRCLIB_DURATION_TOLERANCE_SEC}s`;
+                    logDebug('Failed', {
+                        error: result.error,
+                        totalResults: data.length,
+                        trackDurationSec: trackDurationSec.toFixed(2)
+                    });
                     return result;
                 }
 
-                // ─────────────────────────────────────────────────────────────
-                // 【3단계】 관대한 점수 평가 (Scoring)
-                // ─────────────────────────────────────────────────────────────
-                // 각 품질 지표를 스케일링하고 가중치를 적용하여 총점 계산
-                // Tier에 따라 다른 가중치 전략 적용 (Tier-aware scoring)
-                const scored = qualityPassed.map(item => {
-                    // 【Duration 점수】 ±45초 기준으로 선형 감소
-                    // 0초 차이 = 1.0점, 45초 차이 = 0.0점
-                    // 관대한 기준으로 약간의 길이 차이 허용
-                    const durationScore = Math.max(0, 1 - (item.durationDiff / 45));
+                const body = candidates[0];
+                const titleAccepted = body.titleContains || body.titleScore >= LRCLIB_MIN_TITLE_SCORE;
+                const artistAccepted = body.artistContains || body.artistScore >= LRCLIB_MIN_ARTIST_SCORE;
 
-                    // 【Title 점수】 관대한 스케일링 적용
-                    // - 0.5 이상: 최소 0.7점 보장 (낮은 유사도도 구제)
-                    // - 0.5 미만: 1.4배 스케일업 (완전 불일치가 아니면 기회 부여)
-                    // 이유: 번역/로마자 표기로 인해 낮은 원시 점수가 나올 수 있음
-                    const titleScore = item.rawTitleScore >= 0.5
-                        ? 0.7 + (item.rawTitleScore - 0.5) * 0.6   // 0.5→0.7, 1.0→1.0
-                        : item.rawTitleScore * 1.4;                // 0.3→0.42, 0.0→0.0
-
-                    // 【Artist 점수】 더 관대한 스케일링 적용
-                    // - 0.3 이상: 최소 0.5점 보장
-                    // - 0.3 미만: 1.67배 스케일업
-                    // 이유: 아티스트 표기가 매우 다양함 (feat., & 등)
-                    const artistScore = item.rawArtistScore >= 0.3
-                        ? 0.5 + (item.rawArtistScore - 0.3) * 0.71  // 0.3→0.5, 1.0→1.0
-                        : item.rawArtistScore * 1.67;              // 0.0→0.0, 0.3→0.5
-
-                    // 【Density 점수】 가사 밀도 (최대 1.0)
-                    // 밀도가 너무 높은 경우도 1.0으로 캡핑
-                    const densityScore = Math.min(item.densityRatio, 1);
-
-                    // 【Sync 보너스】 싱크 가사가 있으면 15점 추가
-                    // 사용자 경험상 싱크 가사가 더 가치 있음
-                    const syncBonus = item.syncedLyrics ? 15 : 0;
-
-                    // 【토큰 검증】 아티스트 이름의 부분 일치 확인
-                    // "Artist A & Artist B" 같은 복합 아티스트 대응
-                    // 구분자: 쉼표(,), 일본어 쉼표(、), &, 중점(·), 슬래시(/)
-                    const queryTokens = info.artist.split(/[,、&·/]/).map(s => s.trim().toLowerCase()).filter(t => t.length >= 2);
-                    const resultArtist = item.artistName.toLowerCase();
-                    // 아티스트 이름 토큰 중 하나라도 결과에 포함되면 매치
-                    const hasTokenMatch = queryTokens.some(t => resultArtist.includes(t));
-
-                    // 토큰 매치 보너스/페널티
-                    const tokenBonus = hasTokenMatch ? 10 : 0;       // 토큰 매치 시 +10
-                    // 토큰 매치 없고 유사도도 낮으면 -15 (커버곡/잘못된 결과 차단)
-                    const artistPenalty = (!hasTokenMatch && item.rawArtistScore < 0.3) ? -15 : 0;
-
-                    // 【Tier-aware 최종 점수 합산】
-                    // Tier에 따라 가중치를 다르게 적용
-                    let totalScore;
-                    if (tier >= 2) {
-                        // ═══════════════════════════════════════════════════════
-                        // Tier 2/3: 폴백 검색 → Duration + Artist 중시
-                        // ═══════════════════════════════════════════════════════
-                        // 이유: 제목 검색(Tier 2)이나 아티스트 검색(Tier 3)은
-                        // Title 유사도가 불안정하므로 Duration을 더 신뢰
-                        const durationMatch = item.durationDiff <= 2;  // 2초 이내면 거의 확실
-                        totalScore = durationMatch
-                            // Duration 정확 매치: 높은 신뢰도 보너스 (+20)
-                            ? (durationScore * 50) + (artistScore * 20) + syncBonus + 20
-                            // Duration 불일치: Title도 약간 고려하되 비중 낮음
-                            : (durationScore * 50) + (titleScore * 7) + (artistScore * 30) + syncBonus;
-                    } else {
-                        // ═══════════════════════════════════════════════════════
-                        // Tier 1: 구조화 검색 → 균형 잡힌 로직
-                        // ═══════════════════════════════════════════════════════
-                        // 가중치: Duration 30 + Title 40 + Artist 10 + Density 10 + 보너스
-                        // Title에 가장 높은 가중치 (제목이 가장 중요한 매칭 기준)
-                        totalScore = (durationScore * 30) + (titleScore * 40) + (artistScore * 10) +
-                            (densityScore * 10) + tokenBonus + artistPenalty + syncBonus;
-                    }
-
-                    // 계산된 점수들과 함께 반환
-                    return { ...item, durationScore, titleScore, artistScore, densityScore, sync: item.syncCoverage, totalScore, tier };
-                });
-
-                // ─────────────────────────────────────────────────────────────
-                // 【4단계】 최종 선택 및 임계값 검증
-                // ─────────────────────────────────────────────────────────────
-                // 총점 기준 내림차순 정렬 후 최고점 선택
-                scored.sort((a, b) => b.totalScore - a.totalScore);
-                const body = scored[0];  // 최고 점수 후보
-
-                // 【Tier-aware 임계값 검증】
-                // 너무 낮은 점수의 결과는 잘못된 매칭일 가능성이 높으므로 거부
-                if (tier === 1) {
-                    // Tier 1: 엄격한 임계값 적용
-                    // Duration 20% 이상 + Title 40% 이상이어야 통과
-                    if (body.durationScore < 0.2 || body.titleScore < 0.4) {
-                        result.error = 'No matching lyrics';
-                        logDebug(`Failed (T${tier})`, result.error);
-                        return result;
-                    }
-                } else {
-                    // Tier 2/3: Duration 기반 페널티 + 총점 검증
-                    // 15초 이상 차이나면 다른 곡일 가능성 높음 → 50점 감점
-                    const durationPenalty = body.durationDiff > 15 ? 50 : 0;
-                    const adjustedScore = body.totalScore - durationPenalty;
-
-                    // 조정된 점수가 40점 미만이면 거부
-                    if (adjustedScore < 40) {
-                        result.error = body.durationDiff > 15
-                            ? `Duration mismatch (${Math.round(body.durationDiff)}s diff)`  // Duration 차이 명시
-                            : 'Low confidence match';  // 전반적으로 낮은 신뢰도
-                        logDebug(`Failed (T${tier})`, result.error);
-                        return result;
-                    }
+                if (!titleAccepted || !artistAccepted) {
+                    result.error = 'Low confidence structured match';
+                    logDebug('Failed', {
+                        error: result.error,
+                        titleScore: body.titleScore.toFixed(3),
+                        artistScore: body.artistScore.toFixed(3),
+                        durationDiff: body.durationDiff.toFixed(2),
+                        matchedCandidates: candidates.length
+                    });
+                    return result;
                 }
 
-                endLogic = performance.now();  // 매칭 로직 시간 측정 종료
-
-                // ════════════════════════════════════════════════════════════════
-                // 결과 처리 및 반환
-                // ════════════════════════════════════════════════════════════════
-
-                // 【디버깅용 점수 캡처】
-                // logDebug 함수에서 출력하기 위해 최종 선택된 결과의 점수 저장
-                bestScore = body.totalScore;      // 총점
-                bestSync = body.sync;             // Sync 커버리지
-                bestTitle = body.titleScore;      // Title 점수
-                bestArtist = body.artistScore;    // Artist 점수
-
-
-                // (프로덕션에서는 품질 알림 비활성화)
-                // Quality notification removed for production PR
-
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Instrumental 체크】
-                // ─────────────────────────────────────────────────────────────
-                // LRCLIB API가 instrumental=true로 표시한 경우
-                // 가사 없는 연주곡임을 표시
                 if (body.instrumental) {
                     result.synced = [{ startTime: 0, text: '♪ Instrumental ♪' }];
                     result.unsynced = [{ text: '♪ Instrumental ♪' }];
-                    logDebug('Success (Instrumental)');
+                    logDebug('Success', {
+                        instrumental: true,
+                        matchedCandidates: candidates.length,
+                        durationDiff: body.durationDiff.toFixed(2)
+                    });
                     return result;
                 }
 
-                // ─────────────────────────────────────────────────────────────
-                // 【가사 파싱 및 결과 설정】
-                // ─────────────────────────────────────────────────────────────
-
-                // 싱크 가사 파싱 (Sync가 있고 커버리지가 0 초과인 경우)
-                if (body.syncedLyrics && body.sync > 0) {
+                if (body.syncedLyrics && body.syncCoverage > 0) {
                     const parsed = parseLRC(body.syncedLyrics);
-                    result.synced = parsed.synced;       // 싱크 가사 배열
+                    result.synced = parsed.synced;
                     if (!result.unsynced) {
-                        result.unsynced = parsed.unsynced;  // 일반 가사도 함께 설정
+                        result.unsynced = parsed.unsynced;
                     }
                 }
-                // 싱크 가사 없으면 Plain 가사로 폴백
                 else if (body.plainLyrics) {
-                    // 줄 단위로 분리하여 객체 배열로 변환
-                    // 빈 줄은 필터링
                     result.unsynced = body.plainLyrics.split('\n').map(line => ({ text: line.trim() })).filter(l => l.text);
                 }
 
-                // 추가 안전장치: 싱크가 없지만 plain이 있는 경우
                 if (!result.synced && body.plainLyrics && !result.unsynced) {
                     result.unsynced = body.plainLyrics.split('\n').map(line => ({ text: line.trim() })).filter(l => l.text);
                 }
 
-                // 최종 검증: 아무 가사도 없으면 에러 설정
                 if (!result.synced && !result.unsynced) {
                     result.error = 'No lyrics';
+                    logDebug('Failed', {
+                        error: result.error,
+                        matchedCandidates: candidates.length
+                    });
+                    return result;
                 }
 
-                // 디버그 로그 출력 후 결과 반환
-                logDebug(result.error ? 'Failure' : `Success (T${tier})`);
+                logDebug('Success', {
+                    totalResults: data.length,
+                    matchedCandidates: candidates.length,
+                    titleScore: body.titleScore.toFixed(3),
+                    artistScore: body.artistScore.toFixed(3),
+                    durationDiff: body.durationDiff.toFixed(2),
+                    hasSynced: !!result.synced,
+                    hasUnsynced: !!result.unsynced
+                });
                 return result;
 
             } catch (e) {
-                // ═══════════════════════════════════════════════════════════
-                // 예외 처리: 예상치 못한 에러 발생 시
-                // ═══════════════════════════════════════════════════════════
                 result.error = e.message;
-                logDebug('Fatal Error', e.message);
+                logDebug('Fatal Error', { error: e.message });
                 return result;
             }
 
