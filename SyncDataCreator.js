@@ -1636,12 +1636,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					Toast.error(I18n.t('syncCreator.submitError'));
 				}
 			} else {
-				const userHash = Utils.getCurrentUserHash();
-				const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync-data', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ trackId, provider, syncData, userHash })
-				});
+					const userHash = Utils.getCurrentUserHash();
+					const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync-data', {
+						method: 'POST',
+						headers: Utils.getApiHeaders({ 'Content-Type': 'application/json' }),
+						body: JSON.stringify({ trackId, provider, syncData, userHash })
+					});
 
 				if (response.ok) {
 					Toast.success(I18n.t('syncCreator.submitSuccess'));

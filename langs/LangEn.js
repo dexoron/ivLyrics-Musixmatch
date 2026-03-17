@@ -1296,6 +1296,13 @@ window.LANG_EN = {
         "lastSync": "Last login",
         "manageAccount": "Change Account",
         "refresh": "Refresh",
+        "loggingIn": "Opening browser...",
+        "startHint": "Complete the Discord sign-in flow in your browser.",
+        "failed": "Discord login failed.",
+        "loadFailed": "Failed to load account information.",
+        "discordLoginSuccess": "Discord account linked successfully.",
+        "logout": "Log Out",
+        "logoutSuccess": "Signed out from Discord and created a new user hash.",
         "nickname": {
           "label": "Nickname",
           "enter": "Please enter a nickname.",

@@ -1042,15 +1042,20 @@ const Utils = {
     // Fallback logic in case LyricsService is not available (should not happen usually)
     let hash = StorageManager.getPersisted("ivLyrics:user-hash");
     if (!hash) {
-      hash = crypto.randomUUID ? crypto.randomUUID() :
-        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      hash = this.generateUserHash();
+      StorageManager.setPersisted("ivLyrics:user-hash", hash);
+    }
+    return hash;
+  },
+
+  generateUserHash() {
+    return crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
           const r = Math.random() * 16 | 0;
           const v = c === 'x' ? r : (r & 0x3 | 0x8);
           return v.toString(16);
         });
-      StorageManager.setPersisted("ivLyrics:user-hash", hash);
-    }
-    return hash;
   },
 
   setUserHash(userHash) {
@@ -1071,6 +1076,87 @@ const Utils = {
     }
   },
 
+  getAuthToken() {
+    let token = null;
+
+    try {
+      token = Spicetify?.LocalStorage?.get?.("ivLyrics:auth-token") || null;
+    } catch (error) {
+      console.error("[ivLyrics] Failed to read auth token from Spicetify storage:", error);
+    }
+
+    if (!token) {
+      try {
+        token = window.StorageManager?.getPersisted?.("ivLyrics:auth-token") || null;
+      } catch (error) {
+        console.error("[ivLyrics] Failed to read auth token from persisted storage:", error);
+      }
+    }
+
+    return typeof token === "string" && token.trim() ? token.trim() : null;
+  },
+
+  setAuthToken(token) {
+    if (!token || typeof token !== "string") return;
+
+    try {
+      Spicetify?.LocalStorage?.set?.("ivLyrics:auth-token", token);
+    } catch (error) {
+      console.error("[ivLyrics] Failed to store auth token in Spicetify storage:", error);
+    }
+
+    try {
+      window.StorageManager?.setPersisted?.("ivLyrics:auth-token", token);
+    } catch (error) {
+      console.error("[ivLyrics] Failed to store auth token in persisted storage:", error);
+    }
+  },
+
+  clearAuthToken() {
+    try {
+      Spicetify?.LocalStorage?.remove?.("ivLyrics:auth-token");
+    } catch (error) {
+      console.error("[ivLyrics] Failed to clear auth token from Spicetify storage:", error);
+    }
+
+    try {
+      window.StorageManager?.setPersisted?.("ivLyrics:auth-token", "");
+    } catch (error) {
+      console.error("[ivLyrics] Failed to clear auth token from persisted storage:", error);
+    }
+  },
+
+  getApiHeaders(headers = {}) {
+    const nextHeaders = { ...headers };
+    const authToken = this.getAuthToken();
+    if (authToken) {
+      nextHeaders.Authorization = `Bearer ${authToken}`;
+    }
+    return nextHeaders;
+  },
+
+  queueReturnToSettings(options = {}) {
+    try {
+      localStorage.setItem(
+        "ivLyrics:return-to-settings",
+        JSON.stringify({
+          initialTab: options.initialTab || "about",
+          initialSettingKey: options.initialSettingKey || "about-account",
+        })
+      );
+    } catch (error) {
+      console.error("[ivLyrics] Failed to queue return-to-settings state:", error);
+    }
+  },
+
+  resetUserHash() {
+    const nextUserHash = this.generateUserHash();
+    this.setUserHash(nextUserHash);
+    this.clearAuthToken();
+    window.__ivLyricsDiscordLoginToken = null;
+    return nextUserHash;
+  },
+
   getAccountApiBase() {
     return "https://lyrics.api.ivl.is/user";
   },
@@ -1081,16 +1167,20 @@ const Utils = {
       `${this.getAccountApiBase()}/profile?userHash=${encodeURIComponent(userHash)}`,
       {
         cache: "no-store",
-        headers: {
+        headers: this.getApiHeaders({
           "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
-        },
+        }),
       }
     );
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch account profile");
+      throw new Error(
+        data.error ||
+          I18n.t("settingsAdvanced.aboutTab.account.loadFailed") ||
+          "Failed to load account information."
+      );
     }
 
     return data;
@@ -1100,15 +1190,19 @@ const Utils = {
     const currentUserHash = this.getUserHash();
     const response = await fetch(`${this.getAccountApiBase()}/discord/start`, {
       method: "POST",
-      headers: {
+      headers: this.getApiHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({ currentUserHash }),
     });
     const data = await response.json();
 
     if (!response.ok || !data.success || !data.authorizeUrl) {
-      throw new Error(data.error || "Failed to start Discord login");
+      throw new Error(
+        data.error ||
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+          "Discord login failed."
+      );
     }
 
     window.open(data.authorizeUrl, "_blank", "noopener,noreferrer");
@@ -1128,24 +1222,35 @@ const Utils = {
         `${this.getAccountApiBase()}/discord/session?loginToken=${encodeURIComponent(loginToken)}`,
         {
           cache: "no-store",
-          headers: {
+          headers: this.getApiHeaders({
             "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
-          },
+          }),
         }
       );
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to finalize Discord login");
+        throw new Error(
+          data.error ||
+            I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+            "Discord login failed."
+        );
       }
 
       const newUserHash = data.data?.userHash || data.data?.discordId;
+      const authToken = data.data?.authToken;
       if (!newUserHash) {
-        throw new Error("Discord login completed without a user id");
+        throw new Error(
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+            "Discord login failed."
+        );
       }
 
       this.setUserHash(newUserHash);
+      if (authToken) {
+        this.setAuthToken(authToken);
+      }
       window.SyncDataService?.clearCache?.();
       window.dispatchEvent(
         new CustomEvent("ivLyrics:account-changed", { detail: data.data })
@@ -1156,6 +1261,10 @@ const Utils = {
           "Discord account linked successfully."
       );
 
+      this.queueReturnToSettings({
+        initialTab: "about",
+        initialSettingKey: "about-account",
+      });
       Spicetify?.Platform?.History?.push?.("/ivLyrics");
       setTimeout(() => {
         window.location.reload();
@@ -1163,10 +1272,36 @@ const Utils = {
 
       return true;
     } catch (error) {
-      Toast?.error?.(error.message || "Discord login failed");
+      Toast?.error?.(
+        error.message ||
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+          "Discord login failed."
+      );
       window.__ivLyricsDiscordLoginToken = null;
       return false;
     }
+  },
+
+  async logoutDiscordSession() {
+    const authToken = this.getAuthToken();
+    if (!authToken) {
+      return true;
+    }
+
+    try {
+      await fetch(`${this.getAccountApiBase()}/logout`, {
+        method: "POST",
+        headers: this.getApiHeaders({
+          "Content-Type": "application/json",
+        }),
+      });
+    } catch (error) {
+      console.error("[ivLyrics] Failed to revoke Discord session:", error);
+    } finally {
+      this.clearAuthToken();
+    }
+
+    return true;
   },
 
   /**
@@ -1207,7 +1342,7 @@ const Utils = {
     try {
       const response = await fetch(syncUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           trackId,
           offsetMs,
@@ -1249,7 +1384,7 @@ const Utils = {
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           trackId,
           userHash,
@@ -1291,10 +1426,10 @@ const Utils = {
         `https://lyrics.api.ivl.is/lyrics/youtube/community?trackId=${trackId}&userId=${userHash}&_t=${Date.now()}`,
         {
           cache: 'no-store',  // 브라우저 캐시 완전히 우회
-          headers: {
+          headers: this.getApiHeaders({
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
-          }
+          })
         }
       );
       const data = await response.json();
@@ -1321,7 +1456,7 @@ const Utils = {
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/youtube/community', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action: 'submit',
           trackId,
@@ -1356,7 +1491,7 @@ const Utils = {
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/youtube/community', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action: 'vote',
           videoEntryId,
@@ -1390,9 +1525,9 @@ const Utils = {
         `https://lyrics.api.ivl.is/lyrics/youtube/community`,
         {
           method: 'POST',
-          headers: {
+          headers: this.getApiHeaders({
             'Content-Type': 'application/json'
-          },
+          }),
           body: JSON.stringify({
             action: 'delete',
             id: videoEntryId,

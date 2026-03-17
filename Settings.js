@@ -282,40 +282,42 @@ function getAboutAccountThemeTokens() {
 const SettingsBackup = () => null;
 
 function getDiscordAccountCopy() {
-  const lang = I18n.getCurrentLanguage?.() || "en";
-
-  if (lang === "ko") {
-    return {
-      provider: "Discord",
-      description: "Discord 계정으로 ivLyrics 기여 내역과 닉네임을 연결합니다.",
-      info: "로그인하면 현재 userhash가 Discord ID로 바뀌고, 기존 기여 데이터도 함께 이동됩니다.",
-      loginButton: "Discord로 로그인",
-      loggingIn: "브라우저 열기...",
-      loading: "Discord 계정 정보를 불러오는 중...",
-      linked: "연동됨",
-      refresh: "새로고침",
-      linkedAt: "연동 시각",
-      lastLoginAt: "최근 로그인",
-      switchAccount: "다른 Discord 계정으로 로그인",
-      startHint: "브라우저에서 Discord 인증을 완료해 주세요.",
-      failed: "Discord 로그인 시작에 실패했습니다.",
-    };
-  }
-
+  const baseKey = "settingsAdvanced.aboutTab.account";
   return {
     provider: "Discord",
-    description: "Connect your ivLyrics contributions and nickname with Discord.",
-    info: "When you log in, the current user hash is replaced with your Discord ID and existing contribution data is migrated.",
-    loginButton: "Sign In With Discord",
-    loggingIn: "Opening browser...",
-    loading: "Loading Discord account information...",
-    linked: "Connected",
-    refresh: "Refresh",
-    linkedAt: "Linked",
-    lastLoginAt: "Last login",
-    switchAccount: "Sign in with another Discord account",
-    startHint: "Complete the Discord sign-in flow in your browser.",
-    failed: "Failed to start Discord login.",
+    description:
+      I18n.t(`${baseKey}.description`) ||
+      "Connect your ivLyrics contributions and nickname with Discord.",
+    info:
+      I18n.t(`${baseKey}.info`) ||
+      "When you log in, the current user hash is replaced with your Discord ID and existing contribution data is migrated.",
+    loginButton:
+      I18n.t(`${baseKey}.loginButton`) || "Sign In With Discord",
+    loggingIn:
+      I18n.t(`${baseKey}.loggingIn`) || "Opening browser...",
+    loading:
+      I18n.t(`${baseKey}.loading`) || "Loading Discord account information...",
+    linked:
+      I18n.t(`${baseKey}.linked`) || "Connected",
+    refresh:
+      I18n.t(`${baseKey}.refresh`) || "Refresh",
+    linkedAt:
+      I18n.t(`${baseKey}.linkedAt`) || "Linked",
+    lastLoginAt:
+      I18n.t(`${baseKey}.lastSync`) || "Last login",
+    switchAccount:
+      I18n.t(`${baseKey}.manageAccount`) || "Change Account",
+    startHint:
+      I18n.t(`${baseKey}.startHint`) || "Complete the Discord sign-in flow in your browser.",
+    failed:
+      I18n.t(`${baseKey}.failed`) || "Discord login failed.",
+    loadFailed:
+      I18n.t(`${baseKey}.loadFailed`) || "Failed to load account information.",
+    logout:
+      I18n.t(`${baseKey}.logout`) || "Log Out",
+    logoutSuccess:
+      I18n.t(`${baseKey}.logoutSuccess`) ||
+      "Signed out from Discord and created a new user hash.",
   };
 }
 
@@ -338,10 +340,10 @@ const NicknameSection = ({ userHash }) => {
         `${Utils.getAccountApiBase()}/nickname?userHash=${encodeURIComponent(userHash)}`,
         {
           cache: "no-store",
-          headers: {
+          headers: Utils.getApiHeaders({
             "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
-          },
+          }),
         }
       );
       const data = await res.json();
@@ -371,9 +373,9 @@ const NicknameSection = ({ userHash }) => {
       setLoading(true);
       const res = await fetch(`${Utils.getAccountApiBase()}/nickname`, {
         method: "POST",
-        headers: {
+        headers: Utils.getApiHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({ userHash, nickname: inputNickname }),
       });
       const data = await res.json();
@@ -495,7 +497,7 @@ const AccountSection = () => {
       }
     } catch (err) {
       console.error("Failed to load Discord account info:", err);
-      setError(err.message);
+      setError(err.message || copy.loadFailed);
       setAccountInfo(null);
     } finally {
       setLoading(false);
@@ -529,6 +531,31 @@ const AccountSection = () => {
 
   const handleRefresh = () => {
     loadAccountInfo();
+  };
+
+  const handleLogout = async () => {
+    await Utils.logoutDiscordSession();
+    Utils.queueReturnToSettings({
+      initialTab: "about",
+      initialSettingKey: "about-account",
+    });
+    const nextUserHash = Utils.resetUserHash();
+    setAccountInfo(null);
+    setError(null);
+    window.SyncDataService?.clearCache?.();
+    window.dispatchEvent(
+      new CustomEvent("ivLyrics:account-changed", {
+        detail: {
+          linked: false,
+          userHash: nextUserHash,
+        },
+      })
+    );
+    Toast.success(copy.logoutSuccess);
+    Spicetify?.Platform?.History?.push?.("/ivLyrics");
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
   };
 
   if (loading) {
@@ -757,7 +784,7 @@ const AccountSection = () => {
                 fontWeight: "700",
               },
             },
-            accountInfo.displayName || accountInfo.username || "Discord User"
+            accountInfo.displayName || accountInfo.username || copy.provider
           ),
           react.createElement(
             "span",
@@ -846,23 +873,53 @@ const AccountSection = () => {
         )
     ),
     react.createElement(
-      "button",
+      "div",
       {
-        onClick: openLoginPage,
-        disabled: loginLoading,
         style: {
-          width: "100%",
-          padding: "10px 16px",
-          background: themeTokens.subtleButtonBackground,
-          border: `1px solid ${themeTokens.subtleButtonBorder}`,
-          borderRadius: "8px",
-          color: themeTokens.subtleButtonText,
-          fontSize: "13px",
-          fontWeight: "600",
-          cursor: "pointer",
+          display: "flex",
+          gap: "10px",
+          marginBottom: "16px",
+          flexWrap: "wrap",
         },
       },
-      loginLoading ? copy.loggingIn : copy.switchAccount
+      react.createElement(
+        "button",
+        {
+          onClick: openLoginPage,
+          disabled: loginLoading,
+          style: {
+            flex: "1 1 220px",
+            padding: "10px 16px",
+            background: themeTokens.subtleButtonBackground,
+            border: `1px solid ${themeTokens.subtleButtonBorder}`,
+            borderRadius: "8px",
+            color: themeTokens.subtleButtonText,
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: "pointer",
+          },
+        },
+        loginLoading ? copy.loggingIn : copy.switchAccount
+      ),
+      react.createElement(
+        "button",
+        {
+          onClick: handleLogout,
+          disabled: loginLoading,
+          style: {
+            flex: "1 1 160px",
+            padding: "10px 16px",
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.2)",
+            borderRadius: "8px",
+            color: "#f87171",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: "pointer",
+          },
+        },
+        copy.logout
+      )
     ),
     react.createElement(NicknameSection, { userHash: Utils.getUserHash() }),
     react.createElement(SettingsBackup, { userHash: Utils.getUserHash() })
@@ -3683,7 +3740,11 @@ const SettingsMainPanelShell = ({
     )
   );
 
-const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
+const ConfigModal = ({
+  onRequestClose = () => {},
+  initialTab = "general",
+  initialSettingKey = null,
+}) => {
   const [activeTab, setActiveTab] = react.useState(initialTab || "general");
   const [searchQuery, setSearchQuery] = react.useState("");
   const shouldReduceMotion = getEffectiveReducedMotionPreference();
@@ -4397,7 +4458,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
   }, []);
 
   // Pending scroll target when switching tabs
-  const pendingTabScrollRef = react.useRef(null);
+  const pendingTabScrollRef = react.useRef(initialSettingKey || null);
   const shouldResetContentScrollRef = react.useRef(false);
 
   react.useEffect(() => {
@@ -5055,7 +5116,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
   );
   const resolveNavItemId = (tabId, settingKey) => settingKey || tabId;
   const [activeNavItemId, setActiveNavItemId] = react.useState(() =>
-    resolveNavItemId("general", "language")
+    resolveNavItemId(initialTab || "general", initialSettingKey || (initialTab || "general"))
   );
   const activeNavItemIdRef = react.useRef(activeNavItemId);
 
@@ -12654,7 +12715,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 };
 
 function openConfig(options = {}) {
-  const { initialTab = "general" } = options || {};
+  const { initialTab = "general", initialSettingKey = null } = options || {};
   const existingOverlay = document.getElementById("ivLyrics-settings-overlay");
   if (existingOverlay) {
     return;
@@ -12726,6 +12787,7 @@ function openConfig(options = {}) {
     react.createElement(ConfigModal, {
       onRequestClose: closeOverlay,
       initialTab,
+      initialSettingKey,
     }),
     modalContainer
   );
@@ -12733,20 +12795,31 @@ function openConfig(options = {}) {
 
 // 언어 변경 후 자동으로 설정 페이지 열기
 (function checkReturnToSettings() {
-  const shouldReturn = localStorage.getItem("ivLyrics:return-to-settings");
-  if (shouldReturn === "true") {
-    localStorage.removeItem("ivLyrics:return-to-settings");
-    // DOM이 준비된 후 설정 열기
-    const tryOpenSettings = () => {
-      if (typeof openConfig === "function" && document.body) {
-        // 약간의 지연을 두고 설정 열기
-        setTimeout(() => {
-          openConfig();
-        }, 500);
-      } else {
-        setTimeout(tryOpenSettings, 100);
-      }
-    };
-    tryOpenSettings();
+  const rawValue = localStorage.getItem("ivLyrics:return-to-settings");
+  if (!rawValue) return;
+
+  let pendingOptions = null;
+  if (rawValue === "true") {
+    pendingOptions = { initialTab: "general" };
+  } else {
+    try {
+      pendingOptions = JSON.parse(rawValue);
+    } catch (error) {
+      pendingOptions = { initialTab: "general" };
+    }
   }
+
+  localStorage.removeItem("ivLyrics:return-to-settings");
+
+  const tryOpenSettings = () => {
+    if (typeof openConfig === "function" && document.body) {
+      setTimeout(() => {
+        openConfig(pendingOptions || {});
+      }, 500);
+    } else {
+      setTimeout(tryOpenSettings, 100);
+    }
+  };
+
+  tryOpenSettings();
 })();

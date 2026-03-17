@@ -1270,17 +1270,19 @@
          * @param {Object} syncData - 싱크 데이터 { lines: [...] }
          * @returns {Promise<Object>} - 제출 결과
          */
-        async function submitSyncData(trackId, provider, syncData) {
-            const userHash = getUserHash();
+	        async function submitSyncData(trackId, provider, syncData) {
+	            const userHash = getUserHash();
+	            const authToken = Spicetify.LocalStorage.get("ivLyrics:auth-token");
 
-            const response = await fetch(`${API_BASE}/lyrics/sync-data`, {
-                method: 'POST',
-                headers: {
-                    "Content-Type": "application/json",
-                    "User-Agent": `spicetify v${Spicetify.Config.version}`,
-                },
-                body: JSON.stringify({
-                    trackId,
+	            const response = await fetch(`${API_BASE}/lyrics/sync-data`, {
+	                method: 'POST',
+	                headers: {
+	                    "Content-Type": "application/json",
+	                    "User-Agent": `spicetify v${Spicetify.Config.version}`,
+	                    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+	                },
+	                body: JSON.stringify({
+	                    trackId,
                     provider,
                     syncData,
                     userHash
@@ -3617,4 +3619,3 @@
     serviceDebug("[LyricsService] LyricsService Extension initialized successfully!");
     serviceDebug("[LyricsService] Available APIs: window.LyricsService, window.LyricsCache, window.ApiTracker, window.Translator, window.OverlaySender, window.lyricsHelperSender");
 })();
-
