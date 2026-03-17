@@ -45,7 +45,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const scaled = (progress - 0.5) * 2;
 		return 0.5 + (0.5 * Math.pow(scaled, 3));
 	};
-	const applyInterpolatedRangeToCharTimes = (target, startIdx, endIdx, startTime, endTime) => {
+	const smoothStepInterpolation = (progress) => {
+		if (progress <= 0) return 0;
+		if (progress >= 1) return 1;
+		return progress * progress * (3 - (2 * progress));
+	};
+	const applyInterpolatedRangeToCharTimes = (target, startIdx, endIdx, startTime, endTime, interpolationFn = edgeInterpolation) => {
 		if (!target || startIdx > endIdx || startIdx < 0) return;
 		const count = endIdx - startIdx + 1;
 		const safeEndTime = Math.max(startTime, endTime);
@@ -55,11 +60,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 		for (let i = 0; i < count; i++) {
 			const progress = count === 1 ? 1 : i / (count - 1);
-			target[startIdx + i] = roundSyncTime(startTime + ((safeEndTime - startTime) * edgeInterpolation(progress)));
+			target[startIdx + i] = roundSyncTime(startTime + ((safeEndTime - startTime) * interpolationFn(progress)));
 		}
 	};
 	const estimateSegmentDuration = (startIdx, endIdx, scale = 0.055, maxDuration = 0.26) =>
 		Math.min(maxDuration, Math.max(0.07, (endIdx - startIdx + 1) * scale));
+	const estimateWordInterpolationDuration = (startIdx, endIdx) => {
+		const charCount = Math.max(1, endIdx - startIdx + 1);
+		const preferredDuration = charCount * 0.085;
+		const minimumDuration = 0.11 + Math.max(0, charCount - 1) * 0.05;
+		return Math.min(0.42, Math.max(minimumDuration, preferredDuration));
+	};
 	const buildLatinWordSyllables = (chars, wordStart, wordEnd) => {
 		const nuclei = [];
 		let index = wordStart;
@@ -1036,7 +1047,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					startIdx,
 					endIdx,
 					startTime,
-					startTime + duration
+					startTime + duration,
+					smoothStepInterpolation
 				);
 
 				window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to word:', startIdx, '-', endIdx, 'duration:', duration.toFixed(3));
@@ -1104,8 +1116,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					if (keyboardCharIndexRef.current >= currentLineChars.length - 1) {
 						// 첫 단어이자 마지막 단어인 경우에도 보간 적용
 						if (interpolationEnabledRef.current && endIdx > 0) {
-							const duration = estimateSegmentDuration(0, endIdx);
-							applyInterpolatedRangeToCharTimes(charTimesRef.current, 0, endIdx, currentTime, currentTime + duration);
+							const duration = estimateWordInterpolationDuration(0, endIdx);
+							applyInterpolatedRangeToCharTimes(charTimesRef.current, 0, endIdx, currentTime, currentTime + duration, smoothStepInterpolation);
 							window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to single word line');
 						}
 						finishKeyboardSync();
@@ -1183,8 +1195,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						const charCount = endIdx - startIdx + 1;
 						if (charCount > 1) {
 							// 마지막 단어는 시작 시간으로부터 글자 수에 비례한 짧은 지속시간 부여
-							const duration = estimateSegmentDuration(startIdx, endIdx); // 최대 260ms
-							applyInterpolatedRangeToCharTimes(charTimesRef.current, startIdx, endIdx, startTime, startTime + duration);
+							const duration = estimateWordInterpolationDuration(startIdx, endIdx);
+							applyInterpolatedRangeToCharTimes(charTimesRef.current, startIdx, endIdx, startTime, startTime + duration, smoothStepInterpolation);
 							window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to last word:', startIdx, '-', endIdx);
 						}
 					}
