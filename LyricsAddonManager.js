@@ -356,7 +356,8 @@
                 order = order.filter(id => allAddonIds.includes(id));
 
                 // Add any new IDs that aren't in the order yet
-                const newIds = allAddonIds.filter(id => !order.includes(id));
+                const orderedIds = new Set(order);
+                const newIds = allAddonIds.filter(id => !orderedIds.has(id));
                 order = [...order, ...newIds];
 
                 return order;

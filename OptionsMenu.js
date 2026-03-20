@@ -1369,14 +1369,18 @@ const OptionsMenu = react.memo(
 
     // React 31 방지: options 배열 유효성 검사
     const safeOptions = Array.isArray(options) ? options : [];
+    const optionByKey = react.useMemo(
+      () => new Map(safeOptions.map((option) => [option.key, option])),
+      [safeOptions]
+    );
 
     // 초기 선택 값 결정 (selected 또는 defaultValue에서)
     const getInitialSelected = () => {
       let initialItem = selected || defaultValue;
       if (initialItem && typeof initialItem !== 'object') {
-        initialItem = safeOptions.find(o => o.key === initialItem);
+        initialItem = optionByKey.get(initialItem);
       } else if (initialItem && initialItem.key && !initialItem.value) {
-        const found = safeOptions.find(o => o.key === initialItem.key);
+        const found = optionByKey.get(initialItem.key);
         if (found) initialItem = found;
       }
       return initialItem;
@@ -1388,14 +1392,14 @@ const OptionsMenu = react.memo(
     // props가 변경되면 내부 상태 업데이트
     react.useEffect(() => {
       setSelectedItem(getInitialSelected());
-    }, [selected, defaultValue]);
+    }, [selected, defaultValue, optionByKey]);
 
     // Resolve default item for display fallback
     let defaultItem = defaultValue;
     if (defaultValue && typeof defaultValue !== 'object') {
-      defaultItem = safeOptions.find(o => o.key === defaultValue);
+      defaultItem = optionByKey.get(defaultValue);
     } else if (defaultValue && defaultValue.key && !defaultValue.value) {
-      const found = safeOptions.find(o => o.key === defaultValue.key);
+      const found = optionByKey.get(defaultValue.key);
       if (found) defaultItem = found;
     }
 
@@ -1484,7 +1488,7 @@ const OptionsMenu = react.memo(
                 e.stopPropagation();
 
                 // 내부 상태 업데이트
-                const selectedOption = safeOptions.find(o => o.key === key);
+                const selectedOption = optionByKey.get(key);
                 if (selectedOption) {
                   setSelectedItem(selectedOption);
                 }
@@ -2693,9 +2697,14 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
   }, [lyrics]);
 
   // 선택된 가사 라인 객체들
+  const normalizedLyricsByIdx = react.useMemo(
+    () => new Map(normalizedLyrics.map((line) => [line.idx, line])),
+    [normalizedLyrics]
+  );
+  const selectedIndexSet = react.useMemo(() => new Set(selectedIndices), [selectedIndices]);
   const selectedLines = react.useMemo(() => {
-    return selectedIndices.map(idx => normalizedLyrics.find(l => l.idx === idx)).filter(Boolean);
-  }, [selectedIndices, normalizedLyrics]);
+    return selectedIndices.map((idx) => normalizedLyricsByIdx.get(idx)).filter(Boolean);
+  }, [selectedIndices, normalizedLyricsByIdx]);
 
   // Generate preview when selection or template changes
   react.useEffect(() => {
@@ -2939,15 +2948,15 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
             react.createElement("div", {
               key: line.idx,
               className: "share-image-modal-lyric-line",
-              "data-selected": selectedIndices.includes(line.idx),
+              "data-selected": selectedIndexSet.has(line.idx),
               onClick: () => toggleLine(line.idx),
               style: {
                 padding: '10px 12px',
                 marginBottom: '4px',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                background: selectedIndices.includes(line.idx) ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255,255,255,0.05)',
-                border: selectedIndices.includes(line.idx) ? '1px solid rgba(29, 185, 84, 0.5)' : '1px solid transparent',
+                background: selectedIndexSet.has(line.idx) ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255,255,255,0.05)',
+                border: selectedIndexSet.has(line.idx) ? '1px solid rgba(29, 185, 84, 0.5)' : '1px solid transparent',
                 transition: 'all 0.15s ease',
               }
             },

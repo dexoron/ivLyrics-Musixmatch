@@ -45,8 +45,6 @@ const SwapButton = ({ icon, disabled, onClick }) => {
   );
 };
 
-
-
 // 데스크탑 오버레이 설정 컴포넌트
 const OverlaySettings = () => {
   const [enabled, setEnabled] = useState(window.OverlaySender?.enabled ?? false);

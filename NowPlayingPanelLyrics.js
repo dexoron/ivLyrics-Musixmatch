@@ -749,7 +749,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const lineClass = `ivlyrics-panel-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${isFuture ? 'future' : ''} ${isPlaceholder ? 'placeholder' : ''}`;
 
         // 노래방 가사인지 확인
-        const syllables = getSyllablesFromLine(line);
+        const syllables = useMemo(() => getSyllablesFromLine(line), [line]);
         const isKaraoke = syllables.length > 0;
         const displayText = line.originalText || line.text || '';
 

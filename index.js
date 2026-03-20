@@ -207,7 +207,7 @@ if (!XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) {
         }
       }
 
-      if (conversionCache.size > MAX_CONVERSION_CACHE_SIZE) {
+      if (conversionCache.size >= MAX_CONVERSION_CACHE_SIZE) {
         const firstKey = conversionCache.keys().next().value;
         conversionCache.delete(firstKey);
       }
@@ -2205,11 +2205,12 @@ const Prefetcher = {
             return null;
           }
 
-          const originalNonSectionIndices = [];
+          const originalNonSectionIndexMap = new Map();
+          let nonSectionLineIndex = 0;
           lyricsArray.forEach((line, i) => {
             const lineText = line?.text || "";
             if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-              originalNonSectionIndices.push(i);
+              originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
             }
           });
 
@@ -2225,7 +2226,7 @@ const Prefetcher = {
             if (originalText.trim() === "") {
               return { ...line, text: "", originalText };
             }
-            const positionInNonSectionLines = originalNonSectionIndices.indexOf(i);
+            const positionInNonSectionLines = originalNonSectionIndexMap.get(i);
             const translatedText = cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
             return { ...line, text: translatedText || line?.text || "", originalText };
           });
@@ -3490,13 +3491,14 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].lastMode2 = mode2;
       this._dmResults[currentUri].lastProvider = currentProvider;
 
-      const originalNonSectionIndices = [];
-      originalLyrics.forEach((line, i) => {
-        const lineText = line?.text || "";
-        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-          originalNonSectionIndices.push(i);
-        }
-      });
+	      const originalNonSectionIndexMap = new Map();
+	      let nonSectionLineIndex = 0;
+	      originalLyrics.forEach((line, i) => {
+	        const lineText = line?.text || "";
+	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
+	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
+	        }
+	      });
 
       const mapResultLinesToLyrics = (linesInput) => {
         if (!Array.isArray(linesInput)) return null;
@@ -3528,10 +3530,10 @@ class LyricsContainer extends react.Component {
             };
           }
 
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText =
-            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText =
+	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,
@@ -3744,9 +3746,9 @@ class LyricsContainer extends react.Component {
           }
 
           // Find the translation index for this non-section, non-empty line
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText = lines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText = lines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,
@@ -4575,7 +4577,8 @@ class LyricsContainer extends react.Component {
       const words1 = norm1.split(" ").filter((w) => w.length > 2);
       const words2 = norm2.split(" ").filter((w) => w.length > 2);
       if (words1.length === 0 || words2.length === 0) return false;
-      const commonWords = words1.filter((word) => words2.includes(word));
+	      const words2Set = new Set(words2);
+	      const commonWords = words1.filter((word) => words2Set.has(word));
       const similarity =
         commonWords.length / Math.max(words1.length, words2.length);
       return similarity > 0.85;
@@ -4794,13 +4797,14 @@ class LyricsContainer extends react.Component {
       const text = nonSectionLines.join("\n");
 
       // Create mapping arrays for proper alignment
-      const originalNonSectionIndices = [];
-      lyrics.forEach((line, i) => {
-        const lineText = line?.text || "";
-        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-          originalNonSectionIndices.push(i);
-        }
-      });
+	      const originalNonSectionIndexMap = new Map();
+	      let nonSectionLineIndex = 0;
+	      lyrics.forEach((line, i) => {
+	        const lineText = line?.text || "";
+	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
+	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
+	        }
+	      });
 
       const mapResultLinesToLyrics = (linesInput) => {
         if (!Array.isArray(linesInput)) return null;
@@ -4832,10 +4836,10 @@ class LyricsContainer extends react.Component {
             };
           }
 
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText =
-            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText =
+	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,

@@ -73,14 +73,6 @@ const Utils = {
   _colorCache: new LRUCache(100),
   _normalizeCache: new LRUCache(200),
 
-  // Common cache size limiter (최적화 #1)
-  _limitCacheSize(cache, maxSize) {
-    if (cache.size > maxSize) {
-      const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
-    }
-  },
-
   addQueueListener(callback) {
     Spicetify.Player.origin._events.addListener("queue_update", callback);
   },
@@ -103,8 +95,6 @@ const Utils = {
 
     const result = `rgb(${r},${g},${b})`;
 
-    // Cache result (limit cache size)
-    this._limitCacheSize(this._colorCache, 100);
     this._colorCache.set(cacheKey, result);
 
     return result;
@@ -387,9 +377,6 @@ const Utils = {
     if (!processedText || typeof processedText !== "string") return furiganaMap;
 
     const rubyRegex = /<ruby>([^<]+)<rt>([^<]+)<\/rt><\/ruby>/g;
-
-    // Build clean text from processedText (removing all HTML tags)
-    const cleanText = processedText.replace(/<ruby>([^<]+)<rt>[^<]+<\/rt><\/ruby>/g, '$1');
 
     // Now parse the HTML and map positions
     let currentPos = 0;
@@ -1998,7 +1985,7 @@ const Toast = {
 
     // Auto dismiss
     if (duration > 0) {
-      const toastData = this._toasts.find(t => t.id === id);
+      const toastData = this._toasts[this._toasts.length - 1];
       if (toastData) {
         toastData.timeout = setTimeout(() => this.dismiss(id), duration);
       }

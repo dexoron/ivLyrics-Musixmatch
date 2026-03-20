@@ -158,6 +158,7 @@
     const Utils = {
         _langDetectCache: new Map(),
         _maxLangCacheSize: 500,
+        _cjkMatchRegex: null,
 
         _cacheLanguageResult(cacheKey, result) {
             if (this._langDetectCache.size >= this._maxLangCacheSize) {
@@ -215,9 +216,10 @@
             const devanagariRegex = /[\u0900-\u097F]/gu;
             const latinExtendedRegex = /[a-zA-ZÀ-ÿ]/gu;
 
-            const cjkMatch = rawLyrics.match(
-                new RegExp(`${kanaRegex.source}|${hanziRegex.source}|${hangulRegex.source}`, "gu")
+            const cjkMatchRegex = this._cjkMatchRegex || (
+                this._cjkMatchRegex = new RegExp(`${kanaRegex.source}|${hanziRegex.source}|${hangulRegex.source}`, "gu")
             );
+            const cjkMatch = rawLyrics.match(cjkMatchRegex);
 
             const cyrillicMatch = rawLyrics.match(cyrillicRegex);
             const vietnameseMatch = rawLyrics.match(vietnameseRegex);
@@ -409,7 +411,13 @@
         },
 
         logResponse(logId, response, status = 'success', error = null, cached = false) {
-            const entry = this._logs.find(l => l.id === logId);
+            let entry = null;
+            for (let i = this._logs.length - 1; i >= 0; i--) {
+                if (this._logs[i].id === logId) {
+                    entry = this._logs[i];
+                    break;
+                }
+            }
             if (entry) {
                 entry.response = response;
                 entry.status = status;

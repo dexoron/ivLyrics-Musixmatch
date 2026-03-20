@@ -1964,32 +1964,36 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const formatSeconds = useCallback((seconds) => `${seconds.toFixed(1)}s`, []);
+	const syncLinesByStart = useMemo(() => {
+		if (!Array.isArray(syncData?.lines) || syncData.lines.length === 0) return null;
+		return new Map(syncData.lines.map((line) => [line.start, line]));
+	}, [syncData]);
 
 	const isCharSynced = useCallback((lineIndex, charIndex) => {
-		if (!syncData || !syncData.lines) return false;
+		if (!syncLinesByStart) return false;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		return lineData && lineData.chars && lineData.chars.length > charIndex;
-	}, [syncData, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets]);
 
 	const getCharSyncTime = useCallback((lineIndex, charIndex) => {
-		if (!syncData || !syncData.lines) return null;
+		if (!syncLinesByStart) return null;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		return lineData?.chars?.[charIndex] ?? null;
-	}, [syncData, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets]);
 
 	const getPreviewCharIndex = useCallback((lineIndex) => {
-		if (!syncData || !syncData.lines) return -1;
+		if (!syncLinesByStart) return -1;
 		const currentTimeSec = position / 1000;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		if (!lineData || !lineData.chars) return -1;
 		for (let i = lineData.chars.length - 1; i >= 0; i--) {
 			if (currentTimeSec >= lineData.chars[i]) return i;
 		}
 		return -1;
-	}, [syncData, position, lineCharOffsets]);
+	}, [syncLinesByStart, position, lineCharOffsets]);
 
 	useEffect(() => { charElementsRef.current = []; }, [currentLineIndex, lyricsText]);
 

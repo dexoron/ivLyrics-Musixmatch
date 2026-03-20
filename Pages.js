@@ -35,19 +35,28 @@ function mergeCreatorProfileContributions(currentItems, nextItems) {
 	const merged = [];
 	const seen = new Set();
 
-	for (const item of [...(Array.isArray(currentItems) ? currentItems : []), ...(Array.isArray(nextItems) ? nextItems : [])]) {
-		if (!item || typeof item !== "object") {
-			continue;
+	const appendUniqueItems = (items) => {
+		if (!Array.isArray(items)) {
+			return;
 		}
 
-		const key = `${item.trackId || "unknown"}:${item.provider || "unknown"}`;
-		if (seen.has(key)) {
-			continue;
-		}
+		for (const item of items) {
+			if (!item || typeof item !== "object") {
+				continue;
+			}
 
-		seen.add(key);
-		merged.push(item);
-	}
+			const key = `${item.trackId || "unknown"}:${item.provider || "unknown"}`;
+			if (seen.has(key)) {
+				continue;
+			}
+
+			seen.add(key);
+			merged.push(item);
+		}
+	};
+
+	appendUniqueItems(currentItems);
+	appendUniqueItems(nextItems);
 
 	return merged;
 }
