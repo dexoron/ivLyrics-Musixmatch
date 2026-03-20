@@ -45,6 +45,29 @@ const SwapButton = ({ icon, disabled, onClick }) => {
   );
 };
 
+function buildOrderedProviderList(providers, providerOrder) {
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  const safeProviderOrder = Array.isArray(providerOrder) ? providerOrder : [];
+  const providersById = new Map(safeProviders.map((provider) => [provider.id, provider]));
+  const orderedIds = new Set(safeProviderOrder);
+  const sortedProviders = [];
+
+  safeProviderOrder.forEach((id) => {
+    const provider = providersById.get(id);
+    if (provider) {
+      sortedProviders.push(provider);
+    }
+  });
+
+  safeProviders.forEach((provider) => {
+    if (!orderedIds.has(provider.id)) {
+      sortedProviders.push(provider);
+    }
+  });
+
+  return sortedProviders;
+}
+
 // 데스크탑 오버레이 설정 컴포넌트
 const OverlaySettings = () => {
   const [enabled, setEnabled] = useState(window.OverlaySender?.enabled ?? false);
@@ -1269,16 +1292,7 @@ const LyricsProvidersTab = () => {
   };
 
   // 정렬된 provider 목록
-  const sortedProviders = providerOrder
-    .map(id => providers.find(p => p.id === id))
-    .filter(Boolean);
-
-  // 등록되었지만 순서에 없는 provider 추가
-  providers.forEach(p => {
-    if (!providerOrder.includes(p.id)) {
-      sortedProviders.push(p);
-    }
-  });
+  const sortedProviders = buildOrderedProviderList(providers, providerOrder);
 
   return react.createElement("div", { className: "settings-section lyrics-providers-section" },
     // 통합 컨테이너
@@ -1402,16 +1416,7 @@ const AIProvidersTab = () => {
   };
 
   // 정렬된 provider 목록
-  const sortedProviders = providerOrder
-    .map(id => providers.find(p => p.id === id))
-    .filter(Boolean);
-
-  // 등록되었지만 순서에 없는 provider 추가
-  providers.forEach(p => {
-    if (!providerOrder.includes(p.id)) {
-      sortedProviders.push(p);
-    }
-  });
+  const sortedProviders = buildOrderedProviderList(providers, providerOrder);
 
   return react.createElement("div", { className: "settings-section lyrics-providers-section" },
     // 통합 컨테이너
@@ -4300,22 +4305,29 @@ const ConfigModal = ({
     },
   ], []);
 
+  const searchableSettingEntries = react.useMemo(() => {
+    return searchableSettings.map((setting) => {
+      const allTranslations = (setting.i18nKeys || []).flatMap((key) =>
+        I18n.getAllTranslations(key)
+      );
+      const keywords = (setting.keywords || []).join(" ");
+
+      return {
+        setting,
+        searchText: `${allTranslations.join(" ")} ${keywords}`.toLowerCase(),
+      };
+    });
+  }, [searchableSettings]);
+
   // 검색 결과 필터링 (모든 언어의 번역을 검색 대상에 포함)
   const searchResults = react.useMemo(() => {
     if (!searchQuery.trim()) return [];
 
     const query = searchQuery.toLowerCase().trim();
-    return searchableSettings.filter(setting => {
-      // i18nKeys의 모든 키에 대해, 모든 언어의 번역을 수집
-      const allTranslations = (setting.i18nKeys || []).flatMap(key =>
-        I18n.getAllTranslations(key)
-      );
-      const keywords = (setting.keywords || []).join(" ");
-      const searchIn = `${allTranslations.join(" ")} ${keywords}`.toLowerCase();
-
-      return searchIn.includes(query);
-    });
-  }, [searchQuery, searchableSettings]);
+    return searchableSettingEntries
+      .filter(({ searchText }) => searchText.includes(query))
+      .map(({ setting }) => setting);
+  }, [searchQuery, searchableSettingEntries]);
 
   // 검색 결과 컴포넌트
   const SearchResults = () => {

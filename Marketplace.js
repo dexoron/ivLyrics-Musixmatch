@@ -946,6 +946,18 @@ const MarketplacePage = (() => {
             };
         }, [loadAddons]);
 
+        const addonSearchTextById = useMemo(() => {
+            return new Map(addons.map((addon) => {
+                const descriptionText = typeof addon.description === 'string'
+                    ? addon.description
+                    : typeof addon.description === 'object' && addon.description
+                        ? Object.values(addon.description).join(' ')
+                        : '';
+                const searchText = `${addon.name || ''} ${addon.author || ''} ${descriptionText}`.toLowerCase();
+                return [addon.id, searchText];
+            }));
+        }, [addons]);
+
         const filteredAddons = useMemo(() => {
             let result = addons;
 
@@ -955,16 +967,11 @@ const MarketplacePage = (() => {
 
             if (searchQuery.trim()) {
                 const q = searchQuery.trim().toLowerCase();
-                result = result.filter(a =>
-                    a.name.toLowerCase().includes(q) ||
-                    a.author.toLowerCase().includes(q) ||
-                    (typeof a.description === 'string' && a.description.toLowerCase().includes(q)) ||
-                    (typeof a.description === 'object' && Object.values(a.description).some(d => d.toLowerCase().includes(q)))
-                );
+                result = result.filter((addon) => addonSearchTextById.get(addon.id)?.includes(q));
             }
 
             return result;
-        }, [addons, filter, searchQuery]);
+        }, [addonSearchTextById, addons, filter, searchQuery]);
 
         const authorAddons = useMemo(() => {
             if (!selectedAuthor) return [];

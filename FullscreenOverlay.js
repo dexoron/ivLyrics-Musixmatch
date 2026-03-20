@@ -34,6 +34,15 @@ const FullscreenOverlay = (() => {
         return trimmed || title;
     };
 
+    const isUnknownTrackMetadata = (meta) => {
+        if (!meta) return true;
+        const title = meta.title || '';
+        const artist = meta.artist_name || '';
+        return (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
+            (!title && !artist) ||
+            (title === '' && artist === '');
+    };
+
     // Clock Component
     const Clock = ({ show, showSeconds = false, size = 48 }) => {
         const [time, setTime] = useState(new Date());
@@ -185,24 +194,23 @@ const FullscreenOverlay = (() => {
                         const queue = Spicetify.Queue;
                         if (queue?.nextTracks?.length > 0) {
                             // Unknown 트랙이 아닌 첫 번째 유효한 트랙 찾기
-                            const validNext = queue.nextTracks.find(track => {
+                            const validNext = queue.nextTracks.find((track) => {
                                 const meta = track?.contextTrack?.metadata;
-                                // Unknown 트랙 필터링 (제목과 아티스트 모두 Unknown이거나 비어있는 경우)
-                                if (!meta) return false;
-                                const title = meta.title || '';
-                                const artist = meta.artist_name || '';
-                                const isUnknown = (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
-                                    (!title && !artist) ||
-                                    (title === '' && artist === '');
-                                return !isUnknown;
+                                return !isUnknownTrackMetadata(meta);
                             });
 
                             if (validNext?.contextTrack?.metadata) {
-                                setNextTrack({
+                                const nextTrackData = {
                                     title: validNext.contextTrack.metadata.title,
                                     artist: validNext.contextTrack.metadata.artist_name,
                                     image: validNext.contextTrack.metadata.image_url
-                                });
+                                };
+                                setNextTrack((prev) => (
+                                    prev &&
+                                        prev.title === nextTrackData.title &&
+                                        prev.artist === nextTrackData.artist &&
+                                        prev.image === nextTrackData.image
+                                ) ? prev : nextTrackData);
                                 setVisible(true);
                                 return;
                             }
@@ -704,34 +712,28 @@ const FullscreenOverlay = (() => {
                     // 다음 곡들 (최대 15곡) - Unknown 트랙 이후 필터링
                     if (nextSource.length > 0) {
                         // Unknown 트랙의 인덱스 찾기 (컨텍스트 끝 마커)
-                        const unknownIndex = nextSource.findIndex(track => {
-                            const meta = track?.contextTrack?.metadata || track?.metadata || {};
-                            const title = meta.title || '';
-                            const artist = meta.artist_name || '';
-                            // Unknown 트랙 감지: 제목과 아티스트 모두 Unknown이거나 비어있는 경우
-                            return (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
-                                (!title && !artist) ||
-                                (title === '' && artist === '');
-                        });
-
-                        // Unknown 트랙이 있으면 그 이전까지만, 없으면 전체
-                        const tracksToShow = unknownIndex >= 0
-                            ? nextSource.slice(0, unknownIndex)
-                            : nextSource;
-
-                        const next = tracksToShow.slice(0, 15).map((track, index) => {
+                        const next = [];
+                        for (const track of nextSource) {
                             const contextTrack = track?.contextTrack || track || {};
                             const meta = contextTrack.metadata || track?.metadata || {};
-                            return {
+                            if (isUnknownTrackMetadata(meta)) {
+                                break;
+                            }
+
+                            next.push({
                                 title: meta.title || "Unknown",
                                 artist: meta.artist_name || "Unknown",
                                 image: meta.image_url || "",
                                 uri: contextTrack.uri || track?.uri || "",
                                 uid: contextTrack.uid || track?.uid || "",
                                 contextUri: currentContextUri || meta.context_uri || "",
-                                index: index + 1
-                            };
-                        });
+                                index: next.length + 1
+                            });
+
+                            if (next.length >= 15) {
+                                break;
+                            }
+                        }
                         setNextTracks(next);
                     } else {
                         setNextTracks([]);

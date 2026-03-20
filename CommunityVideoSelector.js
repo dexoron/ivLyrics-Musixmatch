@@ -875,15 +875,15 @@ const CommunityVideoSelector = ({
     try {
       const result = await Utils.deleteCommunityVideo(videoEntryId, trackUri);
       if (result) {
+        const deletedVideo = previewVideoId
+          ? videos.find((v) => v.id === videoEntryId)
+          : null;
         Toast.success(I18n.t("communityVideo.deleted"));
         // 목록에서 제거
         setVideos((prev) => prev.filter((v) => v.id !== videoEntryId));
         // 미리보기 중이던 영상이면 미리보기 닫기
-        if (previewVideoId) {
-          const deletedVideo = videos.find((v) => v.id === videoEntryId);
-          if (deletedVideo && deletedVideo.youtubeVideoId === previewVideoId) {
-            setPreviewVideoId(null);
-          }
+        if (deletedVideo && deletedVideo.youtubeVideoId === previewVideoId) {
+          setPreviewVideoId(null);
         }
       } else {
         Toast.error(I18n.t("communityVideo.deleteError"));
