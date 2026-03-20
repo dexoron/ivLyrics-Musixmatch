@@ -1,7 +1,7 @@
 // Fullscreen Overlay Component - Enhanced UI/UX
 const FullscreenOverlay = (() => {
     const react = Spicetify.React;
-    const { useState, useEffect, useCallback, useRef } = react;
+    const { useState, useEffect, useCallback, useMemo, useRef } = react;
 
     // Format time helper (ms to mm:ss)
     const formatTime = (ms) => {
@@ -41,6 +41,44 @@ const FullscreenOverlay = (() => {
         return (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
             (!title && !artist) ||
             (title === '' && artist === '');
+    };
+
+    const createQueueTrackInfo = (meta, track, fallbackContextUri = "", index = 0) => ({
+        title: meta?.title || "Unknown",
+        artist: meta?.artist_name || "Unknown",
+        image: meta?.image_url || "",
+        uri: track?.uri || "",
+        uid: track?.uid || "",
+        contextUri: fallbackContextUri || meta?.context_uri || "",
+        index
+    });
+
+    const areTrackInfoEqual = (prev, next) => {
+        if (prev === next) return true;
+        if (!prev || !next) return false;
+
+        return prev.title === next.title &&
+            prev.artist === next.artist &&
+            prev.image === next.image &&
+            prev.uri === next.uri &&
+            prev.uid === next.uid &&
+            prev.contextUri === next.contextUri &&
+            prev.index === next.index;
+    };
+
+    const areTrackListsEqual = (prev, next) => {
+        if (prev === next) return true;
+        if (!Array.isArray(prev) || !Array.isArray(next) || prev.length !== next.length) {
+            return false;
+        }
+
+        for (let i = 0; i < prev.length; i++) {
+            if (!areTrackInfoEqual(prev[i], next[i])) {
+                return false;
+            }
+        }
+
+        return true;
     };
 
     // Clock Component
@@ -695,72 +733,84 @@ const FullscreenOverlay = (() => {
                         playerData?.item?.metadata?.context_uri ||
                         "";
                     const queueState = queueData?.data || Spicetify.Queue || {};
-                    const hasModernQueueShape =
-                        Array.isArray(queueState?.queued) || Array.isArray(queueState?.nextUp);
-                    const nextSource = hasModernQueueShape
-                        ? [...(queueState.queued || []), ...(queueState.nextUp || [])]
-                        : (queueState.nextTracks || []);
                     const prevSource = queueState.prevTracks || Spicetify.Queue?.prevTracks || [];
 
                     // 현재 재생 중인 곡
                     if (playerData?.item) {
                         const meta = playerData.item.metadata;
-                        setCurrentTrack({
+                        const currentTrackData = {
                             title: meta?.title || "Unknown",
                             artist: meta?.artist_name || "Unknown",
                             image: meta?.image_url || "",
                             uri: playerData.item.uri
-                        });
+                        };
+                        setCurrentTrack((prev) => areTrackInfoEqual(prev, currentTrackData) ? prev : currentTrackData);
                     }
 
                     // 다음 곡들 (최대 15곡) - Unknown 트랙 이후 필터링
-                    if (nextSource.length > 0) {
+                    const next = [];
+                    const appendNextTracks = (items) => {
+                        if (!Array.isArray(items) || next.length >= 15) {
+                            return false;
+                        }
+
                         // Unknown 트랙의 인덱스 찾기 (컨텍스트 끝 마커)
-                        const next = [];
-                        for (const track of nextSource) {
+                        for (const track of items) {
                             const contextTrack = track?.contextTrack || track || {};
                             const meta = contextTrack.metadata || track?.metadata || {};
                             if (isUnknownTrackMetadata(meta)) {
-                                break;
+                                return true;
                             }
 
-                            next.push({
-                                title: meta.title || "Unknown",
-                                artist: meta.artist_name || "Unknown",
-                                image: meta.image_url || "",
-                                uri: contextTrack.uri || track?.uri || "",
-                                uid: contextTrack.uid || track?.uid || "",
-                                contextUri: currentContextUri || meta.context_uri || "",
-                                index: next.length + 1
-                            });
+                            next.push(createQueueTrackInfo(
+                                meta,
+                                {
+                                    uri: contextTrack.uri || track?.uri || "",
+                                    uid: contextTrack.uid || track?.uid || ""
+                                },
+                                currentContextUri,
+                                next.length + 1
+                            ));
 
                             if (next.length >= 15) {
-                                break;
+                                return true;
                             }
                         }
-                        setNextTracks(next);
+                        return false;
+                    };
+
+                    const hasModernQueueShape =
+                        Array.isArray(queueState?.queued) || Array.isArray(queueState?.nextUp);
+                    if (hasModernQueueShape) {
+                        const stopped = appendNextTracks(queueState.queued || []);
+                        if (!stopped) {
+                            appendNextTracks(queueState.nextUp || []);
+                        }
                     } else {
-                        setNextTracks([]);
+                        appendNextTracks(queueState.nextTracks || []);
                     }
+                    setNextTracks((prev) => areTrackListsEqual(prev, next) ? prev : next);
 
                     // 최근 재생 곡들 (이전 곡 기록)
                     if (prevSource.length > 0) {
-                        const prev = prevSource.slice(-10).reverse().map((track, index) => {
+                        const prev = [];
+                        for (let i = prevSource.length - 1; i >= 0 && prev.length < 10; i--) {
+                            const track = prevSource[i];
                             const contextTrack = track?.contextTrack || track || {};
                             const meta = contextTrack.metadata || track?.metadata || {};
-                            return {
-                                title: meta.title || "Unknown",
-                                artist: meta.artist_name || "Unknown",
-                                image: meta.image_url || "",
-                                uri: contextTrack.uri || track?.uri || "",
-                                uid: contextTrack.uid || track?.uid || "",
-                                contextUri: currentContextUri || meta.context_uri || "",
-                                index: index + 1
-                            };
-                        });
-                        setRecentTracks(prev);
+                            prev.push(createQueueTrackInfo(
+                                meta,
+                                {
+                                    uri: contextTrack.uri || track?.uri || "",
+                                    uid: contextTrack.uid || track?.uid || ""
+                                },
+                                currentContextUri,
+                                prev.length + 1
+                            ));
+                        }
+                        setRecentTracks((current) => areTrackListsEqual(current, prev) ? current : prev);
                     } else {
-                        setRecentTracks([]);
+                        setRecentTracks((current) => current.length === 0 ? current : []);
                     }
                 } catch (e) {
                     console.warn('[FullscreenOverlay] Queue update failed:', e);
@@ -793,13 +843,15 @@ const FullscreenOverlay = (() => {
                 );
                 if (selectedIndex >= 0) {
                     const selected = nextTracks[selectedIndex];
-                    setCurrentTrack({
+                    const selectedTrackData = {
                         title: selected.title || "Unknown",
                         artist: selected.artist || "Unknown",
                         image: selected.image || "",
                         uri: selected.uri
-                    });
-                    setNextTracks(nextTracks.slice(selectedIndex + 1));
+                    };
+                    setCurrentTrack((prev) => areTrackInfoEqual(prev, selectedTrackData) ? prev : selectedTrackData);
+                    const remainingTracks = nextTracks.slice(selectedIndex + 1);
+                    setNextTracks((prev) => areTrackListsEqual(prev, remainingTracks) ? prev : remainingTracks);
                 }
                 // URI로 직접 재생 (불필요한 스킵 요청 방지)
                 const currentContextUri =

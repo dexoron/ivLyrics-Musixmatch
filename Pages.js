@@ -1395,6 +1395,11 @@ const buildGlobalCharState = (lyrics, position) => {
 	};
 };
 
+const EMPTY_GLOBAL_CHAR_STATE = {
+	globalCharOffsets: [],
+	activeGlobalCharIndex: -1,
+};
+
 const buildPaddedSyncedLyrics = (lyrics, leadingEmptyLines) =>
 	Array.from({ length: leadingEmptyLines }, () => emptyLine)
 		.concat(lyrics)
@@ -1444,7 +1449,7 @@ const LyricsLineBlock = react.memo(({
 	style,
 	lineRef = null,
 	dir = "auto",
-	onClick = null,
+	seekTime = null,
 	mainText,
 	subText = null,
 	subText2 = null,
@@ -1483,6 +1488,12 @@ const LyricsLineBlock = react.memo(({
 		mainProps.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(mainText) };
 	}
 
+	const handleClick = useCallback(() => {
+		if (Number.isFinite(seekTime)) {
+			Spicetify.Player.seek(seekTime);
+		}
+	}, [seekTime]);
+
 	return react.createElement(
 		"div",
 		{
@@ -1490,7 +1501,7 @@ const LyricsLineBlock = react.memo(({
 			style,
 			dir,
 			ref: lineRef,
-			onClick,
+			onClick: Number.isFinite(seekTime) ? handleClick : null,
 		},
 		react.createElement(
 			"p",
@@ -1499,7 +1510,7 @@ const LyricsLineBlock = react.memo(({
 				isKara,
 				mainText,
 				line: mainLine,
-				position,
+				position: isKara ? position : 0,
 				isActive,
 				globalCharOffset,
 				activeGlobalCharIndex,
@@ -1559,7 +1570,7 @@ const SyncedLyricsScrollView = react.memo(({
 					cursor: Number.isFinite(startTime) ? "pointer" : "default",
 				},
 				lineRef: isActiveLine ? activeLineRef : null,
-				onClick: Number.isFinite(startTime) ? () => Spicetify.Player.seek(startTime) : null,
+				seekTime: Number.isFinite(startTime) ? startTime : null,
 				mainText,
 				subText,
 				subText2,
@@ -1622,10 +1633,13 @@ const useSyncedLyricsEngine = ({
 		? leadingEmptyLines
 		: activeLineIndex;
 
-	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(
-		() => buildGlobalCharState(lyrics, position),
-		[lyrics, position]
-	);
+	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(() => {
+		if (!isKara) {
+			return EMPTY_GLOBAL_CHAR_STATE;
+		}
+
+		return buildGlobalCharState(lyrics, position);
+	}, [lyrics, position, isKara]);
 
 	const compactOffset = compact
 		? getCompactSyncedOffset(containerRef.current, activeLineRef.current, isScrolling)
@@ -2310,14 +2324,14 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 					className: item.className,
 					style: item.style,
 					lineRef: item.trackLineRef ? compactActiveLineEle : null,
-					onClick: item.canSeek ? () => Spicetify.Player.seek(item.startTime) : null,
+					seekTime: item.canSeek ? item.startTime : null,
 					mainText: item.mainText,
 					subText: item.subText,
 					subText2: item.subText2,
 					originalText: item.originalText,
 					isKara,
 					line: item.line,
-					position,
+					position: isKara ? position : 0,
 					isActive: item.karaokeActive,
 					globalCharOffset: item.globalCharOffset,
 					activeGlobalCharIndex: item.activeGlobalCharIndex,
@@ -2396,6 +2410,10 @@ class SearchBar extends react.Component {
 		};
 		this.container = null;
 		this.instanceId = `searchbar-${Date.now()}-${Math.random()}`;
+		this.getNodeFromInput = this.getNodeFromInput.bind(this);
+		this.handleInputRef = (node) => {
+			this.container = node;
+		};
 	}
 
 	componentDidMount() {
@@ -2509,12 +2527,10 @@ class SearchBar extends react.Component {
 			{
 				className: `lyrics-Searchbar${this.state.hidden ? " hidden" : ""}`,
 			},
-			react.createElement("input", {
-				ref: (c) => {
-					this.container = c;
-				},
-				onChange: this.getNodeFromInput.bind(this),
-			}),
+						react.createElement("input", {
+								ref: this.handleInputRef,
+								onChange: this.getNodeFromInput,
+						}),
 			react.createElement("svg", {
 				width: 16,
 				height: 16,
@@ -2600,14 +2616,14 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 				className: item.className,
 				style: item.style,
 				lineRef: item.trackLineRef ? activeLineRef : null,
-				onClick: item.canSeek ? () => Spicetify.Player.seek(item.startTime) : null,
+				seekTime: item.canSeek ? item.startTime : null,
 				mainText: item.mainText,
 				subText: item.subText,
 				subText2: item.subText2,
 				originalText: item.originalText,
 				isKara,
 				line: item.line,
-				position,
+				position: isKara ? position : 0,
 				isActive: item.karaokeActive,
 			});
 		}),
