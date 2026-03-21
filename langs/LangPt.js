@@ -1009,6 +1009,14 @@ window.LANG_PT = {
       "bounce": {
         "label": "Efeito Bounce na Letra",
         "desc": "Aplica animação de pulo na letra atual no modo karaokê"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaokê virtual",
+        "desc": "Quando a letra fornece apenas sincronização por linha, o tempo de karaokê é sintetizado a partir da análise de áudio do Spotify. Linhas em coreano, japonês e chinês são divididas com mais detalhe quando a confiança é alta."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Avanço de renderização do karaokê virtual",
+        "desc": "Aplica um deslocamento de tempo na renderização apenas ao karaokê virtual. Valores positivos fazem o destaque aparecer mais cedo."
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_PT = {
       "enabled": "Mostrar Letra no Painel",
       "linesCount": "Linhas para exibir"
     },
+    "pseudoKaraokeTip": {
+      "title": "Karaokê virtual",
+      "subtitle": "Ative o destaque estilo karaokê em quase todas as músicas",
+      "description": "Usa a análise de áudio do Spotify para sintetizar o timing de karaokê a partir de letras sincronizadas por linha. Isso faz o modo karaokê funcionar em quase todas as músicas, mas o timing é aproximado e pode não ser preciso.",
+      "enabled": "Ativar karaokê virtual"
+    },
     "complete": {
       "title": "Tudo Pronto!",
       "subtitle": "Agora você está pronto para usar o ivLyrics",
@@ -1853,6 +1867,7 @@ window.LANG_PT = {
       "syllable": "Sílaba"
     },
     "copyLyrics": "Copiar letra",
+    "virtualKaraoke": "Dados de karaokê virtual",
     "lyricsCopied": "Letra copiada para a área de transferência",
     "copyError": "Falha ao copiar",
     "export": "Exportar",

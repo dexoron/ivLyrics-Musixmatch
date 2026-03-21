@@ -1009,6 +1009,14 @@ window.LANG_VI = {
       "bounce": {
         "label": "Hiệu ứng nảy chữ",
         "desc": "Áp dụng hoạt ảnh nảy lên cho các ký tự đang hát trong chế độ Karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke ảo",
+        "desc": "Khi lời bài hát chỉ cung cấp đồng bộ theo dòng, thời gian karaoke sẽ được tổng hợp từ Spotify audio analysis. Các dòng tiếng Hàn, tiếng Nhật và tiếng Trung sẽ được tách dày hơn khi độ tin cậy cao."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Độ sớm khi render karaoke ảo",
+        "desc": "Áp dụng độ lệch thời gian khi render chỉ cho karaoke ảo. Giá trị dương sẽ làm phần tô sáng xuất hiện sớm hơn."
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_VI = {
       "enabled": "Hiển thị lời bài hát Panel",
       "linesCount": "Số dòng hiển thị"
     },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke ảo",
+      "subtitle": "Bật tô sáng kiểu karaoke cho gần như mọi bài hát",
+      "description": "Dùng Spotify audio analysis để tổng hợp thời gian karaoke cho lời bài hát chỉ có đồng bộ theo dòng. Nhờ vậy chế độ karaoke hoạt động với gần như mọi bài hát, nhưng thời gian chỉ là ước lượng và có thể không chính xác.",
+      "enabled": "Bật karaoke ảo"
+    },
     "complete": {
       "title": "Hoàn tất!",
       "subtitle": "Bạn đã sẵn sàng sử dụng ivLyrics",
@@ -1853,6 +1867,7 @@ window.LANG_VI = {
       "syllable": "Âm tiết"
     },
     "copyLyrics": "Sao chép lời bài hát",
+    "virtualKaraoke": "Dữ liệu karaoke ảo",
     "lyricsCopied": "Đã sao chép lời bài hát vào clipboard",
     "copyError": "Sao chép thất bại",
     "export": "Xuất",

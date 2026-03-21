@@ -1009,6 +1009,14 @@ window.LANG_ID = {
       "bounce": {
         "label": "Efek Pantulan Huruf",
         "desc": "Terapkan animasi memantul pada huruf yang sedang dinyanyikan di mode karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke virtual",
+        "desc": "Saat lirik hanya menyediakan sinkronisasi per baris, timing karaoke akan disintesis dari analisis audio Spotify. Baris berbahasa Korea, Jepang, dan Tionghoa akan dipecah lebih rapat saat tingkat keyakinannya tinggi."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pemajuan render karaoke virtual",
+        "desc": "Menerapkan offset waktu saat render hanya untuk karaoke virtual. Nilai positif membuat sorotan muncul lebih awal."
       }
     },
     "prefetch": {
@@ -1707,6 +1715,12 @@ window.LANG_ID = {
       "enabled": "Tampilkan Lirik Panel",
       "linesCount": "Jumlah Baris"
     },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke virtual",
+      "subtitle": "Aktifkan sorotan gaya karaoke di hampir semua lagu",
+      "description": "Menggunakan analisis audio Spotify untuk menyusun timing karaoke dari lirik yang hanya sinkron per baris. Ini membuat mode karaoke bekerja di hampir semua lagu, tetapi timing-nya bersifat perkiraan dan bisa tidak akurat.",
+      "enabled": "Aktifkan karaoke virtual"
+    },
     "complete": {
       "title": "Siap Digunakan!",
       "subtitle": "Sekarang Anda siap menggunakan ivLyrics",
@@ -1852,6 +1866,7 @@ window.LANG_ID = {
       "syllable": "Suku kata"
     },
     "copyLyrics": "Salin lirik",
+    "virtualKaraoke": "Data karaoke virtual",
     "lyricsCopied": "Lirik disalin ke clipboard",
     "copyError": "Gagal menyalin",
     "export": "Ekspor",

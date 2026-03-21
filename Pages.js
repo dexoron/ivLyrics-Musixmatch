@@ -1421,6 +1421,16 @@ const EMPTY_GLOBAL_CHAR_STATE = {
 const KARAOKE_PRE_SPACE_MIN_DURATION_MS = 45;
 const KARAOKE_PRE_SPACE_NEXT_CHAR_RATIO = 0.7;
 const KARAOKE_PRE_SPACE_MAX_DURATION_MS = 120;
+const PSEUDO_KARAOKE_SOURCES = new Set(["audio-analysis-pseudo", "spotify-audio-analysis"]);
+
+const getPseudoKaraokeRenderAdvance = (karaokeSource) => {
+	if (!PSEUDO_KARAOKE_SOURCES.has(karaokeSource)) {
+		return 0;
+	}
+
+	const configuredAdvance = Number(CONFIG.visual["pseudo-karaoke-render-advance"] ?? 0);
+	return Number.isFinite(configuredAdvance) ? configuredAdvance : 0;
+};
 
 const buildPreparedSyncedLyrics = (lyrics, isKara) =>
 	lyrics.map((line) => ({
@@ -2347,8 +2357,9 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 	);
 });
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null }) => {
 	const position = useLyricsPlaybackPosition();
+	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const [containerReady, setContainerReady] = useState(false);
 	const compactActiveLineEle = useRef();
 	const lyricContainerEle = useRef();
@@ -2370,7 +2381,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 		activeGlobalCharIndex,
 	} = useSyncedLyricsEngine({
 		lyrics,
-		position,
+		position: karaokePosition,
 		compact: true,
 		isKara,
 		containerRef: lyricContainerEle,
@@ -2442,7 +2453,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 			...renderLyricsItems({
 				items: renderItems,
 				isKara,
-				position,
+				position: karaokePosition,
 				activeLineRef: compactActiveLineEle,
 			})
 		)
@@ -2676,8 +2687,9 @@ function isInViewport(element) {
 	);
 }
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null }) => {
 	const position = useLyricsPlaybackPosition();
+	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const activeLineRef = useRef(null);
 	const pageRef = useRef(null);
 	const lyricsId = useMemo(() => lyrics[0]?.text || "no-lyrics", [lyrics]);
@@ -2686,7 +2698,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 		renderItems,
 	} = useSyncedLyricsEngine({
 		lyrics,
-		position,
+		position: karaokePosition,
 		compact: false,
 		isKara,
 		containerRef: pageRef,
@@ -2712,7 +2724,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 		...renderLyricsItems({
 			items: renderItems,
 			isKara,
-			position,
+			position: karaokePosition,
 			activeLineRef,
 		}),
 		react.createElement("p", {
@@ -2907,6 +2919,7 @@ const LyricsPageRenderer = react.memo(({
 	trackUri = "",
 	currentLyrics = [],
 	karaoke = null,
+	karaokeSource = null,
 	synced = null,
 	unsynced = null,
 	provider = null,
@@ -2942,6 +2955,7 @@ const LyricsPageRenderer = react.memo(({
 					contributors,
 					copyright,
 					isKara: true,
+					karaokeSource,
 					reRenderLyricsPage,
 				},
 			};
@@ -2986,6 +3000,7 @@ const LyricsPageRenderer = react.memo(({
 		syncedMode,
 		unsyncedMode,
 		karaoke,
+		karaokeSource,
 		synced,
 		unsynced,
 		karaokeLyrics,

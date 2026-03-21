@@ -1526,6 +1526,10 @@ const CONFIG = {
       "ivLyrics:visual:spotify-fake-karaoke-enabled",
       false
     ),
+    "pseudo-karaoke-render-advance": StorageManager.get(
+      "ivLyrics:visual:pseudo-karaoke-render-advance",
+      250
+    ),
     // Prefetch settings
     "prefetch-enabled": StorageManager.get(
       "ivLyrics:visual:prefetch-enabled",
@@ -5692,6 +5696,8 @@ class LyricsContainer extends react.Component {
         this.setState({ explicitMode: -1 });
       } else if (event.detail?.name === "spotify-fake-karaoke-enabled") {
         this.reloadLyrics?.(false);
+      } else if (event.detail?.name === "pseudo-karaoke-render-advance") {
+        this.forceUpdate?.();
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
@@ -6201,6 +6207,7 @@ class LyricsContainer extends react.Component {
         trackUri: this.state.uri,
         currentLyrics: this.state.currentLyrics,
         karaoke: this.state.karaoke,
+        karaokeSource: this.state.karaokeSource,
         synced: this.state.synced,
         unsynced: this.state.unsynced,
         provider: this.state.provider,

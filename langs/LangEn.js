@@ -1013,6 +1013,10 @@ window.LANG_EN = {
       "spotifyFakeKaraoke": {
         "label": "Pseudo Karaoke",
         "desc": "When lyrics only provide line-synced timing, synthesize karaoke timing from Spotify audio analysis. Korean, Japanese, and Chinese lines are split more densely when confidence is high."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pseudo Karaoke Render Advance",
+        "desc": "Apply a render-time timing offset to pseudo karaoke only. Positive values make the highlight appear earlier."
       }
     },
     "prefetch": {
@@ -1711,6 +1715,12 @@ window.LANG_EN = {
       "description": "Displays current lyrics in Spotify's 'Now Playing' panel. You can see lyrics without using fullscreen mode.",
       "enabled": "Show Panel Lyrics",
       "linesCount": "Lines to Show"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Virtual Karaoke",
+      "subtitle": "Enable karaoke-style highlighting on almost every song",
+      "description": "Uses Spotify audio analysis to synthesize karaoke timing for line-synced lyrics. This makes karaoke mode work on almost every song, but the timing is approximate and may be inaccurate.",
+      "enabled": "Enable Virtual Karaoke"
     },
     "complete": {
       "title": "Ready!",

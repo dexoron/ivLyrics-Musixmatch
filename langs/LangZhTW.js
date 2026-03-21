@@ -1009,6 +1009,14 @@ window.LANG_ZH_TW = {
       "bounce": {
         "label": "文字彈跳效果",
         "desc": "在卡拉OK模式中，為目前演唱的文字套用彈跳動畫"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "虛擬卡拉OK",
+        "desc": "當歌詞只提供逐行同步時間時，會根據 Spotify audio analysis 合成卡拉OK時間。當信心度較高時，韓文、日文與中文的行會被切分得更細。"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "虛擬卡拉OK渲染提前量",
+        "desc": "僅對虛擬卡拉OK套用渲染時序偏移。數值越大，高亮推進越早。"
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_ZH_TW = {
       "enabled": "顯示面板歌詞",
       "linesCount": "顯示行數"
     },
+    "pseudoKaraokeTip": {
+      "title": "虛擬卡拉OK",
+      "subtitle": "讓幾乎所有歌曲都能使用卡拉OK式高亮",
+      "description": "使用 Spotify audio analysis 為只有逐行同步的歌詞合成卡拉OK時間。這樣幾乎所有歌曲都能使用卡拉OK模式，但時間是近似值，可能不夠準確。",
+      "enabled": "啟用虛擬卡拉OK"
+    },
     "complete": {
       "title": "準備完成！",
       "subtitle": "現在可以開始使用 ivLyrics 了",
@@ -1853,6 +1867,7 @@ window.LANG_ZH_TW = {
       "syllable": "音節"
     },
     "copyLyrics": "複製歌詞",
+    "virtualKaraoke": "虛擬卡拉OK資料",
     "lyricsCopied": "歌詞已複製到剪貼簿",
     "copyError": "複製失敗",
     "export": "匯出",

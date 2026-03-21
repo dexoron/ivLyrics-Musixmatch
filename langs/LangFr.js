@@ -1009,6 +1009,14 @@ window.LANG_FR = {
       "bounce": {
         "label": "Effet rebond",
         "desc": "Animation de rebond sur les caractères chantés"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoké virtuel",
+        "desc": "Lorsque les paroles ne fournissent qu’une synchronisation par ligne, un timing karaoké est synthétisé à partir de l’analyse audio Spotify. Les lignes coréennes, japonaises et chinoises sont découpées plus finement lorsque la confiance est élevée."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Avance de rendu du karaoké virtuel",
+        "desc": "Applique un décalage temporel au rendu uniquement pour le karaoké virtuel. Des valeurs positives font apparaître le surlignage plus tôt."
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_FR = {
       "enabled": "Afficher paroles panneau",
       "linesCount": "Nombre de lignes"
     },
+    "pseudoKaraokeTip": {
+      "title": "Karaoké virtuel",
+      "subtitle": "Activer le surlignage karaoké sur presque tous les morceaux",
+      "description": "Utilise l’analyse audio de Spotify pour synthétiser un timing karaoké à partir de paroles synchronisées par ligne. Le mode karaoké fonctionnera ainsi sur presque tous les morceaux, mais le timing reste approximatif et peut être imprécis.",
+      "enabled": "Activer le karaoké virtuel"
+    },
     "complete": {
       "title": "Tout est prêt !",
       "subtitle": "Vous êtes prêt à utiliser ivLyrics",
@@ -1853,6 +1867,7 @@ window.LANG_FR = {
       "syllable": "Syllabe"
     },
     "copyLyrics": "Copier les paroles",
+    "virtualKaraoke": "Données de karaoké virtuelles",
     "lyricsCopied": "Paroles copiées dans le presse-papiers",
     "copyError": "Échec de la copie",
     "export": "Exporter",

@@ -174,6 +174,7 @@ const SettingKeys = [
   "ivLyrics:visual:translate:target-language",
   "ivLyrics:visual:reduce-motion",
   "ivLyrics:visual:spotify-fake-karaoke-enabled",
+  "ivLyrics:visual:pseudo-karaoke-render-advance",
 ];
 
 const BYTES_FOR_INDEX = Math.ceil(SettingKeys.length / 255);

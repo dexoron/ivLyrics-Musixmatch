@@ -1009,6 +1009,14 @@ window.LANG_DE = {
       "bounce": {
         "label": "Text-Bounce-Effekt",
         "desc": "Animiert die aktuell gesungene Silbe mit einem Hüpf-Effekt"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Pseudo-Karaoke",
+        "desc": "Wenn Songtexte nur zeilensynchrones Timing liefern, wird aus der Spotify-Audioanalyse ein Karaoke-Timing erzeugt. Koreanische, japanische und chinesische Zeilen werden bei hoher Zuverlässigkeit feiner aufgeteilt."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pseudo-Karaoke-Vorlauf",
+        "desc": "Wendet einen Timing-Offset nur beim Rendern von Pseudo-Karaoke an. Positive Werte lassen die Hervorhebung früher erscheinen."
       }
     },
     "prefetch": {
@@ -1707,6 +1715,12 @@ window.LANG_DE = {
       "enabled": "Panel-Songtext anzeigen",
       "linesCount": "Anzahl Zeilen"
     },
+    "pseudoKaraokeTip": {
+      "title": "Virtuelles Karaoke",
+      "subtitle": "Karaoke-Hervorhebung bei fast allen Songs aktivieren",
+      "description": "Verwendet die Spotify-Audioanalyse, um Karaoke-Timing für zeilensynchronisierte Texte zu erzeugen. Dadurch funktioniert der Karaoke-Modus bei fast allen Songs, aber das Timing ist nur angenähert und kann ungenau sein.",
+      "enabled": "Virtuelles Karaoke aktivieren"
+    },
     "complete": {
       "title": "Fertig!",
       "subtitle": "ivLyrics ist jetzt einsatzbereit",
@@ -1852,6 +1866,7 @@ window.LANG_DE = {
       "syllable": "Silbe"
     },
     "copyLyrics": "Liedtext kopieren",
+    "virtualKaraoke": "Virtuelle Karaoke-Daten",
     "lyricsCopied": "Liedtext in Zwischenablage kopiert",
     "copyError": "Kopieren fehlgeschlagen",
     "export": "Exportieren",

@@ -59,6 +59,7 @@
     const ORIGINAL_SIZE_KEY = "ivLyrics:visual:panel-lyrics-original-size";
     const PHONETIC_SIZE_KEY = "ivLyrics:visual:panel-lyrics-phonetic-size";
     const TRANSLATION_SIZE_KEY = "ivLyrics:visual:panel-lyrics-translation-size";
+    const PSEUDO_KARAOKE_SOURCES = new Set(['audio-analysis-pseudo', 'spotify-audio-analysis']);
     // 배경 설정 키
     const BG_TYPE_KEY = "ivLyrics:visual:panel-bg-type";
     const BG_COLOR_KEY = "ivLyrics:visual:panel-bg-color";
@@ -598,6 +599,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         }
     };
 
+    const getPseudoKaraokeRenderAdvance = () => {
+        const configuredAdvance = Number(CONFIG?.visual?.["pseudo-karaoke-render-advance"] ?? 0);
+        return Number.isFinite(configuredAdvance) ? configuredAdvance : 0;
+    };
+
     const setStorageValue = (key, value) => {
         try {
             localStorage.setItem(key, String(value));
@@ -817,9 +823,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     // ============================================
     const PanelLyrics = () => {
         const [lyrics, setLyrics] = useState([]);
+        const [karaokeSource, setKaraokeSource] = useState(null);
         const [currentIndex, setCurrentIndex] = useState(0);
         // currentTime은 더 이상 상태로 관리하지 않음 - 전역 변수 사용
         const [trackOffset, setTrackOffset] = useState(0); // 곡별 싱크 오프셋
+        const [pseudoKaraokeAdvanceMs, setPseudoKaraokeAdvanceMs] = useState(getPseudoKaraokeRenderAdvance());
         const [isEnabled, setIsEnabled] = useState(getStorageValue(STORAGE_KEY, DEFAULT_ENABLED));
         const [numLines, setNumLines] = useState(parseInt(getStorageValue(PANEL_LINES_KEY, DEFAULT_LINES), 10));
         const [fontScale, setFontScale] = useState(parseInt(getStorageValue(FONT_SCALE_KEY, DEFAULT_FONT_SCALE), 10));
@@ -900,6 +908,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     // karaoke (노래방) → synced → unsynced 순서로 선택
                     let lyricsData = result.karaoke || result.synced || result.unsynced || [];
                     const isKaraoke = !!result.karaoke;
+                    const nextKaraokeSource = result.karaokeSource || null;
 
                     if (lyricsData.length > 0) {
                         // endTime 계산 (없으면 다음 라인의 startTime 사용)
@@ -916,6 +925,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         }
 
                         setLyrics(lyricsData);
+                        setKaraokeSource(nextKaraokeSource);
                         currentLyricsState.lyrics = lyricsData;
                         currentLyricsState.trackUri = loadingForTrackUri;
                         setCurrentIndex(0);
@@ -934,16 +944,19 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     } else {
                         panelDebug("[PanelLyrics] No lyrics in result");
                         setLyrics([]);
+                        setKaraokeSource(null);
                         currentLyricsState.lyrics = [];
                     }
                 } else {
                     panelDebug("[PanelLyrics] No lyrics found:", result?.error);
                     setLyrics([]);
+                    setKaraokeSource(null);
                     currentLyricsState.lyrics = [];
                 }
             } catch (error) {
                 console.error("[PanelLyrics] Failed to load lyrics:", error);
                 setLyrics([]);
+                setKaraokeSource(null);
             } finally {
                 loadingRef.current = false;
             }
@@ -1107,6 +1120,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
                 // 이전 가사 상태 초기화 (새 곡 전환 중임을 표시)
                 setLyrics([]);
+                setKaraokeSource(null);
                 currentLyricsState.lyrics = [];
                 currentLyricsState.currentIndex = 0;
 
@@ -1127,6 +1141,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 }
                 if (event.detail?.name === 'panel-font-scale') {
                     setFontScale(parseInt(event.detail.value, 10) || DEFAULT_FONT_SCALE);
+                }
+                if (event.detail?.name === 'pseudo-karaoke-render-advance') {
+                    setPseudoKaraokeAdvanceMs(Number(event.detail.value) || 0);
                 }
                 // 새로운 설정들 처리 - CSS 변수 업데이트
                 if (event.detail?.name === 'panel-lyrics-width' ||
@@ -1371,8 +1388,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     }
                 }
 
-                // 곡별 딜레이 + 곡별 싱크 오프셋 적용
-                const adjustedPosition = position + (cachedDelay || 0) + trackOffset;
+                // 곡별 딜레이 + 곡별 싱크 오프셋 + 가상 노래방 렌더 선행값 적용
+                const pseudoAdvance = PSEUDO_KARAOKE_SOURCES.has(karaokeSource)
+                    ? pseudoKaraokeAdvanceMs
+                    : 0;
+                const adjustedPosition = position + (cachedDelay || 0) + trackOffset + pseudoAdvance;
 
                 // 전역 변수에 현재 시간 저장 (KaraokeWord에서 읽음)
                 window._ivLyricsPanelCurrentTime = adjustedPosition;
@@ -1408,7 +1428,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 // 전역 변수 정리
                 window._ivLyricsPanelCurrentTime = 0;
             };
-        }, [lyrics, isEnabled, trackOffset]); // currentIndex 의존성 제거
+        }, [lyrics, isEnabled, trackOffset, karaokeSource, pseudoKaraokeAdvanceMs]); // currentIndex 의존성 제거
 
         // 스크롤 애니메이션 비활성화 - Now Playing 탭 스크롤 문제 방지
         // useEffect(() => {

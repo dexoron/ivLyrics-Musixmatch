@@ -1492,9 +1492,18 @@
 
     const PseudoKaraokeService = (() => {
         const SETTING_KEY = 'ivLyrics:visual:spotify-fake-karaoke-enabled';
-        const CACHE_VERSION_BASE = 'pseudo-karaoke-v3';
-        const PSEUDO_ADVANCE_MS = 30;
+        const CACHE_VERSION_BASE = 'pseudo-karaoke-v9';
         const AGGRESSIVE_SCRIPT_REGEX = /[\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
+        const HANGUL_BASE_CODE = 0xac00;
+        const HANGUL_END_CODE = 0xd7a3;
+        const HANGUL_JUNGSEONG_COUNT = 21;
+        const HANGUL_JONGSEONG_COUNT = 28;
+        const HANGUL_COMPLEX_VOWELS = new Set([9, 10, 11, 14, 15, 16, 19]);
+        const HANGUL_SUSTAIN_FINALS = new Set([4, 8, 16, 21, 27]);
+        const KOREAN_SHORT_PARTICLES = new Set(['은', '는', '이', '가', '을', '를', '도', '만', '에', '엔', '로', '으로', '와', '과', '랑', '이랑', '한테', '께', '의', '야']);
+        const JAPANESE_SMALL_KANA_REGEX = /[ゃゅょぁぃぅぇぉゎャュョァィゥェォヮヵヶ]/;
+        const JAPANESE_PARTICLES = new Set(['は', 'が', 'を', 'に', 'へ', 'と', 'も', 'で', 'の', 'ね', 'よ', 'か', 'な', 'さ']);
+        const HAN_PARTICLES = new Set(['的', '了', '吗', '呢', '啊', '呀', '吧', '啦', '嘛', '着', '过']);
         const _analysisCache = new Map();
         const _inflightAnalysis = new Map();
         const PSEUDO_SOURCES = new Set(['audio-analysis-pseudo', 'spotify-audio-analysis']);
@@ -1523,6 +1532,88 @@
 
         function isAggressiveChar(char) {
             return AGGRESSIVE_SCRIPT_REGEX.test(char);
+        }
+
+        function isHangulSyllable(char) {
+            if (!char) return false;
+            const code = char.codePointAt(0);
+            return code >= HANGUL_BASE_CODE && code <= HANGUL_END_CODE;
+        }
+
+        function isJapaneseChar(char) {
+            if (!char) return false;
+            return /[\u3040-\u30ff\u31f0-\u31ffー]/.test(char);
+        }
+
+        function isHanChar(char) {
+            if (!char) return false;
+            return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(char);
+        }
+
+        function getHangulSyllableMeta(char) {
+            if (!isHangulSyllable(char)) return null;
+            const offset = char.codePointAt(0) - HANGUL_BASE_CODE;
+            const jongseongIndex = offset % HANGUL_JONGSEONG_COUNT;
+            const jungseongIndex = Math.floor(offset / HANGUL_JONGSEONG_COUNT) % HANGUL_JUNGSEONG_COUNT;
+            return { jungseongIndex, jongseongIndex };
+        }
+
+        function getHangulUnitWeight(text, repeatedCount) {
+            const chars = Array.from(text);
+            let total = 0;
+
+            for (const char of chars) {
+                const meta = getHangulSyllableMeta(char);
+                if (!meta) {
+                    total += 0.8;
+                    continue;
+                }
+
+                let syllableWeight = 0.96;
+                if (HANGUL_COMPLEX_VOWELS.has(meta.jungseongIndex)) syllableWeight += 0.18;
+                if (meta.jongseongIndex === 0) {
+                    syllableWeight += 0.12;
+                } else if (HANGUL_SUSTAIN_FINALS.has(meta.jongseongIndex)) {
+                    syllableWeight += 0.03;
+                } else {
+                    syllableWeight -= 0.04;
+                }
+                total += syllableWeight;
+            }
+
+            const particlePenalty = KOREAN_SHORT_PARTICLES.has(text) ? 0.76 : 1;
+            return clamp((total + (repeatedCount * 0.14)) * particlePenalty, 0.78, 7.2);
+        }
+
+        function getJapaneseUnitWeight(text, repeatedCount) {
+            const chars = Array.from(text);
+            let moraWeight = 0;
+
+            for (const char of chars) {
+                if (JAPANESE_SMALL_KANA_REGEX.test(char)) {
+                    moraWeight += 0.1;
+                    continue;
+                }
+                if (char === 'ー') {
+                    moraWeight += 0.58;
+                    continue;
+                }
+                if (char === 'っ' || char === 'ッ' || char === 'ん' || char === 'ン') {
+                    moraWeight += 0.7;
+                    continue;
+                }
+                moraWeight += 0.98;
+            }
+
+            const particlePenalty = JAPANESE_PARTICLES.has(text) ? 0.74 : 1;
+            return clamp((moraWeight + (repeatedCount * 0.16)) * particlePenalty, 0.72, 7);
+        }
+
+        function getHanUnitWeight(text, repeatedCount) {
+            const chars = Array.from(text);
+            const base = chars.length * 0.97;
+            const particlePenalty = chars.length <= 2 && HAN_PARTICLES.has(text) ? 0.8 : 1;
+            return clamp((base + (repeatedCount * 0.12)) * particlePenalty, 0.8, 6.8);
         }
 
         function getCacheVersion() {
@@ -1644,9 +1735,55 @@
             const chars = Array.from(trimmed);
             const alphaNumericCount = chars.filter((char) => /[A-Za-z0-9]/.test(char)).length;
             const aggressiveCount = chars.filter(isAggressiveChar).length;
+            const hangulCount = chars.filter(isHangulSyllable).length;
+            const japaneseCount = chars.filter(isJapaneseChar).length;
+            const hanCount = chars.filter(isHanChar).length;
+            const punctuationCount = chars.filter((char) => /[.,!?;:'"()[\]{}\-]/.test(char)).length;
+            const repeatedCount = chars.reduce((count, char, index) => {
+                if (index === 0) return count;
+                return count + (char === chars[index - 1] ? 1 : 0);
+            }, 0);
 
-            if (aggressiveCount === chars.length) return Math.max(0.9, aggressiveCount);
-            if (alphaNumericCount > 0) return Math.max(1, Math.min(6, alphaNumericCount * 0.65));
+            if (punctuationCount === chars.length) {
+                return Math.max(0.22, chars.length * 0.18);
+            }
+
+            if (hangulCount === chars.length) {
+                return getHangulUnitWeight(trimmed, repeatedCount);
+            }
+
+            if (japaneseCount === chars.length) {
+                return getJapaneseUnitWeight(trimmed, repeatedCount);
+            }
+
+            if (hanCount === chars.length) {
+                return getHanUnitWeight(trimmed, repeatedCount);
+            }
+
+            if (aggressiveCount === chars.length) {
+                return Math.max(0.9, aggressiveCount + (repeatedCount * 0.28));
+            }
+
+            if (alphaNumericCount > 0) {
+                const normalized = trimmed.toLowerCase();
+                const vowelGroups = normalized.match(/[aeiouy]+/g)?.length || 0;
+                const letterCount = chars.filter((char) => /[A-Za-z]/.test(char)).length;
+                const digitCount = chars.filter((char) => /[0-9]/.test(char)).length;
+                const pronunciationUnits = Math.max(
+                    vowelGroups,
+                    Math.ceil(letterCount / 3.4),
+                    digitCount > 0 ? digitCount : 0
+                );
+                const connectorWords = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'for', 'and', 'or', 'but']);
+                const connectorPenalty = connectorWords.has(normalized) ? 0.72 : 1;
+                const longEndingBoost = /(ing|ed|er|est|oo|ee|ah|oh)$/i.test(trimmed) ? 0.42 : 0;
+                return clamp(
+                    ((pronunciationUnits * 0.95) + longEndingBoost + (repeatedCount * 0.15)) * connectorPenalty,
+                    0.75,
+                    6.8
+                );
+            }
+
             return Math.max(0.45, chars.length * 0.4);
         }
 
@@ -1667,6 +1804,39 @@
             return { peak, focus, spread: Math.sqrt(variance) };
         }
 
+        function getPitchPeakIndex(pitches) {
+            if (!Array.isArray(pitches) || pitches.length === 0) return -1;
+
+            let bestIndex = 0;
+            let bestValue = pitches[0] || 0;
+            for (let index = 1; index < pitches.length; index++) {
+                if ((pitches[index] || 0) > bestValue) {
+                    bestValue = pitches[index] || 0;
+                    bestIndex = index;
+                }
+            }
+            return bestValue > 0 ? bestIndex : -1;
+        }
+
+        function getPitchNeighborAffinity(segment, neighborSegment) {
+            if (!segment || !neighborSegment) return 0;
+
+            const segmentPeakIndex = Number.isFinite(segment?.pitchPeakIndex)
+                ? segment.pitchPeakIndex
+                : getPitchPeakIndex(segment?.pitches);
+            const neighborPeakIndex = Number.isFinite(neighborSegment?.pitchPeakIndex)
+                ? neighborSegment.pitchPeakIndex
+                : getPitchPeakIndex(neighborSegment?.pitches);
+            if (segmentPeakIndex < 0 || neighborPeakIndex < 0) return 0;
+
+            const distance = Math.abs(segmentPeakIndex - neighborPeakIndex);
+            const peakCloseness = clamp01(1 - (distance / 5));
+            const segmentFocus = Number.isFinite(segment?.pitchFocus) ? segment.pitchFocus : getPitchStats(segment?.pitches).focus;
+            const neighborFocus = Number.isFinite(neighborSegment?.pitchFocus) ? neighborSegment.pitchFocus : getPitchStats(neighborSegment?.pitches).focus;
+            const focusCloseness = clamp01(1 - (Math.abs(segmentFocus - neighborFocus) / 0.32));
+            return clamp01((peakCloseness * 0.62) + (focusCloseness * 0.38));
+        }
+
         function getTimbreDelta(currentSegment, neighborSegment) {
             const current = currentSegment?.timbre;
             const neighbor = neighborSegment?.timbre;
@@ -1683,7 +1853,7 @@
 
         function scoreVocalCandidate(segment, previousSegment, nextSegment) {
             const durationMs = Math.max(1, (segment?.duration || 0) * 1000);
-            if (durationMs < 35 || durationMs > 650) return 0;
+            if (durationMs < 35 || durationMs > 650) return null;
 
             const confidence = clamp01(typeof segment?.confidence === 'number' ? segment.confidence : 0);
             const loudnessStart = Number.isFinite(segment?.loudness_start) ? segment.loudness_start : -60;
@@ -1712,7 +1882,20 @@
             if (pitchStats.focus < 0.38 && pitchStats.peak < 0.42) score -= 0.12;
             if (pitchStats.spread > 0.25 && durationMs < 110) score -= 0.08;
 
-            return clamp01(score);
+            return {
+                baseScore: clamp01(score),
+                durationMs,
+                confidence,
+                attackRatio,
+                onsetScore,
+                sustainedScore,
+                loudnessScore,
+                harmonicScore,
+                contrastScore,
+                pitchPeakIndex: getPitchPeakIndex(segment?.pitches),
+                pitchSpread: pitchStats.spread,
+                pitchFocus: pitchStats.focus
+            };
         }
 
         function buildRhythmAnchors(startTime, endTime, analysis) {
@@ -1742,26 +1925,69 @@
         function buildVocalCandidates(startTime, endTime, analysis) {
             if (!Array.isArray(analysis?.segments)) return [];
 
-            const candidates = [];
+            const rawCandidates = [];
             for (let index = 0; index < analysis.segments.length; index++) {
                 const segment = analysis.segments[index];
                 const segmentStart = (segment?.start || 0) * 1000;
                 const segmentEnd = segmentStart + ((segment?.duration || 0) * 1000);
                 if (segmentEnd <= startTime || segmentStart >= endTime) continue;
 
-                const score = scoreVocalCandidate(segment, analysis.segments[index - 1], analysis.segments[index + 1]);
-                if (score < 0.28) continue;
+                const descriptor = scoreVocalCandidate(segment, analysis.segments[index - 1], analysis.segments[index + 1]);
+                if (!descriptor || descriptor.baseScore < 0.2) continue;
 
                 const loudnessMaxTime = Number.isFinite(segment?.loudness_max_time) ? segment.loudness_max_time * 1000 : Math.min(80, (segment?.duration || 0) * 380);
                 const candidateTime = Math.round(clamp(segmentStart + loudnessMaxTime, startTime, endTime));
-                candidates.push({
+                rawCandidates.push({
                     time: candidateTime,
-                    score,
+                    baseScore: descriptor.baseScore,
                     segmentStart: Math.round(Math.max(startTime, segmentStart)),
                     segmentEnd: Math.round(Math.min(endTime, segmentEnd)),
-                    durationMs: Math.max(1, Math.round(segmentEnd - segmentStart))
+                    durationMs: Math.max(1, Math.round(segmentEnd - segmentStart)),
+                    ...descriptor
                 });
             }
+
+            const candidates = rawCandidates.map((candidate, index) => {
+                const previous = rawCandidates[index - 1] || null;
+                const next = rawCandidates[index + 1] || null;
+                const previousGap = previous ? Math.max(0, candidate.segmentStart - previous.segmentEnd) : Number.POSITIVE_INFINITY;
+                const nextGap = next ? Math.max(0, next.segmentStart - candidate.segmentEnd) : Number.POSITIVE_INFINITY;
+                const previousSupport = previous && previousGap <= 110
+                    ? previous.baseScore * getPitchNeighborAffinity(candidate, previous) * clamp01(1 - (previousGap / 130))
+                    : 0;
+                const nextSupport = next && nextGap <= 110
+                    ? next.baseScore * getPitchNeighborAffinity(candidate, next) * clamp01(1 - (nextGap / 130))
+                    : 0;
+                const neighborSupport = (previousSupport + nextSupport) / 2;
+                const runSupport = previousSupport > 0.2 && nextSupport > 0.2
+                    ? Math.min(previousSupport, nextSupport) * 0.9
+                    : 0;
+                const percussionPenalty =
+                    (candidate.durationMs < 95 && candidate.attackRatio < 0.12 && candidate.onsetScore > 0.7 ? 0.16 : 0) +
+                    (candidate.harmonicScore < 0.4 && candidate.contrastScore > 0.72 ? 0.11 : 0) +
+                    (candidate.pitchSpread > 0.28 && candidate.durationMs < 120 ? 0.07 : 0);
+                const isolationPenalty = neighborSupport < 0.12 && candidate.baseScore < 0.52
+                    ? (0.08 + (candidate.contrastScore * 0.06))
+                    : 0;
+                const harmonicRunBoost = candidate.harmonicScore > 0.58 && neighborSupport > 0.18
+                    ? 0.08 + (neighborSupport * 0.12)
+                    : 0;
+                const refinedScore = clamp01(
+                    (candidate.baseScore * 0.74) +
+                    (neighborSupport * 0.24) +
+                    (runSupport * 0.18) +
+                    harmonicRunBoost -
+                    percussionPenalty -
+                    isolationPenalty
+                );
+
+                return {
+                    ...candidate,
+                    score: refinedScore,
+                    supportScore: neighborSupport,
+                    runSupportScore: runSupport
+                };
+            }).filter((candidate) => candidate.score >= 0.26);
 
             candidates.sort((left, right) => left.time - right.time);
             return candidates.reduce((accumulator, candidate) => {
@@ -1880,6 +2106,536 @@
             };
         }
 
+        function buildVocalMassCurve(startTime, endTime, vocalCandidates, rhythmAnchors, confidence) {
+            const intervalMs = Math.max(1, endTime - startTime);
+            const stepMs = Math.max(18, Math.min(36, Math.round(intervalMs / 88)));
+            const frameCount = Math.max(2, Math.ceil(intervalMs / stepMs) + 1);
+            const frames = [];
+            const anchorSet = new Set((rhythmAnchors || []).map((time) => Math.round(time)));
+            const baseMassFloor = vocalCandidates.length > 0
+                ? Math.max(0.008, 0.012 - (confidence * 0.004))
+                : 0.004;
+
+            for (let index = 0; index < frameCount; index++) {
+                const time = index === frameCount - 1
+                    ? endTime
+                    : Math.min(endTime, Math.round(startTime + (index * stepMs)));
+                let mass = baseMassFloor;
+
+                for (const candidate of vocalCandidates || []) {
+                    const durationMs = Math.max(1, candidate.durationMs || (candidate.segmentEnd - candidate.segmentStart) || stepMs);
+                    const peakRadius = Math.max(55, Math.min(220, durationMs * 0.6));
+                    const sustainRadius = Math.max(90, Math.min(320, durationMs * 1.1));
+                    const distanceToPeak = Math.abs(time - candidate.time);
+                    const peakShape = clamp01(1 - (distanceToPeak / peakRadius));
+                    const distanceToCenter = Math.abs(time - ((candidate.segmentStart + candidate.segmentEnd) / 2));
+                    const sustainShape = clamp01(1 - (distanceToCenter / sustainRadius));
+                    const inSegmentBoost = time >= candidate.segmentStart && time <= candidate.segmentEnd ? 1 : 0;
+
+                    mass += candidate.score * (
+                        (peakShape * 0.7) +
+                        (sustainShape * 0.35) +
+                        (inSegmentBoost * 0.18)
+                    );
+                }
+
+                if (anchorSet.has(time) && confidence < 0.5) {
+                    mass += 0.03 + ((0.5 - confidence) * 0.04);
+                }
+
+                frames.push({
+                    time,
+                    mass: Math.max(baseMassFloor, mass),
+                    cumulative: 0
+                });
+            }
+
+            let cumulative = 0;
+            for (const frame of frames) {
+                cumulative += frame.mass;
+                frame.cumulative = cumulative;
+            }
+
+            return {
+                frames,
+                stepMs,
+                totalMass: cumulative
+            };
+        }
+
+        function buildSilenceSpans(massCurve, startTime, endTime, confidence) {
+            const frames = massCurve?.frames || [];
+            if (!frames.length) return [];
+
+            const averageMass = frames.reduce((sum, frame) => sum + frame.mass, 0) / Math.max(1, frames.length);
+            const threshold = averageMass * (confidence >= 0.52 ? 0.58 : 0.68);
+            const minSpanMs = Math.max(70, Math.min(220, (endTime - startTime) * 0.06));
+            const spans = [];
+            let currentSpan = null;
+
+            for (let index = 0; index < frames.length; index++) {
+                const frame = frames[index];
+                const nextTime = frames[index + 1]?.time ?? endTime;
+                const frameEnd = Math.min(endTime, Math.max(frame.time, nextTime));
+                const isSilent = frame.mass <= threshold;
+
+                if (isSilent) {
+                    if (!currentSpan) {
+                        currentSpan = {
+                            start: frame.time,
+                            end: frameEnd,
+                            minMass: frame.mass,
+                            totalMass: frame.mass,
+                            count: 1
+                        };
+                    } else {
+                        currentSpan.end = frameEnd;
+                        currentSpan.minMass = Math.min(currentSpan.minMass, frame.mass);
+                        currentSpan.totalMass += frame.mass;
+                        currentSpan.count += 1;
+                    }
+                    continue;
+                }
+
+                if (currentSpan && (currentSpan.end - currentSpan.start) >= minSpanMs) {
+                    spans.push({
+                        ...currentSpan,
+                        avgMass: currentSpan.totalMass / Math.max(1, currentSpan.count),
+                        center: Math.round((currentSpan.start + currentSpan.end) / 2)
+                    });
+                }
+                currentSpan = null;
+            }
+
+            if (currentSpan && (currentSpan.end - currentSpan.start) >= minSpanMs) {
+                spans.push({
+                    ...currentSpan,
+                    avgMass: currentSpan.totalMass / Math.max(1, currentSpan.count),
+                    center: Math.round((currentSpan.start + currentSpan.end) / 2)
+                });
+            }
+
+            return spans;
+        }
+
+        function getMassAtTime(massCurve, time, startTime, endTime) {
+            const frames = massCurve?.frames || [];
+            if (!frames.length) {
+                const interval = Math.max(1, endTime - startTime);
+                return clamp01((time - startTime) / interval);
+            }
+
+            const clampedTime = clamp(time, startTime, endTime);
+            let previousFrame = { time: startTime, cumulative: 0 };
+
+            for (const frame of frames) {
+                if (frame.time >= clampedTime) {
+                    const spanTime = frame.time - previousFrame.time;
+                    const localRatio = spanTime > 0
+                        ? (clampedTime - previousFrame.time) / spanTime
+                        : 0;
+                    return previousFrame.cumulative + ((frame.cumulative - previousFrame.cumulative) * localRatio);
+                }
+
+                previousFrame = frame;
+            }
+
+            return frames[frames.length - 1]?.cumulative || 0;
+        }
+
+        function getLocalMassAtTime(massCurve, time, startTime, endTime) {
+            const frames = massCurve?.frames || [];
+            if (!frames.length) return 0;
+
+            const clampedTime = clamp(time, startTime, endTime);
+            let previousFrame = frames[0];
+
+            if (clampedTime <= previousFrame.time) {
+                return previousFrame.mass;
+            }
+
+            for (let index = 1; index < frames.length; index++) {
+                const frame = frames[index];
+                if (frame.time >= clampedTime) {
+                    const spanTime = frame.time - previousFrame.time;
+                    const localRatio = spanTime > 0
+                        ? (clampedTime - previousFrame.time) / spanTime
+                        : 0;
+                    return previousFrame.mass + ((frame.mass - previousFrame.mass) * localRatio);
+                }
+                previousFrame = frame;
+            }
+
+            return previousFrame.mass;
+        }
+
+        function getTimeByMassTarget(massCurve, targetMass, startTime, endTime) {
+            const frames = massCurve?.frames || [];
+            const totalMass = massCurve?.totalMass || 0;
+
+            if (!frames.length || totalMass <= 0.0001) {
+                const fallbackRatio = totalMass > 0.0001 ? clamp01(targetMass / totalMass) : 0.5;
+                return Math.round(startTime + ((endTime - startTime) * fallbackRatio));
+            }
+
+            const clampedTargetMass = clamp(targetMass, 0, totalMass);
+            let previousTime = startTime;
+            let previousCumulative = 0;
+
+            for (const frame of frames) {
+                if (frame.cumulative >= clampedTargetMass) {
+                    const spanMass = frame.cumulative - previousCumulative;
+                    const localRatio = spanMass > 0
+                        ? (clampedTargetMass - previousCumulative) / spanMass
+                        : 0;
+                    return Math.round(previousTime + ((frame.time - previousTime) * localRatio));
+                }
+
+                previousTime = frame.time;
+                previousCumulative = frame.cumulative;
+            }
+
+            return Math.round(endTime);
+        }
+
+        function getTimeByMassRatio(massCurve, ratio, startTime, endTime) {
+            const clampedRatio = clamp01(ratio);
+            const totalMass = massCurve?.totalMass || 0;
+            if (totalMass <= 0.0001) {
+                return Math.round(startTime + ((endTime - startTime) * clampedRatio));
+            }
+
+            return getTimeByMassTarget(massCurve, totalMass * clampedRatio, startTime, endTime);
+        }
+
+        function buildUnitPhrases(units, weights) {
+            if (!Array.isArray(units) || !units.length) return [];
+
+            const phrases = [];
+            let phraseStartIndex = 0;
+            let phraseWeight = 0;
+            let lexicalCount = 0;
+            let aggressiveCount = 0;
+
+            for (let index = 0; index < units.length; index++) {
+                const unitText = units[index] || '';
+                const trimmed = unitText.trim();
+                const unitWeight = weights[index] || 1;
+                const hasLexicalText = !!trimmed;
+                const isWhitespaceOnly = hasLexicalText ? false : /\s/.test(unitText);
+                const isAggressiveUnit = hasLexicalText && Array.from(trimmed).every(isAggressiveChar);
+                const endsPhraseStrong = /[.!?;:)]["']?\s*$/.test(unitText);
+                const hasTrailingWhitespace = /\s+$/.test(unitText);
+
+                phraseWeight += unitWeight;
+                if (hasLexicalText && !isWhitespaceOnly) {
+                    lexicalCount += 1;
+                }
+                if (isAggressiveUnit) {
+                    aggressiveCount += 1;
+                }
+
+                const nextUnit = units[index + 1] || '';
+                const nextTrimmed = nextUnit.trim();
+                const nextStartsLexical = !!nextTrimmed;
+                const currentPhraseSize = index - phraseStartIndex + 1;
+                const aggressiveDominant = aggressiveCount >= Math.max(2, lexicalCount);
+                const shouldSoftBreak =
+                    hasTrailingWhitespace &&
+                    nextStartsLexical &&
+                    (
+                        (aggressiveDominant && (phraseWeight >= 3.2 || lexicalCount >= 5)) ||
+                        (!aggressiveDominant && (phraseWeight >= 4.6 || lexicalCount >= 3))
+                    );
+                const shouldHardBreak = endsPhraseStrong || currentPhraseSize >= (aggressiveDominant ? 6 : 4);
+
+                if (index === units.length - 1 || shouldHardBreak || shouldSoftBreak) {
+                    phrases.push({
+                        startIndex: phraseStartIndex,
+                        endIndex: index,
+                        weight: Math.max(0.2, phraseWeight)
+                    });
+                    phraseStartIndex = index + 1;
+                    phraseWeight = 0;
+                    lexicalCount = 0;
+                    aggressiveCount = 0;
+                }
+            }
+
+            return phrases.length
+                ? phrases
+                : [{ startIndex: 0, endIndex: units.length - 1, weight: weights.reduce((sum, weight) => sum + weight, 0) || units.length }];
+        }
+
+        function pickPhraseBoundaryTime(targetTime, timingModel, previousTime, remainingPhrases, endTime) {
+            const minGap = 80;
+            const minAllowed = previousTime + minGap;
+            const maxAllowed = endTime - (remainingPhrases * minGap);
+            if (maxAllowed <= minAllowed) return Math.round(minAllowed);
+
+            const clampedTarget = Math.max(minAllowed, Math.min(maxAllowed, targetTime));
+            const frames = timingModel?.vocalMassCurve?.frames || [];
+            const silenceSpans = timingModel?.silenceSpans || [];
+            const lineConfidence = clamp01(timingModel?.confidence ?? 0);
+            const averageFrameMass = frames.length
+                ? frames.reduce((sum, frame) => sum + frame.mass, 0) / frames.length
+                : 0.0001;
+            const valleyWindow = Math.max(140, Math.min(360, (endTime - previousTime) * (lineConfidence >= 0.5 ? 0.22 : 0.3)));
+            const silenceWindow = Math.max(170, Math.min(420, valleyWindow * 1.15));
+
+            let bestSilenceTime = null;
+            let bestSilenceScore = Number.POSITIVE_INFINITY;
+            for (const span of silenceSpans) {
+                if (span.center < minAllowed || span.center > maxAllowed) continue;
+                const distance = Math.abs(span.center - clampedTarget);
+                if (distance > silenceWindow) continue;
+
+                const distancePenalty = distance / Math.max(1, silenceWindow);
+                const depthPenalty = span.avgMass / Math.max(0.0001, averageFrameMass);
+                const score = (depthPenalty * 0.7) + (distancePenalty * 0.55);
+                if (score < bestSilenceScore) {
+                    bestSilenceScore = score;
+                    bestSilenceTime = span.center;
+                }
+            }
+
+            if (bestSilenceTime !== null) {
+                return pickBoundaryTime(bestSilenceTime, timingModel, previousTime, remainingPhrases, endTime);
+            }
+
+            let bestValleyTime = clampedTarget;
+            let bestValleyScore = Number.POSITIVE_INFINITY;
+
+            for (const frame of frames) {
+                if (frame.time < minAllowed || frame.time > maxAllowed) continue;
+                const distance = Math.abs(frame.time - clampedTarget);
+                if (distance > valleyWindow) continue;
+
+                const distancePenalty = distance / Math.max(1, valleyWindow);
+                const score = frame.mass + (distancePenalty * (0.08 + ((1 - lineConfidence) * 0.07)));
+                if (score < bestValleyScore) {
+                    bestValleyScore = score;
+                    bestValleyTime = frame.time;
+                }
+            }
+
+            return pickBoundaryTime(bestValleyTime, timingModel, previousTime, remainingPhrases, endTime);
+        }
+
+        function buildPhraseBoundaryCandidates(phraseStart, phraseEnd, timingModel, unitCount) {
+            const minGap = 24;
+            const frames = (timingModel?.vocalMassCurve?.frames || [])
+                .filter((frame) => frame.time >= phraseStart && frame.time <= phraseEnd);
+            const frameStride = Math.max(1, Math.floor(frames.length / Math.max(18, unitCount * 8)));
+            const candidateTimes = [phraseStart, phraseEnd];
+
+            for (let index = 0; index < frames.length; index += frameStride) {
+                candidateTimes.push(frames[index].time);
+            }
+
+            for (const frame of frames) {
+                if (frame.mass <= 0) continue;
+                candidateTimes.push(frame.time);
+            }
+
+            for (const anchor of timingModel?.rhythmAnchors || []) {
+                if (anchor > phraseStart && anchor < phraseEnd) {
+                    candidateTimes.push(anchor);
+                }
+            }
+
+            for (const span of timingModel?.silenceSpans || []) {
+                if (span.center > phraseStart && span.center < phraseEnd) {
+                    candidateTimes.push(span.center);
+                }
+                if (span.start > phraseStart && span.start < phraseEnd) {
+                    candidateTimes.push(span.start);
+                }
+                if (span.end > phraseStart && span.end < phraseEnd) {
+                    candidateTimes.push(span.end);
+                }
+            }
+
+            for (const candidate of timingModel?.vocalCandidates || []) {
+                if (candidate.time > phraseStart && candidate.time < phraseEnd) {
+                    candidateTimes.push(candidate.time);
+                }
+                if (candidate.segmentStart > phraseStart && candidate.segmentStart < phraseEnd) {
+                    candidateTimes.push(candidate.segmentStart);
+                }
+                if (candidate.segmentEnd > phraseStart && candidate.segmentEnd < phraseEnd) {
+                    candidateTimes.push(candidate.segmentEnd);
+                }
+            }
+
+            const sorted = dedupeSortedTimes(
+                candidateTimes
+                    .map((time) => Math.round(clamp(time, phraseStart, phraseEnd)))
+                    .sort((left, right) => left - right),
+                Math.max(8, minGap / 2)
+            );
+
+            if (sorted[0] !== phraseStart) sorted.unshift(phraseStart);
+            if (sorted[sorted.length - 1] !== phraseEnd) sorted.push(phraseEnd);
+            return sorted;
+        }
+
+        function buildGreedyPhraseBoundaries(phraseUnits, phraseWeights, phraseStart, phraseEnd, timingModel, activeStart, activeEnd) {
+            const totalWeight = phraseWeights.reduce((sum, weight) => sum + weight, 0) || phraseUnits.length;
+            const phraseStartMass = getMassAtTime(timingModel.vocalMassCurve, phraseStart, activeStart, activeEnd);
+            const phraseEndMass = getMassAtTime(timingModel.vocalMassCurve, phraseEnd, activeStart, activeEnd);
+            const phraseBoundaries = [phraseStart];
+            let accumulatedWeight = 0;
+
+            for (let unitIndex = 1; unitIndex < phraseUnits.length; unitIndex++) {
+                accumulatedWeight += phraseWeights[unitIndex - 1];
+                const localRatio = accumulatedWeight / totalWeight;
+                const targetMass = phraseStartMass + ((phraseEndMass - phraseStartMass) * localRatio);
+                const targetTime = getTimeByMassTarget(
+                    timingModel.vocalMassCurve,
+                    targetMass,
+                    phraseStart,
+                    phraseEnd
+                );
+                phraseBoundaries.push(
+                    pickBoundaryTime(
+                        targetTime,
+                        timingModel,
+                        phraseBoundaries[phraseBoundaries.length - 1],
+                        phraseUnits.length - unitIndex,
+                        phraseEnd
+                    )
+                );
+            }
+
+            phraseBoundaries.push(phraseEnd);
+            return phraseBoundaries;
+        }
+
+        function alignPhraseUnitsWithDP(phraseUnits, phraseWeights, phraseStart, phraseEnd, timingModel, activeStart, activeEnd) {
+            if (!Array.isArray(phraseUnits) || phraseUnits.length <= 1) {
+                return [phraseStart, phraseEnd];
+            }
+
+            const candidateTimes = buildPhraseBoundaryCandidates(phraseStart, phraseEnd, timingModel, phraseUnits.length);
+            const lastCandidateIndex = candidateTimes.length - 1;
+            if (lastCandidateIndex < phraseUnits.length) {
+                return buildGreedyPhraseBoundaries(phraseUnits, phraseWeights, phraseStart, phraseEnd, timingModel, activeStart, activeEnd);
+            }
+
+            const minGap = 24;
+            const phraseDuration = Math.max(1, phraseEnd - phraseStart);
+            const phraseWeightTotal = phraseWeights.reduce((sum, weight) => sum + weight, 0) || phraseUnits.length;
+            const phraseMassValues = candidateTimes.map((time) => getMassAtTime(timingModel.vocalMassCurve, time, activeStart, activeEnd));
+            const phraseLocalMasses = candidateTimes.map((time) => getLocalMassAtTime(timingModel.vocalMassCurve, time, activeStart, activeEnd));
+            const phraseTotalMass = Math.max(0.0001, phraseMassValues[lastCandidateIndex] - phraseMassValues[0]);
+            const averageLocalMass = phraseLocalMasses.reduce((sum, value) => sum + value, 0) / Math.max(1, phraseLocalMasses.length);
+            const averageDensity = phraseTotalMass / phraseDuration;
+            const lineConfidence = clamp01(timingModel?.confidence ?? 0);
+            const prefixWeights = [0];
+
+            for (let index = 0; index < phraseWeights.length; index++) {
+                prefixWeights.push(prefixWeights[index] + phraseWeights[index]);
+            }
+
+            const dp = Array.from({ length: phraseUnits.length + 1 }, () => Array(candidateTimes.length).fill(Number.POSITIVE_INFINITY));
+            const backtrack = Array.from({ length: phraseUnits.length + 1 }, () => Array(candidateTimes.length).fill(-1));
+            dp[0][0] = 0;
+
+            for (let unitIndex = 1; unitIndex <= phraseUnits.length; unitIndex++) {
+                const isFinalUnit = unitIndex === phraseUnits.length;
+                const expectedSegmentRatio = phraseWeights[unitIndex - 1] / phraseWeightTotal;
+                const expectedCumulativeRatio = prefixWeights[unitIndex] / phraseWeightTotal;
+                const unitText = phraseUnits[unitIndex - 1] || '';
+                const trimmedUnit = unitText.trim();
+                const isWhitespaceOnly = !trimmedUnit && /\s/.test(unitText);
+                const isPunctuationOnly = !!trimmedUnit && /^[.,!?;:'"()[\]{}\-]+$/.test(trimmedUnit);
+                const isLexicalUnit = !!trimmedUnit && !isPunctuationOnly;
+                const minCandidateIndex = unitIndex;
+                const maxCandidateIndex = isFinalUnit
+                    ? lastCandidateIndex
+                    : lastCandidateIndex - (phraseUnits.length - unitIndex);
+
+                for (let candidateIndex = minCandidateIndex; candidateIndex <= maxCandidateIndex; candidateIndex++) {
+                    if (isFinalUnit && candidateIndex !== lastCandidateIndex) continue;
+                    if (!isFinalUnit && candidateIndex === lastCandidateIndex) continue;
+
+                    const actualCumulativeRatio = (phraseMassValues[candidateIndex] - phraseMassValues[0]) / phraseTotalMass;
+                    const boundaryMassNorm = averageLocalMass > 0
+                        ? phraseLocalMasses[candidateIndex] / averageLocalMass
+                        : 1;
+
+                    for (let previousIndex = unitIndex - 1; previousIndex < candidateIndex; previousIndex++) {
+                        const previousCost = dp[unitIndex - 1][previousIndex];
+                        if (!Number.isFinite(previousCost)) continue;
+
+                        const segmentStart = candidateTimes[previousIndex];
+                        const segmentEnd = candidateTimes[candidateIndex];
+                        const segmentDuration = segmentEnd - segmentStart;
+                        if (segmentDuration < minGap) continue;
+                        if ((phraseEnd - segmentEnd) < ((phraseUnits.length - unitIndex) * minGap)) continue;
+
+                        const segmentMass = Math.max(0.0001, phraseMassValues[candidateIndex] - phraseMassValues[previousIndex]);
+                        const actualSegmentRatio = segmentMass / phraseTotalMass;
+                        const actualDurationRatio = segmentDuration / phraseDuration;
+                        const massError = Math.abs(actualSegmentRatio - expectedSegmentRatio);
+                        const durationError = Math.abs(actualDurationRatio - expectedSegmentRatio);
+                        const cumulativeError = Math.abs(actualCumulativeRatio - expectedCumulativeRatio);
+                        const densityNorm = (segmentMass / segmentDuration) / Math.max(averageDensity, 0.0001);
+
+                        let densityPenalty = 0;
+                        if (isLexicalUnit) {
+                            densityPenalty = Math.max(0, 0.82 - densityNorm) * 0.55;
+                        } else if (isWhitespaceOnly) {
+                            densityPenalty = Math.max(0, densityNorm - 0.7) * 0.18;
+                        } else {
+                            densityPenalty = Math.max(0, densityNorm - 1.15) * 0.12;
+                        }
+
+                        const boundaryPenalty = !isFinalUnit
+                            ? boundaryMassNorm * (0.11 + (lineConfidence * 0.06))
+                            : 0;
+                        const massWeight = 4.2 + (lineConfidence * 0.55);
+                        const durationWeight = isWhitespaceOnly ? 0.8 : 2.05;
+                        const cumulativeWeight = 2.1;
+                        const longTailPenalty = isLexicalUnit && actualDurationRatio > (expectedSegmentRatio * 2.4)
+                            ? (actualDurationRatio - (expectedSegmentRatio * 2.4)) * 1.1
+                            : 0;
+
+                        const score = previousCost +
+                            (massError * massWeight) +
+                            (durationError * durationWeight) +
+                            (cumulativeError * cumulativeWeight) +
+                            densityPenalty +
+                            boundaryPenalty +
+                            longTailPenalty;
+
+                        if (score < dp[unitIndex][candidateIndex]) {
+                            dp[unitIndex][candidateIndex] = score;
+                            backtrack[unitIndex][candidateIndex] = previousIndex;
+                        }
+                    }
+                }
+            }
+
+            if (!Number.isFinite(dp[phraseUnits.length][lastCandidateIndex])) {
+                return buildGreedyPhraseBoundaries(phraseUnits, phraseWeights, phraseStart, phraseEnd, timingModel, activeStart, activeEnd);
+            }
+
+            const boundaries = [candidateTimes[lastCandidateIndex]];
+            let candidateIndex = lastCandidateIndex;
+
+            for (let unitIndex = phraseUnits.length; unitIndex > 0; unitIndex--) {
+                candidateIndex = backtrack[unitIndex][candidateIndex];
+                if (candidateIndex < 0) {
+                    return buildGreedyPhraseBoundaries(phraseUnits, phraseWeights, phraseStart, phraseEnd, timingModel, activeStart, activeEnd);
+                }
+                boundaries.push(candidateTimes[candidateIndex]);
+            }
+
+            return boundaries.reverse();
+        }
+
         function buildLineTimingModel(startTime, endTime, analysis, unitCount = 1) {
             const vocalCandidates = buildVocalCandidates(startTime, endTime, analysis);
             const rhythmAnchors = buildRhythmAnchors(startTime, endTime, analysis);
@@ -1894,8 +2650,24 @@
             const density = clamp01(strongCandidates / Math.max(1, expectedCandidates - 0.25));
             const confidence = clamp01((topAverage * 0.5) + (coverage * 0.3) + (density * 0.2));
             const activeWindow = buildVocalActivityWindow(startTime, endTime, vocalCandidates, confidence, unitCount);
+            const vocalMassCurve = buildVocalMassCurve(
+                activeWindow.activeStart,
+                activeWindow.activeEnd,
+                vocalCandidates.filter((candidate) =>
+                    candidate.segmentEnd > activeWindow.activeStart &&
+                    candidate.segmentStart < activeWindow.activeEnd
+                ),
+                rhythmAnchors.filter((anchor) => anchor >= activeWindow.activeStart && anchor <= activeWindow.activeEnd),
+                confidence
+            );
+            const silenceSpans = buildSilenceSpans(
+                vocalMassCurve,
+                activeWindow.activeStart,
+                activeWindow.activeEnd,
+                confidence
+            );
 
-            return { rhythmAnchors, vocalCandidates, confidence, ...activeWindow };
+            return { rhythmAnchors, vocalCandidates, vocalMassCurve, silenceSpans, confidence, ...activeWindow };
         }
 
         function pickBoundaryTime(targetTime, timingModel, previousTime, remainingUnits, endTime) {
@@ -1969,33 +2741,67 @@
             if (!units.length) return null;
 
             const weights = units.map(getUnitWeight);
-            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || units.length;
-            const boundaries = [activeStart];
+            const phrases = buildUnitPhrases(units, weights);
+            const phraseWeightTotal = phrases.reduce((sum, phrase) => sum + phrase.weight, 0) || phrases.length;
+            const phraseBoundaries = [activeStart];
+            let accumulatedPhraseWeight = 0;
 
-            let accumulatedWeight = 0;
-            for (let index = 1; index < units.length; index++) {
-                accumulatedWeight += weights[index - 1];
-                const targetTime = activeStart + ((activeEnd - activeStart) * accumulatedWeight / totalWeight);
-                boundaries.push(pickBoundaryTime(targetTime, timingModel, boundaries[boundaries.length - 1], units.length - index, activeEnd));
+            for (let index = 0; index < phrases.length - 1; index++) {
+                accumulatedPhraseWeight += phrases[index].weight;
+                const targetRatio = accumulatedPhraseWeight / phraseWeightTotal;
+                const targetTime = getTimeByMassRatio(
+                    timingModel.vocalMassCurve,
+                    targetRatio,
+                    activeStart,
+                    activeEnd
+                );
+                phraseBoundaries.push(
+                    pickPhraseBoundaryTime(
+                        targetTime,
+                        timingModel,
+                        phraseBoundaries[phraseBoundaries.length - 1],
+                        phrases.length - index - 1,
+                        activeEnd
+                    )
+                );
             }
-            boundaries.push(activeEnd);
+            phraseBoundaries.push(activeEnd);
+
+            const boundaries = [activeStart];
+            for (let phraseIndex = 0; phraseIndex < phrases.length; phraseIndex++) {
+                const phrase = phrases[phraseIndex];
+                const phraseStart = phraseBoundaries[phraseIndex];
+                const phraseEnd = phraseBoundaries[phraseIndex + 1];
+                const phraseUnits = units.slice(phrase.startIndex, phrase.endIndex + 1);
+                const phraseWeights = weights.slice(phrase.startIndex, phrase.endIndex + 1);
+                const phraseInternalBoundaries = alignPhraseUnitsWithDP(
+                    phraseUnits,
+                    phraseWeights,
+                    phraseStart,
+                    phraseEnd,
+                    timingModel,
+                    activeStart,
+                    activeEnd
+                );
+
+                for (let boundaryIndex = 1; boundaryIndex < phraseInternalBoundaries.length; boundaryIndex++) {
+                    boundaries.push(phraseInternalBoundaries[boundaryIndex]);
+                }
+            }
 
             const syllables = units.map((unitText, index) => {
                 const originalStart = boundaries[index];
                 const originalEnd = Math.max(originalStart + 1, boundaries[index + 1]);
-                const shiftedStart = Math.max(0, originalStart - PSEUDO_ADVANCE_MS);
-                const shiftedEnd = Math.max(shiftedStart + 1, originalEnd - PSEUDO_ADVANCE_MS);
-
                 return {
                     text: unitText,
-                    startTime: shiftedStart,
-                    endTime: shiftedEnd
+                    startTime: originalStart,
+                    endTime: originalEnd
                 };
             });
 
             return {
-                startTime: Math.max(0, activeStart - PSEUDO_ADVANCE_MS),
-                endTime: syllables[syllables.length - 1]?.endTime || Math.max(1, activeEnd - PSEUDO_ADVANCE_MS),
+                startTime: activeStart,
+                endTime: syllables[syllables.length - 1]?.endTime || Math.max(1, activeEnd),
                 text,
                 syllables
             };

@@ -1009,6 +1009,14 @@ window.LANG_IT = {
       "bounce": {
         "label": "Effetto rimbalzo testo",
         "desc": "Applica un'animazione di rimbalzo al carattere corrente in modalità karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke virtuale",
+        "desc": "Quando i testi forniscono solo la sincronizzazione a livello di riga, il timing karaoke viene sintetizzato dall’analisi audio di Spotify. Le righe in coreano, giapponese e cinese vengono suddivise più finemente quando l’affidabilità è alta."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Anticipo render karaoke virtuale",
+        "desc": "Applica un offset temporale in fase di rendering solo al karaoke virtuale. I valori positivi fanno apparire l’evidenziazione prima."
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_IT = {
       "enabled": "Mostra testo nel pannello",
       "linesCount": "Righe da mostrare"
     },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke virtuale",
+      "subtitle": "Attiva l’evidenziazione stile karaoke su quasi tutte le canzoni",
+      "description": "Usa l’analisi audio di Spotify per sintetizzare il timing karaoke a partire da testi sincronizzati per riga. In questo modo la modalità karaoke funziona su quasi tutte le canzoni, ma il timing è approssimativo e potrebbe non essere preciso.",
+      "enabled": "Attiva karaoke virtuale"
+    },
     "complete": {
       "title": "Tutto pronto!",
       "subtitle": "Sei pronto per usare ivLyrics",
@@ -1853,6 +1867,7 @@ window.LANG_IT = {
       "syllable": "Sillaba"
     },
     "copyLyrics": "Copia testo",
+    "virtualKaraoke": "Dati karaoke virtuali",
     "lyricsCopied": "Testo copiato negli appunti",
     "copyError": "Copia fallita",
     "export": "Esporta",

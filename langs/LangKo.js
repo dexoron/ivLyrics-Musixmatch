@@ -1013,6 +1013,10 @@ window.LANG_KO = {
       "spotifyFakeKaraoke": {
         "label": "가상 노래방",
         "desc": "가사가 줄단위 싱크만 제공할 때 Spotify audio analysis를 기반으로 노래방 타이밍을 합성합니다. 신뢰도가 높을 때 한글, 일본어, 중국어는 더 촘촘하게 분해합니다."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "가상 노래방 렌더 선행값",
+        "desc": "가상 노래방에만 렌더링 시점 오프셋을 적용합니다. 양수일수록 하이라이트가 더 빨리 진행됩니다."
       }
     },
     "prefetch": {
@@ -1712,6 +1716,12 @@ window.LANG_KO = {
       "enabled": "패널 가사 표시",
       "linesCount": "표시할 줄 수"
     },
+    "pseudoKaraokeTip": {
+      "title": "가상 노래방",
+      "subtitle": "거의 모든 곡에서 노래방 스타일 하이라이트 사용",
+      "description": "줄단위 싱크 가사에 Spotify audio analysis를 사용해 노래방 타이밍을 합성합니다. 거의 모든 곡에서 노래방 모드가 동작하지만, 타이밍은 근사치라서 정확하지 않을 수 있습니다.",
+      "enabled": "가상 노래방 활성화"
+    },
     "complete": {
       "title": "준비 완료!",
       "subtitle": "이제 ivLyrics를 사용할 준비가 되었습니다",
@@ -1857,6 +1867,7 @@ window.LANG_KO = {
       "syllable": "음절"
     },
     "copyLyrics": "가사 복사",
+    "virtualKaraoke": "가상 노래방 데이터",
     "lyricsCopied": "가사를 클립보드에 복사했습니다",
     "copyError": "복사 실패",
     "export": "내보내기",

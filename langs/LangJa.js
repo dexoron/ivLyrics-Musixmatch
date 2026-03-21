@@ -1009,6 +1009,14 @@ window.LANG_JA = {
       "bounce": {
         "label": "文字バウンス効果",
         "desc": "カラオケモードで現在歌っている文字に弾むようなアニメーションを適用します"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "バーチャルカラオケ",
+        "desc": "歌詞が行単位の同期タイミングしか提供しない場合、Spotify の audio analysis をもとにカラオケタイミングを合成します。信頼度が高いときは韓国語、日本語、中国語の行をより細かく分割します。"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "バーチャルカラオケのレンダリング先行値",
+        "desc": "バーチャルカラオケにのみ、レンダリング時のタイミングオフセットを適用します。正の値ほどハイライトが早く進みます。"
       }
     },
     "prefetch": {
@@ -1708,6 +1716,12 @@ window.LANG_JA = {
       "enabled": "パネル歌詞を表示",
       "linesCount": "表示する行数"
     },
+    "pseudoKaraokeTip": {
+      "title": "バーチャルカラオケ",
+      "subtitle": "ほぼすべての曲でカラオケ風ハイライトを有効化",
+      "description": "行単位の同期歌詞に対して Spotify の audio analysis を使い、カラオケタイミングを合成します。これによりほぼすべての曲でカラオケモードが動作しますが、タイミングは近似値のため正確ではない場合があります。",
+      "enabled": "バーチャルカラオケを有効化"
+    },
     "complete": {
       "title": "準備完了！",
       "subtitle": "これでivLyricsを使用する準備が整いました",
@@ -1853,6 +1867,7 @@ window.LANG_JA = {
       "syllable": "音節"
     },
     "copyLyrics": "歌詞をコピー",
+    "virtualKaraoke": "バーチャルカラオケデータ",
     "lyricsCopied": "歌詞をクリップボードにコピーしました",
     "copyError": "コピー失敗",
     "export": "エクスポート",
