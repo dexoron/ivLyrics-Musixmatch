@@ -1,0 +1,197 @@
+[spicetifyWrapper] Waiting for required webpack modules to load
+MusixmatchAddon.js:62 [MusixmatchAddon] Musixmatch provider registered in LyricsAddonManager
+xpui-modules.js:sourcemap:1 It is recommended that a robustness level be specified. Not specifying the robustness level could result in unexpected behavior.
+(anonymous) @ xpui-modules.js:sourcemap:1
+spicetifyWrapper.js:550 [spicetifyWrapper] All required webpack modules loaded
+extension.js:8 Initializing Spicetify Marketplace v1.0.8
+localhost:15123/lyrics/progress:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+extension.js:8 Loaded Marketplace extension
+LyricsAddonManager.js:491 [LyricsAddonManager] getLyrics start Object
+LyricsAddonManager.js:522 [LyricsAddonManager] Trying provider musixmatch
+LyricsAddonManager.js:530 [LyricsAddonManager] Provider settings Object
+about:srcdoc:1 An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+spclient.wg.spotify.com/gander/v2/GetUserHasUnreadNotification?{%22postFix%22:%22a%22}:1  Failed to load resource: the server responded with a status of 400 ()
+MusixmatchProvider.js:598 [MusixmatchProvider] getLyrics start Object
+gew1-spclient.spotify.com/remote-config-resolver/v3/configuration:1  Failed to load resource: the server responded with a status of 404 ()
+xpui-modules.js:sourcemap:1 provider:transport resolve error k Object
+f @ xpui-modules.js:sourcemap:1
+localhost:15123/lyrics/sender:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+MusixmatchProvider.js:222 [MusixmatchProvider] findLyrics status 401
+LyricsAddonManager.js:628 [LyricsAddonManager] Provider returned error/empty Object
+LyricsAddonManager.js:491 [LyricsAddonManager] getLyrics start Object
+LyricsAddonManager.js:522 [LyricsAddonManager] Trying provider musixmatch
+LyricsAddonManager.js:530 [LyricsAddonManager] Provider settings Object
+MusixmatchProvider.js:598 [MusixmatchProvider] getLyrics start Object
+spclient.wg.spotify.com/gander/v2/GetUserHasUnreadNotification?{%22postFix%22:%22a%22}:1  Failed to load resource: the server responded with a status of 400 ()
+api.spotify.com/v1/audio-features/2lfFi1dlX6gkYX2qG6T18b:1  Failed to load resource: the server responded with a status of 429 ()
+MusixmatchProvider.js:222 [MusixmatchProvider] findLyrics status 401
+LyricsAddonManager.js:628 [LyricsAddonManager] Provider returned error/empty Object
+localhost:15123/lyrics/sender:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+www-widgetapi.js:194 Unrecognized feature: 'web-share'.
+X @ www-widgetapi.js:194
+www-widgetapi.js:210 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube-nocookie.com') does not match the recipient window's origin ('https://xpui.app.spotify.com').
+(anonymous) @ www-widgetapi.js:210
+www-widgetapi.js:210 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube-nocookie.com') does not match the recipient window's origin ('https://xpui.app.spotify.com').
+(anonymous) @ www-widgetapi.js:210
+spclient.wg.spotify.com/gander/v2/GetUserHasUnreadNotification?{%22postFix%22:%22a%22}:1  Failed to load resource: the server responded with a status of 400 ()
+favicon.ico:1  Failed to load resource: net::ERR_CONNECTION_CLOSED
+spclient.wg.spotify.com/gander/v2/GetUserHasUnreadNotification?{%22postFix%22:%22a%22}:1  Failed to load resource: the server responded with a status of 400 ()
+index.html:1 Access to XMLHttpRequest at 'https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ln0a2ra' from origin 'https://xpui.app.spotify.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ln0a2ra:1  Failed to load resource: net::ERR_FAILED
+spicy-lyrics@5.19.12.mjs:6904 [Spicy Lyrics] [Socket.IO] Connection error: xhr poll error
+error @ spicy-lyrics@5.19.12.mjs:6904
+index.html:1 Access to XMLHttpRequest at 'https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ltgplb1' from origin 'https://xpui.app.spotify.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ltgplb1:1  Failed to load resource: net::ERR_FAILED
+spicy-lyrics@5.19.12.mjs:6904 [Spicy Lyrics] [Socket.IO] Connection error: xhr poll error
+error @ spicy-lyrics@5.19.12.mjs:6904
+index.html:1 Access to XMLHttpRequest at 'https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ly6rehm' from origin 'https://xpui.app.spotify.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9ly6rehm:1  Failed to load resource: net::ERR_FAILED
+spicy-lyrics@5.19.12.mjs:6904 [Spicy Lyrics] [Socket.IO] Connection error: xhr poll error
+error @ spicy-lyrics@5.19.12.mjs:6904
+LyricsAddonManager.js:491 [LyricsAddonManager] getLyrics start Object
+LyricsAddonManager.js:522 [LyricsAddonManager] Trying provider musixmatch
+LyricsAddonManager.js:530 [LyricsAddonManager] Provider settings Object
+MusixmatchProvider.js:598 [MusixmatchProvider] getLyrics start Object
+LyricsAddonManager.js:491 [LyricsAddonManager] getLyrics start Object
+LyricsAddonManager.js:522 [LyricsAddonManager] Trying provider musixmatch
+LyricsAddonManager.js:530 [LyricsAddonManager] Provider settings Object
+MusixmatchProvider.js:598 [MusixmatchProvider] getLyrics start Object
+MusixmatchProvider.js:222 [MusixmatchProvider] findLyrics status 200
+MusixmatchProvider.js:250 [MusixmatchProvider] findLyrics availability Object
+MusixmatchProvider.js:440 [MusixmatchProvider] selected language not in list, will still try Object
+MusixmatchProvider.js:446 [MusixmatchProvider] selected language not available, fallback Object
+MusixmatchProvider.js:480 [MusixmatchProvider] mapped language code Object
+MusixmatchProvider.js:488 [MusixmatchProvider] getTranslation Object
+MusixmatchProvider.js:492 [MusixmatchProvider] getTranslation token present true
+MusixmatchProvider.js:222 [MusixmatchProvider] findLyrics status 200
+MusixmatchProvider.js:250 [MusixmatchProvider] findLyrics availability Object
+MusixmatchProvider.js:440 [MusixmatchProvider] selected language not in list, will still try Object
+MusixmatchProvider.js:446 [MusixmatchProvider] selected language not available, fallback Object
+MusixmatchProvider.js:480 [MusixmatchProvider] mapped language code Object
+MusixmatchProvider.js:488 [MusixmatchProvider] getTranslation Object
+MusixmatchProvider.js:492 [MusixmatchProvider] getTranslation token present true
+api.spotify.com/v1/audio-features/32filOsmivxaFHKLX6Ixth:1  Failed to load resource: the server responded with a status of 429 ()
+LyricsAddonManager.js:491 [LyricsAddonManager] getLyrics start Object
+LyricsAddonManager.js:522 [LyricsAddonManager] Trying provider musixmatch
+LyricsAddonManager.js:530 [LyricsAddonManager] Provider settings Object
+MusixmatchProvider.js:598 [MusixmatchProvider] getLyrics start Object
+MusixmatchProvider.js:222 [MusixmatchProvider] findLyrics status 200
+MusixmatchProvider.js:250 [MusixmatchProvider] findLyrics availability Object
+MusixmatchProvider.js:480 [MusixmatchProvider] mapped language code Object
+MusixmatchProvider.js:488 [MusixmatchProvider] getTranslation Object
+MusixmatchProvider.js:492 [MusixmatchProvider] getTranslation token present true
+MusixmatchProvider.js:506 [MusixmatchProvider] getTranslation status 200 lang rus
+MusixmatchProvider.js:509 [MusixmatchProvider] getTranslation list size 16 lang rus
+MusixmatchProvider.js:618 [MusixmatchProvider] raw results Object
+MusixmatchProvider.js:656 [MusixmatchProvider] translation map sample Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:697 [MusixmatchProvider] translation attached Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:689 [MusixmatchProvider] no translation match Object
+MusixmatchProvider.js:697 [MusixmatchProvider] translation attached Object
+MusixmatchProvider.js:738 [MusixmatchProvider] translate source musixmatch
+MusixmatchProvider.js:739 [MusixmatchProvider] sample line Object
+MusixmatchProvider.js:756 [MusixmatchProvider] getLyrics failed: ReferenceError: selectedLanguage is not defined
+    at Object.getLyrics (MusixmatchProvider.js:753:46)
+    at async Object.musixmatchGetLyrics [as getLyrics] (MusixmatchAddon.js:22:28)
+    at async LyricsAddonManager.getLyrics (LyricsAddonManager.js:619:34)
+    at async Object.getLyricsFromProviders (LyricsService.js:1469:32)
+    at async spicetify-routes-ivLyrics.js:2112:22
+    at async spicetify-routes-ivLyrics.js:2056:24
+getLyrics @ MusixmatchProvider.js:756
+LyricsAddonManager.js:628 [LyricsAddonManager] Provider returned error/empty Object
+MusixmatchProvider.js:506 [MusixmatchProvider] getTranslation status 200 lang rus
+MusixmatchProvider.js:509 [MusixmatchProvider] getTranslation list size 0 lang rus
+MusixmatchProvider.js:524 [MusixmatchProvider] retrying translation with original language Object
+MusixmatchProvider.js:506 [MusixmatchProvider] getTranslation status 200 lang rus
+MusixmatchProvider.js:509 [MusixmatchProvider] getTranslation list size 0 lang rus
+MusixmatchProvider.js:524 [MusixmatchProvider] retrying translation with original language Object
+MusixmatchProvider.js:506 [MusixmatchProvider] getTranslation status 200 lang ru
+MusixmatchProvider.js:509 [MusixmatchProvider] getTranslation list size 0 lang ru
+MusixmatchProvider.js:618 [MusixmatchProvider] raw results Object
+MusixmatchProvider.js:738 [MusixmatchProvider] translate source musixmatch
+MusixmatchProvider.js:739 [MusixmatchProvider] sample line Object
+MusixmatchProvider.js:756 [MusixmatchProvider] getLyrics failed: ReferenceError: selectedLanguage is not defined
+    at Object.getLyrics (MusixmatchProvider.js:753:46)
+    at async Object.musixmatchGetLyrics [as getLyrics] (MusixmatchAddon.js:22:28)
+    at async LyricsAddonManager.getLyrics (LyricsAddonManager.js:619:34)
+    at async Object.getLyricsFromProviders (LyricsService.js:1469:32)
+    at async LyricsContainer.fetchLyrics (spicetify-routes-ivLyrics.js:4035:22)
+getLyrics @ MusixmatchProvider.js:756
+LyricsAddonManager.js:628 [LyricsAddonManager] Provider returned error/empty Object
+localhost:15123/lyrics/sender:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+MusixmatchProvider.js:506 [MusixmatchProvider] getTranslation status 200 lang ru
+MusixmatchProvider.js:509 [MusixmatchProvider] getTranslation list size 0 lang ru
+MusixmatchProvider.js:618 [MusixmatchProvider] raw results Object
+MusixmatchProvider.js:738 [MusixmatchProvider] translate source musixmatch
+MusixmatchProvider.js:739 [MusixmatchProvider] sample line Object
+MusixmatchProvider.js:756 [MusixmatchProvider] getLyrics failed: ReferenceError: selectedLanguage is not defined
+    at Object.getLyrics (MusixmatchProvider.js:753:46)
+    at async Object.musixmatchGetLyrics [as getLyrics] (MusixmatchAddon.js:22:28)
+    at async LyricsAddonManager.getLyrics (LyricsAddonManager.js:619:34)
+    at async Object.getLyricsFromProviders (LyricsService.js:1469:32)
+    at async NowPlayingPanelLyrics.js:860:32
+getLyrics @ MusixmatchProvider.js:756
+LyricsAddonManager.js:628 [LyricsAddonManager] Provider returned error/empty Object
+index.html:1 Access to XMLHttpRequest at 'https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9m7jhwf9' from origin 'https://xpui.app.spotify.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9m7jhwf9:1  Failed to load resource: net::ERR_FAILED
+spicy-lyrics@5.19.12.mjs:6904 [Spicy Lyrics] [Socket.IO] Connection error: xhr poll error
+error @ spicy-lyrics@5.19.12.mjs:6904
+localhost:15123/lyrics/sender:1  Failed to load resource: net::ERR_CONNECTION_REFUSED
+index.html:1 Access to XMLHttpRequest at 'https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9mq5j07d' from origin 'https://xpui.app.spotify.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+VideoBackgroundDepend.js:174  GET https://skt-v2.spicylyrics.org/realtime/?EIO=4&transport=polling&t=9mq5j07d net::ERR_FAILED 403 (Forbidden)
+patchedSend @ VideoBackgroundDepend.js:174
+_create @ spicy-lyrics@5.19.12.mjs:6904
+t @ spicy-lyrics@5.19.12.mjs:6904
+request @ spicy-lyrics@5.19.12.mjs:6904
+doPoll @ spicy-lyrics@5.19.12.mjs:6904
+_poll @ spicy-lyrics@5.19.12.mjs:6904
+doOpen @ spicy-lyrics@5.19.12.mjs:6904
+open @ spicy-lyrics@5.19.12.mjs:6904
+_open @ spicy-lyrics@5.19.12.mjs:6904
+t @ spicy-lyrics@5.19.12.mjs:6904
+Rk @ spicy-lyrics@5.19.12.mjs:6904
+Sh @ spicy-lyrics@5.19.12.mjs:6904
+open @ spicy-lyrics@5.19.12.mjs:6904
+(anonymous) @ spicy-lyrics@5.19.12.mjs:6904
+spicy-lyrics@5.19.12.mjs:6904 [Spicy Lyrics] [Socket.IO] Connection error: xhr poll error
+error @ spicy-lyrics@5.19.12.mjs:6904
+(anonymous) @ spicy-lyrics@5.19.12.mjs:6904
+It.emit @ spicy-lyrics@5.19.12.mjs:6904
+onerror @ spicy-lyrics@5.19.12.mjs:6904
+It.emit @ spicy-lyrics@5.19.12.mjs:6904
+r @ spicy-lyrics@5.19.12.mjs:6904
+It.emit @ spicy-lyrics@5.19.12.mjs:6904
+_onError @ spicy-lyrics@5.19.12.mjs:6904
+It.emit @ spicy-lyrics@5.19.12.mjs:6904
+onError @ spicy-lyrics@5.19.12.mjs:6904
+(anonymous) @ spicy-lyrics@5.19.12.mjs:6904
+It.emit @ spicy-lyrics@5.19.12.mjs:6904
+_onError @ spicy-lyrics@5.19.12.mjs:6904
+(anonymous) @ spicy-lyrics@5.19.12.mjs:6904
+setTimeout
+i.onreadystatechange @ spicy-lyrics@5.19.12.mjs:6904
+XMLHttpRequest.send
+patchedSend @ VideoBackgroundDepend.js:174
+_create @ spicy-lyrics@5.19.12.mjs:6904
+t @ spicy-lyrics@5.19.12.mjs:6904
+request @ spicy-lyrics@5.19.12.mjs:6904
+doPoll @ spicy-lyrics@5.19.12.mjs:6904
+_poll @ spicy-lyrics@5.19.12.mjs:6904
+doOpen @ spicy-lyrics@5.19.12.mjs:6904
+open @ spicy-lyrics@5.19.12.mjs:6904
+_open @ spicy-lyrics@5.19.12.mjs:6904
+t @ spicy-lyrics@5.19.12.mjs:6904
+Rk @ spicy-lyrics@5.19.12.mjs:6904
+Sh @ spicy-lyrics@5.19.12.mjs:6904
+open @ spicy-lyrics@5.19.12.mjs:6904
+(anonymous) @ spicy-lyrics@5.19.12.mjs:6904

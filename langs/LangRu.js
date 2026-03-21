@@ -417,6 +417,7 @@ window.LANG_RU = {
         "karaoke": "Караоке",
         "synced": "Синхр.",
         "unsynced": "Обычный",
+        "translation": "Перевод",
         "ivLyricsSync": "ivLyrics Sync"
       }
     }

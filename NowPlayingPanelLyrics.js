@@ -929,6 +929,19 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             }
 
             try {
+                const translateSource = window.CONFIG?.visual?.["translate:translated-lyrics-source"] ||
+                    localStorage.getItem("ivLyrics:visual:translate:translated-lyrics-source") || "auto";
+                if (translateSource === "musixmatch") {
+                    panelDebug("[PanelLyrics] Provider translation selected (musixmatch); skip Gemini");
+                    return;
+                }
+                const aiTranslateEnabled = !!(window.AIAddonManager?.getEnabledProvidersFor &&
+                    window.AIAddonManager.getEnabledProvidersFor('translate')?.length);
+                if (!aiTranslateEnabled) {
+                    panelDebug("[PanelLyrics] No AI translate providers enabled; skip Gemini");
+                    return;
+                }
+
                 // 가사 언어 감지
                 const lyricsText = lyricsData.map(l => l.text || '').join('\n');
                 const trackId = trackInfo.trackId;

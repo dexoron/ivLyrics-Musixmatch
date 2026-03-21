@@ -487,6 +487,15 @@
             const enabledProviders = this.getEnabledProviders();
             const trackId = info.uri?.split(':')[2];
 
+            // Always log basic flow to help diagnose provider/translation issues.
+            console.log('[LyricsAddonManager] getLyrics start', {
+                uri: info?.uri,
+                title: info?.title,
+                artist: info?.artist,
+                trackId,
+                enabledProviders: enabledProviders.map(p => p.id)
+            });
+
             // 디버그 로깅
             if (window.AddonDebug?.isEnabled()) {
                 window.AddonDebug.log('lyrics', 'getLyrics called', {
@@ -510,6 +519,7 @@
 
             for (const provider of enabledProviders) {
                 try {
+                    console.log('[LyricsAddonManager] Trying provider', provider.id);
                     window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Trying provider: ${provider.id}`);
 
                     // 사용자 설정 확인 (먼저 확인해서 최적화)
@@ -517,10 +527,17 @@
                     const allowSynced = this.getAddonSetting(provider.id, 'enable_synced', true);
                     const allowUnsynced = this.getAddonSetting(provider.id, 'enable_unsynced', true);
 
+                    console.log('[LyricsAddonManager] Provider settings', {
+                        provider: provider.id,
+                        allowKaraoke,
+                        allowSynced,
+                        allowUnsynced
+                    });
                     window.__ivLyricsDebugLog?.(`[LyricsAddonManager] User settings for ${provider.id}: karaoke=${allowKaraoke}, synced=${allowSynced}, unsynced=${allowUnsynced}`);
 
                     // 모든 유형이 비활성화되면 이 provider 건너뜀
                     if (!allowKaraoke && !allowSynced && !allowUnsynced) {
+                        console.log('[LyricsAddonManager] Skipping provider (all types disabled)', provider.id);
                         window.__ivLyricsDebugLog?.(`[LyricsAddonManager] All lyrics types disabled for ${provider.id}, skipping`);
                         continue;
                     }
@@ -536,8 +553,61 @@
                         try {
                             const cached = await window.LyricsService.getCachedLyrics(trackId, provider.id);
                             if (cached) {
-                                result = cached;
-                                window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Cache hit for ${provider.id}`);
+                                const translateSource = Spicetify.LocalStorage.get("ivLyrics:visual:translate:translated-lyrics-source") || "auto";
+                                const wantsProviderTranslation = translateSource === "musixmatch" || translateSource === "auto";
+                                const cachedHasTranslation = (() => {
+                                    if (cached.translation || cached.translations || cached.translationLines || cached.hasTranslation) return true;
+                                    const lineSets = [cached.karaoke, cached.synced, cached.unsynced].filter(Boolean);
+                                    for (const lines of lineSets) {
+                                        if (!Array.isArray(lines)) continue;
+                                        for (const line of lines) {
+                                            if (line && typeof line.text2 === "string" && line.text2.trim().length > 0) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                    return false;
+                                })();
+
+                                // If user explicitly picked a Musixmatch translation language, ensure cache matches it.
+                                let cacheLangMismatch = false;
+                                if (provider.id === "musixmatch") {
+                                    const desiredLang = Spicetify.LocalStorage.get("ivLyrics:musixmatch-translation-language") || "none";
+                                    const userSelected = Spicetify.LocalStorage.get("ivLyrics:musixmatch-translation-language-user") === "true";
+                                    const cachedLang = cached.translationLanguage || cached.translationLang || null;
+                                    const cachedLangResolved = cached.translationLanguageResolved || null;
+                                    if (userSelected && desiredLang !== "none") {
+                                        if (!cachedLang && !cachedLangResolved) {
+                                            cacheLangMismatch = true;
+                                        } else if (cachedLang && cachedLang !== desiredLang) {
+                                            cacheLangMismatch = true;
+                                        }
+                                        if (cacheLangMismatch) {
+                                            console.log('[LyricsAddonManager] Cache translation language mismatch, refreshing', {
+                                                provider: provider.id,
+                                                desiredLang,
+                                                cachedLang,
+                                                cachedLangResolved,
+                                            });
+                                        }
+                                    }
+                                }
+
+                                // If we want provider translation but cached result doesn't include it, refresh.
+                                if (cacheLangMismatch || (provider.supports?.translation && wantsProviderTranslation && !cachedHasTranslation)) {
+                                    console.log('[LyricsAddonManager] Cache hit without translation, refreshing', {
+                                        provider: provider.id,
+                                        translateSource,
+                                        cachedHasTranslation
+                                    });
+                                } else {
+                                    result = cached;
+                                    window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Cache hit for ${provider.id}`);
+                                    console.log('[LyricsAddonManager] Cache hit', {
+                                        provider: provider.id,
+                                        hasTranslation: cachedHasTranslation
+                                    });
+                                }
                             }
                         } catch (e) {
                             console.warn(`[LyricsAddonManager] Cache lookup failed for ${provider.id}:`, e);
@@ -555,10 +625,22 @@
                     }
 
                     if (!result || result.error) {
+                        console.log('[LyricsAddonManager] Provider returned error/empty', {
+                            provider: provider.id,
+                            error: result?.error || null
+                        });
                         window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Provider ${provider.id} returned error:`, result?.error);
                         continue;
                     }
 
+                    console.log('[LyricsAddonManager] Provider result', {
+                        provider: provider.id,
+                        hasKaraoke: !!result.karaoke,
+                        hasSynced: !!result.synced,
+                        hasUnsynced: !!result.unsynced,
+                        hasTranslation: !!(result.translation || result.translations || result.translationLines),
+                        providerId: result.provider
+                    });
                     window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Got lyrics from: ${provider.id}`, {
                         hasKaraoke: !!result.karaoke,
                         hasSynced: !!result.synced,

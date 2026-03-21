@@ -64,6 +64,8 @@
 		"Addon_AI_Pollinations.js",
 		"Addon_Lyrics_Spotify.js",
 		"Addon_Lyrics_Lrclib.js",
+		"MusixmatchProvider.js",
+		"MusixmatchAddon.js",
 		"AIAddonManager.js",
 		"LyricsAddonManager.js",
 		"LyricsService.js",

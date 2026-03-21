@@ -1214,6 +1214,9 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
     if (provider.supports?.unsynced) {
       badges.push(react.createElement("span", { key: "unsynced", className: "support-badge unsynced" }, I18n.t("settings.lyricsProviders.supports.unsynced") || "Plain"));
     }
+    if (provider.supports?.translation) {
+      badges.push(react.createElement("span", { key: "translation", className: "support-badge translation" }, I18n.t("settings.lyricsProviders.supports.translation") || "Translation"));
+    }
     if (provider.useIvLyricsSync) {
       badges.push(react.createElement("span", { key: "ivsync", className: "support-badge ivsync" }, I18n.t("settings.lyricsProviders.supports.ivLyricsSync") || "ivLyrics Sync"));
     }
@@ -1295,7 +1298,20 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
       )
     ),
     // 확장 영역 (설정 UI)
-    isExpanded && react.createElement("div", { className: "lyrics-provider-card-body" },
+    isExpanded && react.createElement("div", {
+      className: "lyrics-provider-card-body",
+      onClick: (e) => e.stopPropagation(),
+      onMouseDown: (e) => e.stopPropagation()
+    },
+      // Provider custom settings (top inside expanded menu)
+      (provider.id === "musixmatch" || SettingsUI) && react.createElement("div", { className: "lyrics-provider-settings" },
+        react.createElement("div", { className: "lyrics-provider-settings-title" },
+          I18n.t("settings.lyricsProviders.providerSettings") || "Provider Settings"
+        ),
+        provider.id === "musixmatch"
+          ? react.createElement(MusixmatchProviderSettings)
+          : (SettingsUI ? react.createElement(SettingsUI) : null)
+      ),
       // 가사 유형별 필터 토글 영역
       react.createElement("div", { className: "lyrics-type-toggles-container" },
         react.createElement("div", { className: "lyrics-type-toggles-title" }, I18n.t("settings.lyricsProviders.allowedTypes") || "Allowed Lyrics Types"),
@@ -1325,9 +1341,201 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
             I18n.t("settings.lyricsProviders.types.unsynced") || "Unsynced Lyrics"
           )
         )
-      ),
-      SettingsUI && react.createElement(SettingsUI)
+      )
     )
+  );
+};
+
+// Musixmatch settings rendered directly in Providers menu for stability
+const MusixmatchProviderSettings = () => {
+  const [token, setToken] = useState(
+    () => Spicetify.LocalStorage.get("ivLyrics:musixmatch-token") || ""
+  );
+  const [savedLang, setSavedLang] = useState(
+    () => Spicetify.LocalStorage.get("ivLyrics:musixmatch-translation-language") || "none"
+  );
+  const [languages, setLanguages] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    if (window.MusixmatchProvider?.getLanguages) {
+      window.MusixmatchProvider.getLanguages().then((langs) => {
+        setLanguages(langs || {});
+      });
+    }
+  }, []);
+
+  const handleRefreshToken = async () => {
+    setIsRefreshing(true);
+    setStatus(null);
+    try {
+      const newToken = await window.MusixmatchProvider?.fetchNewToken?.();
+      if (newToken) {
+        setToken(newToken);
+        setStatus("✓ Token regenerated successfully");
+      } else {
+        setStatus("✗ Failed to regenerate token");
+      }
+    } catch (e) {
+      setStatus("✗ Error: " + e.message);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    setStatus(null);
+    try {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open("ivLyricsCache");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+
+      const clearStoreByProvider = (storeName) => new Promise((resolve, reject) => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          resolve(0);
+          return;
+        }
+        let deleted = 0;
+        const tx = db.transaction(storeName, "readwrite");
+        const store = tx.objectStore(storeName);
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            if (cursor.value?.provider === "musixmatch") {
+              cursor.delete();
+              deleted++;
+            }
+            cursor.continue();
+          }
+        };
+        tx.oncomplete = () => resolve(deleted);
+        tx.onerror = () => reject(tx.error);
+      });
+
+      const [deletedLyrics, deletedTranslations] = await Promise.all([
+        clearStoreByProvider("lyrics"),
+        clearStoreByProvider("translations"),
+      ]);
+
+      setStatus(`✓ Cache cleared (lyrics: ${deletedLyrics}, translations: ${deletedTranslations})`);
+    } catch (e) {
+      setStatus("✗ Cache clear failed: " + e.message);
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
+  const handleLangChange = (e) => {
+    const lang = e.target.value;
+    setSavedLang(lang);
+    Spicetify.LocalStorage.set("ivLyrics:musixmatch-translation-language", lang);
+    Spicetify.LocalStorage.set(
+      "ivLyrics:musixmatch-translation-language-user",
+      lang === "none" ? "false" : "true"
+    );
+  };
+
+  const langOptions = (() => {
+    const items = Object.entries(languages);
+    const byName = new Map();
+
+    items.forEach(([code, name]) => {
+      const key = String(name || "").toLowerCase();
+      if (!key) return;
+      const existing = byName.get(key);
+      if (!existing) {
+        byName.set(key, { code, name });
+        return;
+      }
+      // Prefer ISO-2 code if both exist
+      const preferNew = code.length === 2 && existing.code.length !== 2;
+      if (preferNew) {
+        byName.set(key, { code, name });
+      }
+    });
+
+    const unique = Array.from(byName.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return [
+      react.createElement("option", { key: "none", value: "none" }, "— Disabled —"),
+      ...unique.map(({ code, name }) =>
+        react.createElement("option", { key: code, value: code }, `${name} (${code})`)
+      )
+    ];
+  })();
+
+  return react.createElement(
+    "div",
+    {
+      className: "musixmatch-settings",
+      onClick: (e) => e.stopPropagation(),
+      onMouseDown: (e) => e.stopPropagation()
+    },
+    react.createElement(
+      "div",
+      { className: "musixmatch-settings-row" },
+      react.createElement("label", { className: "musixmatch-settings-label" }, "Musixmatch Token"),
+      react.createElement("input", {
+        type: "text",
+        readOnly: true,
+        value: token ? token.substring(0, 24) + "..." : "(no token)",
+        className: "musixmatch-settings-input"
+      })
+    ),
+    react.createElement(
+      "div",
+      { className: "musixmatch-settings-actions" },
+      react.createElement(
+        "button",
+        {
+          type: "button",
+          className: "musixmatch-settings-button",
+          disabled: isRefreshing,
+          onClick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleRefreshToken();
+          }
+        },
+        isRefreshing ? "Regenerating..." : "Regenerate Token"
+      ),
+      react.createElement(
+        "button",
+        {
+          type: "button",
+          className: "musixmatch-settings-button",
+          disabled: isClearingCache,
+          onClick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleClearCache();
+          }
+        },
+        isClearingCache ? "Clearing..." : "Reset Musixmatch Cache"
+      )
+    ),
+    react.createElement(
+      "div",
+      { className: "musixmatch-settings-row" },
+      react.createElement("label", { className: "musixmatch-settings-label" }, "Translation Language"),
+      react.createElement(
+        "select",
+        {
+          value: savedLang,
+          onChange: handleLangChange,
+          className: "musixmatch-settings-select"
+        },
+        ...langOptions
+      )
+    ),
+    status && react.createElement("div", { className: "musixmatch-settings-status" }, status)
   );
 };
 
@@ -7904,6 +8112,11 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
     color: #9ca3af;
 }
 
+#${APP_NAME}-config-container .support-badge.translation {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
 #${APP_NAME}-config-container .lyrics-provider-expand-icon {
     color: var(--text-tertiary);
     transition: transform var(--transition-fast);
@@ -7933,6 +8146,82 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 #${APP_NAME}-config-container .lyrics-provider-card-body {
     padding: 16px;
     animation: slideDown 0.2s ease-out;
+}
+
+#${APP_NAME}-config-container .lyrics-provider-settings {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+#${APP_NAME}-config-container .lyrics-provider-settings-title {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-input {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--spice-card);
+    border: 1px solid var(--spice-sidebar);
+    color: var(--spice-text);
+    font-family: monospace;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-button {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--spice-button);
+    color: var(--spice-text);
+    border: none;
+    cursor: pointer;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--spice-card);
+    border: 1px solid var(--spice-sidebar);
+    color: var(--spice-text);
+    font-size: 12px;
+}
+
+#${APP_NAME}-config-container .musixmatch-settings-status {
+    font-size: 11px;
+    color: var(--text-secondary);
 }
 
 #${APP_NAME}-config-container .lyrics-provider-card-body .lyrics-addon-info p {
@@ -8528,6 +8817,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 #${APP_NAME}-config-container .support-badge.karaoke,
 #${APP_NAME}-config-container .support-badge.synced,
 #${APP_NAME}-config-container .support-badge.unsynced,
+#${APP_NAME}-config-container .support-badge.translation,
 #${APP_NAME}-config-container .support-badge.ivsync {
     background: transparent;
 }

@@ -417,6 +417,7 @@ window.LANG_EN = {
         "karaoke": "Karaoke",
         "synced": "Synced",
         "unsynced": "Plain",
+        "translation": "Translation",
         "ivLyricsSync": "ivLyrics Sync"
       }
     }

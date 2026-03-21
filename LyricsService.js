@@ -1698,6 +1698,25 @@
                     mode2 = Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || "none";
                 }
 
+                const aiTranslateEnabled = !!(window.AIAddonManager?.getEnabledProvidersFor &&
+                    window.AIAddonManager.getEnabledProvidersFor('translate')?.length);
+                const hasProviderTranslation = Array.isArray(lyrics) && lyrics.some((line) => {
+                    const t2 = line?.text2 || line?.translation || line?.translationText;
+                    return typeof t2 === 'string' && t2.trim().length > 0;
+                });
+
+                // Provider translation selected (e.g., Musixmatch) or auto with provider translation -> skip Gemini calls
+                if (translationProvider === "musixmatch" || (translationProvider === "auto" && hasProviderTranslation)) {
+                    mode1 = "none";
+                    mode2 = "none";
+                }
+
+                // No AI providers enabled -> disable Gemini modes
+                if (!aiTranslateEnabled) {
+                    if (String(mode1).startsWith("gemini")) mode1 = "none";
+                    if (String(mode2).startsWith("gemini")) mode2 = "none";
+                }
+
                 serviceDebug('[LyricsService] 언어 감지:', { detectedLanguage, friendlyLanguage, modeKey, mode1, mode2 });
 
                 // 5. 발음/번역 요청 (설정에 따라)
@@ -3617,4 +3636,3 @@
     serviceDebug("[LyricsService] LyricsService Extension initialized successfully!");
     serviceDebug("[LyricsService] Available APIs: window.LyricsService, window.LyricsCache, window.ApiTracker, window.Translator, window.OverlaySender, window.lyricsHelperSender");
 })();
-

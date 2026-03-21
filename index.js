@@ -2168,8 +2168,27 @@ const Prefetcher = {
     }
 
     const modeKey = friendlyLanguage || "gemini";
-    const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
-    const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+    const translationProvider = CONFIG.visual["translate:translated-lyrics-source"] || "auto";
+    let displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+    let displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+
+    const aiTranslateEnabled = !!(window.AIAddonManager?.getEnabledProvidersFor &&
+      window.AIAddonManager.getEnabledProvidersFor('translate')?.length);
+    const providerTranslationAvailable = Array.isArray(this.state.currentLyrics) &&
+      this.state.currentLyrics.some((line) => {
+        const t2 = line?.text2 || line?.translation || line?.translationText;
+        return typeof t2 === "string" && t2.trim().length > 0;
+      });
+
+    if (translationProvider === "musixmatch" || (translationProvider === "auto" && providerTranslationAvailable)) {
+      displayMode1 = "none";
+      displayMode2 = "none";
+    }
+
+    if (!aiTranslateEnabled) {
+      if (String(displayMode1).startsWith("gemini")) displayMode1 = "none";
+      if (String(displayMode2).startsWith("gemini")) displayMode2 = "none";
+    }
 
     // 번역/발음 모드가 설정되어 있지 않으면 스킵
     if ((!displayMode1 || displayMode1 === "none") && (!displayMode2 || displayMode2 === "none")) {
@@ -4203,8 +4222,27 @@ class LyricsContainer extends react.Component {
     // For Gemini mode, use generic keys if no specific language detected
     const modeKey = friendlyLanguage || "gemini";
 
-    const displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
-    const displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+    let displayMode1 = CONFIG.visual[`translation-mode:${modeKey}`];
+    let displayMode2 = CONFIG.visual[`translation-mode-2:${modeKey}`];
+
+    const translationProvider = CONFIG.visual["translate:translated-lyrics-source"] || "auto";
+    const aiTranslateEnabled = !!(window.AIAddonManager?.getEnabledProvidersFor &&
+      window.AIAddonManager.getEnabledProvidersFor('translate')?.length);
+    const providerTranslationAvailable = Array.isArray(lyrics) &&
+      lyrics.some((line) => {
+        const t2 = line?.text2 || line?.translation || line?.translationText;
+        return typeof t2 === "string" && t2.trim().length > 0;
+      });
+
+    if (translationProvider === "musixmatch" || (translationProvider === "auto" && providerTranslationAvailable)) {
+      displayMode1 = "none";
+      displayMode2 = "none";
+    }
+
+    if (!aiTranslateEnabled) {
+      if (String(displayMode1).startsWith("gemini")) displayMode1 = "none";
+      if (String(displayMode2).startsWith("gemini")) displayMode2 = "none";
+    }
 
     this.language = originalLanguage;
     this.displayMode = displayMode1; // Keep for legacy compatibility
@@ -6848,4 +6886,3 @@ if (!window.__ivLyricsToastCleanupInitTimer) {
     }
   }, 100);
 }
-

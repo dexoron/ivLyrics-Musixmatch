@@ -103,8 +103,17 @@ const safeRenderText = (value) => {
 // Unified function to handle lyrics display mode logic
 const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
 	const displayMode = CONFIG.visual["translate:display-mode"];
-	const showTranslatedBelow = displayMode === "below";
-	const replaceOriginal = displayMode === "replace";
+	const translateSource = CONFIG?.visual?.["translate:translated-lyrics-source"] || "auto";
+	const allowProviderReplace = translateSource === "musixmatch" || translateSource === "auto";
+
+	// If provider translation exists but display mode would hide it, force replace
+	let effectiveDisplayMode = displayMode;
+	if (text2 && allowProviderReplace && displayMode !== "below" && displayMode !== "replace") {
+		effectiveDisplayMode = "replace";
+	}
+
+	const showTranslatedBelow = effectiveDisplayMode === "below";
+	const replaceOriginal = effectiveDisplayMode === "replace";
 
 	let mainText, subText, subText2;
 
@@ -127,10 +136,18 @@ const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
 				Utils.applyFuriganaIfEnabled(processedOriginalText) : processedOriginalText;
 			subText = text ? safeRenderText(text) : null;
 			subText2 = text2 ? safeRenderText(text2) : null;
-		} else if (replaceOriginal && text) {
-			// Replace original with translation (only if translation exists)
-			mainText = safeRenderText(text);
-			subText = text2 ? safeRenderText(text2) : null;
+		} else if (replaceOriginal && (text || text2)) {
+			// Replace original with translation (allow provider translation in text2)
+			if (text) {
+				mainText = safeRenderText(text);
+				subText = text2 ? safeRenderText(text2) : null;
+			} else if (allowProviderReplace && text2) {
+				mainText = safeRenderText(text2);
+				subText = null;
+			} else {
+				mainText = safeRenderText(originalText);
+				subText = null;
+			}
 			subText2 = null;
 		} else {
 			// Default: just show original with furigana if enabled
