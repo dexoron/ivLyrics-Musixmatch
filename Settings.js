@@ -10614,6 +10614,12 @@ const ConfigModal = ({
               key: "karaoke-bounce",
               type: ConfigSlider,
             },
+            {
+              desc: I18n.t("settingsAdvanced.karaokeMode.spotifyFakeKaraoke.label"),
+              info: I18n.t("settingsAdvanced.karaokeMode.spotifyFakeKaraoke.desc"),
+              key: "spotify-fake-karaoke-enabled",
+              type: ConfigSlider,
+            },
           ],
           onChange: (name, value) => {
             CONFIG.visual[name] = value;

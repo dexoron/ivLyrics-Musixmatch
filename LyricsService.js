@@ -1490,6 +1490,574 @@
 
     window.SyncDataService = SyncDataService;
 
+    const PseudoKaraokeService = (() => {
+        const SETTING_KEY = 'ivLyrics:visual:spotify-fake-karaoke-enabled';
+        const CACHE_VERSION_BASE = 'pseudo-karaoke-v3';
+        const PSEUDO_ADVANCE_MS = 30;
+        const AGGRESSIVE_SCRIPT_REGEX = /[\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
+        const _analysisCache = new Map();
+        const _inflightAnalysis = new Map();
+        const PSEUDO_SOURCES = new Set(['audio-analysis-pseudo', 'spotify-audio-analysis']);
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function clamp01(value) {
+            return clamp(value, 0, 1);
+        }
+
+        function parseMs(value) {
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+            const parsed = parseInt(value, 10);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+
+        function isEnabled() {
+            try {
+                return localStorage.getItem(SETTING_KEY) === 'true';
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function isAggressiveChar(char) {
+            return AGGRESSIVE_SCRIPT_REGEX.test(char);
+        }
+
+        function getCacheVersion() {
+            return `${CACHE_VERSION_BASE}:${isEnabled() ? 'on' : 'off'}`;
+        }
+
+        function clearPseudoKaraoke(result) {
+            if (!result || !PSEUDO_SOURCES.has(result.karaokeSource)) return result;
+            result.karaoke = null;
+            delete result.karaokeSource;
+            delete result.pseudoKaraokeCacheVersion;
+            return result;
+        }
+
+        async function getAudioAnalysis(trackId) {
+            if (!trackId) return null;
+            if (_analysisCache.has(trackId)) return _analysisCache.get(trackId);
+            if (_inflightAnalysis.has(trackId)) return _inflightAnalysis.get(trackId);
+
+            const promise = (async () => {
+                try {
+                    const analysis = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-analysis/${trackId}`);
+                    _analysisCache.set(trackId, analysis);
+                    return analysis;
+                } catch (error) {
+                    window.__ivLyricsDebugLog?.('[PseudoKaraokeService] Audio analysis fetch failed', error);
+                    return null;
+                } finally {
+                    _inflightAnalysis.delete(trackId);
+                }
+            })();
+
+            _inflightAnalysis.set(trackId, promise);
+            return promise;
+        }
+
+        function normalizeSyncedLines(lines, fallbackDurationMs) {
+            if (!Array.isArray(lines)) return [];
+
+            return lines
+                .map((line, index) => {
+                    const startTime = parseMs(line?.startTime);
+                    if (startTime === null) return null;
+
+                    const directEnd = parseMs(line?.endTime);
+                    const nextStart = parseMs(lines[index + 1]?.startTime);
+                    const endTime = directEnd && directEnd > startTime
+                        ? directEnd
+                        : (nextStart && nextStart > startTime
+                            ? nextStart
+                            : (Number.isFinite(fallbackDurationMs) && fallbackDurationMs > startTime ? fallbackDurationMs : startTime + 4000));
+
+                    return {
+                        startTime,
+                        endTime,
+                        text: line?.text || ''
+                    };
+                })
+                .filter(Boolean);
+        }
+
+        function estimateAggressiveChunkSize(coreToken, lineConfidence, lineDurationMs) {
+            const charCount = Array.from(coreToken).length;
+            if (charCount <= 1) return 1;
+
+            const msPerChar = lineDurationMs / Math.max(1, charCount);
+            if (lineConfidence >= 0.62 || msPerChar >= 170) return 1;
+            if (lineConfidence >= 0.42 || msPerChar >= 110) return 2;
+            return charCount >= 8 ? 3 : 2;
+        }
+
+        function tokenizeLine(text, options = {}) {
+            if (!text) return [];
+
+            const lineConfidence = clamp01(options.lineConfidence ?? 0.5);
+            const lineDurationMs = Math.max(1, options.lineDurationMs ?? 2000);
+            const coarseTokens = text.match(/\S+\s*|\s+/g) || [text];
+            const units = [];
+
+            for (const token of coarseTokens) {
+                if (!token) continue;
+
+                const trimmed = token.trim();
+                if (!trimmed) {
+                    units.push(token);
+                    continue;
+                }
+
+                const shouldSplitAggressively = Array.from(trimmed).some(isAggressiveChar);
+                if (!shouldSplitAggressively) {
+                    units.push(token);
+                    continue;
+                }
+
+                const trailingWhitespaceMatch = token.match(/\s+$/);
+                const trailingWhitespace = trailingWhitespaceMatch ? trailingWhitespaceMatch[0] : '';
+                const coreToken = trailingWhitespace ? token.slice(0, -trailingWhitespace.length) : token;
+                const chars = Array.from(coreToken);
+                const chunkSize = estimateAggressiveChunkSize(coreToken, lineConfidence, lineDurationMs);
+
+                if (!chars.length) {
+                    units.push(token);
+                    continue;
+                }
+
+                for (let index = 0; index < chars.length; index += chunkSize) {
+                    const chunk = chars.slice(index, index + chunkSize).join('');
+                    units.push(index + chunkSize >= chars.length && trailingWhitespace ? chunk + trailingWhitespace : chunk);
+                }
+            }
+
+            return units;
+        }
+
+        function getUnitWeight(unitText) {
+            const trimmed = unitText.trim();
+            if (!trimmed) return Math.max(0.2, unitText.length * 0.15);
+
+            const chars = Array.from(trimmed);
+            const alphaNumericCount = chars.filter((char) => /[A-Za-z0-9]/.test(char)).length;
+            const aggressiveCount = chars.filter(isAggressiveChar).length;
+
+            if (aggressiveCount === chars.length) return Math.max(0.9, aggressiveCount);
+            if (alphaNumericCount > 0) return Math.max(1, Math.min(6, alphaNumericCount * 0.65));
+            return Math.max(0.45, chars.length * 0.4);
+        }
+
+        function dedupeSortedTimes(times, minGap) {
+            return times.filter((time, index, array) => index === 0 || (time - array[index - 1]) >= minGap);
+        }
+
+        function getPitchStats(pitches) {
+            if (!Array.isArray(pitches) || pitches.length === 0) return { peak: 0, focus: 0, spread: 0 };
+
+            const sorted = [...pitches].sort((left, right) => right - left);
+            const sum = pitches.reduce((total, value) => total + Math.max(0, value), 0);
+            const peak = sorted[0] || 0;
+            const focus = sum > 0 ? ((sorted[0] || 0) + (sorted[1] || 0) + (sorted[2] || 0)) / sum : 0;
+            const mean = sum / pitches.length;
+            const variance = pitches.reduce((total, value) => total + ((value - mean) ** 2), 0) / pitches.length;
+
+            return { peak, focus, spread: Math.sqrt(variance) };
+        }
+
+        function getTimbreDelta(currentSegment, neighborSegment) {
+            const current = currentSegment?.timbre;
+            const neighbor = neighborSegment?.timbre;
+            if (!Array.isArray(current) || !Array.isArray(neighbor) || !current.length || !neighbor.length) return 0;
+
+            const length = Math.min(current.length, neighbor.length, 6);
+            let sum = 0;
+            for (let index = 0; index < length; index++) {
+                sum += Math.abs(current[index] - neighbor[index]);
+            }
+
+            return clamp01(sum / (length * 45));
+        }
+
+        function scoreVocalCandidate(segment, previousSegment, nextSegment) {
+            const durationMs = Math.max(1, (segment?.duration || 0) * 1000);
+            if (durationMs < 35 || durationMs > 650) return 0;
+
+            const confidence = clamp01(typeof segment?.confidence === 'number' ? segment.confidence : 0);
+            const loudnessStart = Number.isFinite(segment?.loudness_start) ? segment.loudness_start : -60;
+            const loudnessMax = Number.isFinite(segment?.loudness_max) ? segment.loudness_max : loudnessStart;
+            const loudnessRise = loudnessMax - loudnessStart;
+            const loudnessMaxTime = Number.isFinite(segment?.loudness_max_time) ? segment.loudness_max_time : Math.min(segment?.duration || 0, 0.08);
+            const attackRatio = clamp01(loudnessMaxTime / Math.max(segment?.duration || 0.001, 0.001));
+            const attackScore = clamp01(1 - (Math.abs(attackRatio - 0.22) / 0.22));
+            const onsetScore = clamp01((loudnessRise + 2) / 10);
+            const sustainedScore = clamp01((durationMs - 60) / 180);
+            const loudnessScore = clamp01((loudnessMax + 36) / 28);
+            const pitchStats = getPitchStats(segment?.pitches);
+            const harmonicScore = clamp01(((pitchStats.peak * 0.55) + (pitchStats.focus * 0.65) - 0.35) / 0.55);
+            const contrastScore = Math.max(getTimbreDelta(segment, previousSegment), getTimbreDelta(segment, nextSegment));
+
+            let score =
+                (confidence * 0.16) +
+                (onsetScore * 0.2) +
+                (attackScore * 0.12) +
+                (sustainedScore * 0.15) +
+                (harmonicScore * 0.22) +
+                (contrastScore * 0.1) +
+                (loudnessScore * 0.05);
+
+            if (durationMs < 90 && attackRatio < 0.12 && onsetScore > 0.55) score -= 0.18;
+            if (pitchStats.focus < 0.38 && pitchStats.peak < 0.42) score -= 0.12;
+            if (pitchStats.spread > 0.25 && durationMs < 110) score -= 0.08;
+
+            return clamp01(score);
+        }
+
+        function buildRhythmAnchors(startTime, endTime, analysis) {
+            const intervalMs = endTime - startTime;
+            const anchors = [startTime, endTime];
+
+            const addStarts = (items, minConfidence) => {
+                if (!Array.isArray(items)) return;
+                for (const item of items) {
+                    const confidence = typeof item?.confidence === 'number' ? item.confidence : 1;
+                    const itemStart = Math.round((item?.start || 0) * 1000);
+                    if (confidence < minConfidence) continue;
+                    if (itemStart <= startTime || itemStart >= endTime) continue;
+                    anchors.push(itemStart);
+                }
+            };
+
+            addStarts(analysis?.beats, 0.2);
+            addStarts(analysis?.tatums, 0.12);
+
+            return dedupeSortedTimes(
+                anchors.sort((left, right) => left - right).filter((time) => time >= startTime && time <= endTime),
+                Math.max(18, Math.min(90, intervalMs / 140))
+            );
+        }
+
+        function buildVocalCandidates(startTime, endTime, analysis) {
+            if (!Array.isArray(analysis?.segments)) return [];
+
+            const candidates = [];
+            for (let index = 0; index < analysis.segments.length; index++) {
+                const segment = analysis.segments[index];
+                const segmentStart = (segment?.start || 0) * 1000;
+                const segmentEnd = segmentStart + ((segment?.duration || 0) * 1000);
+                if (segmentEnd <= startTime || segmentStart >= endTime) continue;
+
+                const score = scoreVocalCandidate(segment, analysis.segments[index - 1], analysis.segments[index + 1]);
+                if (score < 0.28) continue;
+
+                const loudnessMaxTime = Number.isFinite(segment?.loudness_max_time) ? segment.loudness_max_time * 1000 : Math.min(80, (segment?.duration || 0) * 380);
+                const candidateTime = Math.round(clamp(segmentStart + loudnessMaxTime, startTime, endTime));
+                candidates.push({
+                    time: candidateTime,
+                    score,
+                    segmentStart: Math.round(Math.max(startTime, segmentStart)),
+                    segmentEnd: Math.round(Math.min(endTime, segmentEnd)),
+                    durationMs: Math.max(1, Math.round(segmentEnd - segmentStart))
+                });
+            }
+
+            candidates.sort((left, right) => left.time - right.time);
+            return candidates.reduce((accumulator, candidate) => {
+                const previous = accumulator[accumulator.length - 1];
+                if (!previous || (candidate.time - previous.time) > 55) {
+                    accumulator.push(candidate);
+                } else if (candidate.score > previous.score) {
+                    accumulator[accumulator.length - 1] = candidate;
+                }
+                return accumulator;
+            }, []);
+        }
+
+        function buildVocalActivityWindow(startTime, endTime, vocalCandidates, confidence, unitCount) {
+            const intervalMs = Math.max(1, endTime - startTime);
+            if (!vocalCandidates.length) {
+                return {
+                    activeStart: startTime,
+                    activeEnd: endTime,
+                    leadTrim: 0,
+                    tailTrim: 0
+                };
+            }
+
+            const clusterGap = Math.max(180, Math.min(520, intervalMs * 0.16));
+            const clusters = [];
+
+            for (const candidate of vocalCandidates) {
+                const previous = clusters[clusters.length - 1];
+                if (!previous || (candidate.segmentStart - previous.end) > clusterGap) {
+                    clusters.push({
+                        start: candidate.segmentStart,
+                        end: candidate.segmentEnd,
+                        totalScore: candidate.score,
+                        peakScore: candidate.score,
+                        count: 1
+                    });
+                    continue;
+                }
+
+                previous.start = Math.min(previous.start, candidate.segmentStart);
+                previous.end = Math.max(previous.end, candidate.segmentEnd);
+                previous.totalScore += candidate.score;
+                previous.peakScore = Math.max(previous.peakScore, candidate.score);
+                previous.count += 1;
+            }
+
+            const bestCluster = clusters.reduce((best, cluster) => {
+                if (!best) return cluster;
+                const bestWeight = best.totalScore + (best.peakScore * 0.6) + (best.count * 0.08);
+                const clusterWeight = cluster.totalScore + (cluster.peakScore * 0.6) + (cluster.count * 0.08);
+                return clusterWeight > bestWeight ? cluster : best;
+            }, null);
+
+            const keptClusters = clusters.filter((cluster) => {
+                if (!bestCluster) return true;
+                if (cluster === bestCluster) return true;
+                const isTrailingCluster = cluster.start >= bestCluster.end;
+                const clusterGapFromBest = isTrailingCluster
+                    ? cluster.start - bestCluster.end
+                    : Math.max(0, bestCluster.start - cluster.end);
+                if (isTrailingCluster && clusterGapFromBest > (clusterGap * 0.9)) {
+                    return cluster.totalScore >= bestCluster.totalScore * 0.55 ||
+                        cluster.peakScore >= Math.max(0.68, bestCluster.peakScore * 0.92);
+                }
+                if (cluster.totalScore >= bestCluster.totalScore * 0.32) return true;
+                if (cluster.peakScore >= Math.max(0.58, bestCluster.peakScore * 0.82)) return true;
+                return cluster.count >= 2 && cluster.totalScore >= 0.92;
+            });
+
+            const rawStart = Math.min(...keptClusters.map((cluster) => cluster.start));
+            const rawEnd = Math.max(...keptClusters.map((cluster) => cluster.end));
+            const minActiveDuration = Math.max(
+                260,
+                Math.min(intervalMs, Math.max((unitCount || 1) * 70, intervalMs * 0.24))
+            );
+            const leadPad = Math.max(30, Math.min(170, 45 + (intervalMs * 0.02)));
+            const tailPad = Math.max(80, Math.min(280, 90 + (intervalMs * 0.045)));
+
+            let activeStart = clamp(rawStart - leadPad, startTime, Math.max(startTime, endTime - minActiveDuration));
+            let activeEnd = clamp(rawEnd + tailPad, activeStart + minActiveDuration, endTime);
+
+            const leadTrim = Math.max(0, activeStart - startTime);
+            const tailTrim = Math.max(0, endTime - activeEnd);
+            const startTrimThreshold = Math.max(120, Math.min(420, intervalMs * (confidence >= 0.55 ? 0.08 : 0.13)));
+            const endTrimThreshold = Math.max(180, Math.min(900, intervalMs * (confidence >= 0.5 ? 0.12 : 0.18)));
+            const strongCandidates = vocalCandidates.filter((candidate) => candidate.score >= 0.58);
+            const lastStrongCandidate = strongCandidates[strongCandidates.length - 1] || vocalCandidates[vocalCandidates.length - 1] || null;
+            const tailSilenceMs = lastStrongCandidate ? Math.max(0, endTime - lastStrongCandidate.segmentEnd) : 0;
+            const tailPresenceWindow = Math.max(160, Math.min(700, intervalMs * 0.12));
+            const hasStrongTailPresence = strongCandidates.some((candidate) => candidate.segmentEnd >= (endTime - tailPresenceWindow));
+            const forceTailTrimThreshold = Math.max(260, Math.min(1400, intervalMs * 0.18));
+            const forceTailTrim = !!lastStrongCandidate &&
+                tailSilenceMs >= forceTailTrimThreshold &&
+                !hasStrongTailPresence &&
+                (strongCandidates.length >= 2 || lastStrongCandidate.score >= 0.7);
+
+            if (leadTrim < startTrimThreshold || confidence < 0.36) {
+                activeStart = startTime;
+            }
+
+            if ((tailTrim < endTrimThreshold || confidence < 0.34) && !forceTailTrim) {
+                activeEnd = endTime;
+            }
+
+            if ((activeEnd - activeStart) < minActiveDuration) {
+                activeEnd = Math.min(endTime, activeStart + minActiveDuration);
+                activeStart = Math.max(startTime, activeEnd - minActiveDuration);
+            }
+
+            return {
+                activeStart,
+                activeEnd,
+                leadTrim: Math.max(0, activeStart - startTime),
+                tailTrim: Math.max(0, endTime - activeEnd)
+            };
+        }
+
+        function buildLineTimingModel(startTime, endTime, analysis, unitCount = 1) {
+            const vocalCandidates = buildVocalCandidates(startTime, endTime, analysis);
+            const rhythmAnchors = buildRhythmAnchors(startTime, endTime, analysis);
+            const intervalMs = Math.max(1, endTime - startTime);
+            const expectedCandidates = Math.max(1, Math.round(intervalMs / 260));
+            const strongCandidates = vocalCandidates.filter((candidate) => candidate.score >= 0.58).length;
+            const topAverage = vocalCandidates.length
+                ? vocalCandidates.slice().sort((left, right) => right.score - left.score).slice(0, Math.min(3, vocalCandidates.length))
+                    .reduce((sum, candidate) => sum + candidate.score, 0) / Math.min(3, vocalCandidates.length)
+                : 0;
+            const coverage = clamp01(vocalCandidates.length / expectedCandidates);
+            const density = clamp01(strongCandidates / Math.max(1, expectedCandidates - 0.25));
+            const confidence = clamp01((topAverage * 0.5) + (coverage * 0.3) + (density * 0.2));
+            const activeWindow = buildVocalActivityWindow(startTime, endTime, vocalCandidates, confidence, unitCount);
+
+            return { rhythmAnchors, vocalCandidates, confidence, ...activeWindow };
+        }
+
+        function pickBoundaryTime(targetTime, timingModel, previousTime, remainingUnits, endTime) {
+            const minGap = 24;
+            const minAllowed = previousTime + minGap;
+            const maxAllowed = endTime - (remainingUnits * minGap);
+            if (maxAllowed <= minAllowed) return Math.round(minAllowed);
+
+            const clampedTarget = Math.max(minAllowed, Math.min(maxAllowed, targetTime));
+            const lineConfidence = clamp01(timingModel?.confidence ?? 0);
+            const vocalWindow = Math.max(110, Math.min(260, (endTime - previousTime) * (lineConfidence >= 0.5 ? 0.34 : 0.42)));
+            const rhythmWindow = Math.max(85, Math.min(150, (endTime - previousTime) * 0.24));
+
+            let bestVocalTime = null;
+            let bestVocalScore = -1;
+            for (const candidate of timingModel?.vocalCandidates || []) {
+                if (candidate.time < minAllowed || candidate.time > maxAllowed) continue;
+                const distance = Math.abs(candidate.time - clampedTarget);
+                if (distance > vocalWindow) continue;
+
+                const closeness = 1 - (distance / vocalWindow);
+                const score = (candidate.score * 1.2) + (closeness * 0.85);
+                if (score > bestVocalScore) {
+                    bestVocalScore = score;
+                    bestVocalTime = candidate.time;
+                }
+            }
+
+            if (bestVocalTime !== null && bestVocalScore >= (0.95 - (lineConfidence * 0.15))) {
+                return Math.round(bestVocalTime);
+            }
+
+            let bestRhythmTime = clampedTarget;
+            let bestRhythmDistance = Number.POSITIVE_INFINITY;
+            for (const anchor of timingModel?.rhythmAnchors || []) {
+                if (anchor < minAllowed || anchor > maxAllowed) continue;
+                const distance = Math.abs(anchor - clampedTarget);
+                if (distance <= rhythmWindow && distance < bestRhythmDistance) {
+                    bestRhythmDistance = distance;
+                    bestRhythmTime = anchor;
+                }
+            }
+
+            if (bestVocalTime !== null) {
+                const blendedTime = lineConfidence >= 0.45
+                    ? bestVocalTime
+                    : Math.round(((bestVocalTime * (0.45 + lineConfidence)) + (bestRhythmTime * 0.55)) / (1 + lineConfidence));
+                return Math.round(clamp(blendedTime, minAllowed, maxAllowed));
+            }
+
+            return Math.round(bestRhythmTime);
+        }
+
+        function buildPseudoKaraokeLine(line, analysis) {
+            const text = line?.text || '';
+            const startTime = Number.isFinite(line?.startTime) ? line.startTime : 0;
+            const endTime = Number.isFinite(line?.endTime) && line.endTime > startTime ? line.endTime : startTime + 2500;
+
+            if (!text.trim()) {
+                return { startTime, endTime, text, syllables: [] };
+            }
+
+            const previewUnits = tokenizeLine(text, { lineConfidence: 0.5, lineDurationMs: endTime - startTime });
+            const timingModel = buildLineTimingModel(startTime, endTime, analysis, previewUnits.length || 1);
+            const activeStart = Number.isFinite(timingModel.activeStart) ? timingModel.activeStart : startTime;
+            const activeEnd = Number.isFinite(timingModel.activeEnd) ? timingModel.activeEnd : endTime;
+            const units = tokenizeLine(text, {
+                lineConfidence: timingModel.confidence,
+                lineDurationMs: Math.max(1, activeEnd - activeStart)
+            });
+            if (!units.length) return null;
+
+            const weights = units.map(getUnitWeight);
+            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || units.length;
+            const boundaries = [activeStart];
+
+            let accumulatedWeight = 0;
+            for (let index = 1; index < units.length; index++) {
+                accumulatedWeight += weights[index - 1];
+                const targetTime = activeStart + ((activeEnd - activeStart) * accumulatedWeight / totalWeight);
+                boundaries.push(pickBoundaryTime(targetTime, timingModel, boundaries[boundaries.length - 1], units.length - index, activeEnd));
+            }
+            boundaries.push(activeEnd);
+
+            const syllables = units.map((unitText, index) => {
+                const originalStart = boundaries[index];
+                const originalEnd = Math.max(originalStart + 1, boundaries[index + 1]);
+                const shiftedStart = Math.max(0, originalStart - PSEUDO_ADVANCE_MS);
+                const shiftedEnd = Math.max(shiftedStart + 1, originalEnd - PSEUDO_ADVANCE_MS);
+
+                return {
+                    text: unitText,
+                    startTime: shiftedStart,
+                    endTime: shiftedEnd
+                };
+            });
+
+            return {
+                startTime: Math.max(0, activeStart - PSEUDO_ADVANCE_MS),
+                endTime: syllables[syllables.length - 1]?.endTime || Math.max(1, activeEnd - PSEUDO_ADVANCE_MS),
+                text,
+                syllables
+            };
+        }
+
+        async function applyToResult(result, info = {}) {
+            if (!result) return result;
+
+            if (!isEnabled()) {
+                return clearPseudoKaraoke(result);
+            }
+
+            if (result.karaoke && !PSEUDO_SOURCES.has(result.karaokeSource)) {
+                return result;
+            }
+
+            const trackUri = result.uri || info?.uri || '';
+            const trackId = trackUri.split(':')[2];
+            if (!trackId) {
+                return clearPseudoKaraoke(result);
+            }
+            const fallbackDurationMs = Number.isFinite(info?.duration)
+                ? info.duration
+                : parseMs(Spicetify.Player?.data?.item?.duration?.milliseconds);
+            const baseLyrics = normalizeSyncedLines(result.synced, fallbackDurationMs);
+
+            if (!baseLyrics.length) {
+                return clearPseudoKaraoke(result);
+            }
+
+            if (result.karaoke && PSEUDO_SOURCES.has(result.karaokeSource) && result.pseudoKaraokeCacheVersion === getCacheVersion()) {
+                return result;
+            }
+
+            const analysis = await getAudioAnalysis(trackId);
+            if (!analysis) {
+                result.skipCache = true;
+                return result;
+            }
+
+            const karaoke = baseLyrics.map((line) => buildPseudoKaraokeLine(line, analysis)).filter(Boolean);
+            if (!karaoke.length) {
+                result.skipCache = true;
+                return clearPseudoKaraoke(result);
+            }
+
+            result.karaoke = karaoke;
+            result.karaokeSource = 'audio-analysis-pseudo';
+            result.pseudoKaraokeCacheVersion = getCacheVersion();
+            return result;
+        }
+
+        return {
+            isEnabled,
+            getCacheVersion,
+            applyToResult,
+            clearPseudoKaraoke
+        };
+    })();
+
+    window.PseudoKaraokeService = PseudoKaraokeService;
+
 
 
     // ============================================

@@ -1009,6 +1009,10 @@ window.LANG_KO = {
       "bounce": {
         "label": "글자 바운스 효과",
         "desc": "노래방 모드에서 현재 부르는 글자에 통통 튀는 애니메이션을 적용합니다"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "가상 노래방",
+        "desc": "가사가 줄단위 싱크만 제공할 때 Spotify audio analysis를 기반으로 노래방 타이밍을 합성합니다. 신뢰도가 높을 때 한글, 일본어, 중국어는 더 촘촘하게 분해합니다."
       }
     },
     "prefetch": {

@@ -1009,6 +1009,10 @@ window.LANG_EN = {
       "bounce": {
         "label": "Character Bounce Effect",
         "desc": "Apply a bounce animation to the current singing characters in Karaoke mode"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Pseudo Karaoke",
+        "desc": "When lyrics only provide line-synced timing, synthesize karaoke timing from Spotify audio analysis. Korean, Japanese, and Chinese lines are split more densely when confidence is high."
       }
     },
     "prefetch": {
@@ -1853,6 +1857,7 @@ window.LANG_EN = {
       "syllable": "Syllable"
     },
     "copyLyrics": "Copy Lyrics",
+    "virtualKaraoke": "Virtual karaoke data",
     "lyricsCopied": "Lyrics copied to clipboard",
     "copyError": "Copy failed",
     "export": "Export",

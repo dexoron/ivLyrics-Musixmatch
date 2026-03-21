@@ -632,7 +632,19 @@
                         }
                     }
 
-                    // 3. 사용자 설정에 따라 필터링
+                    // 3. line-synced 가사에 대한 pseudo karaoke를 중앙 서비스에서 합성
+                    if (window.PseudoKaraokeService?.applyToResult) {
+                        try {
+                            const pseudoResult = await window.PseudoKaraokeService.applyToResult(result, info);
+                            if (pseudoResult) {
+                                Object.assign(result, pseudoResult);
+                            }
+                        } catch (e) {
+                            console.warn(`[LyricsAddonManager] Failed to apply pseudo karaoke:`, e);
+                        }
+                    }
+
+                    // 4. 사용자 설정에 따라 필터링
                     const finalResult = { ...result };
                     if (!allowKaraoke) finalResult.karaoke = null;
                     if (!allowSynced) finalResult.synced = null;
@@ -644,7 +656,7 @@
                         hasUnsynced: !!finalResult.unsynced
                     });
 
-                    // 4. 허용된 가사가 있으면 반환
+                    // 5. 허용된 가사가 있으면 반환
                     if (finalResult.karaoke || finalResult.synced || finalResult.unsynced) {
                         // 디버그 타이머 종료
                         if (window.AddonDebug?.isEnabled()) {
@@ -669,14 +681,16 @@
                         });
 
                         // IndexedDB에 캐시 저장
-                        if (trackId && window.LyricsService?.cacheLyrics) {
-                            window.LyricsService.cacheLyrics(trackId, provider.id, finalResult);
+                        if (trackId && window.LyricsService?.cacheLyrics && !finalResult.skipCache) {
+                            const cachePayload = { ...finalResult };
+                            delete cachePayload.skipCache;
+                            window.LyricsService.cacheLyrics(trackId, provider.id, cachePayload);
                         }
 
                         return finalResult;
                     }
 
-                    // 5. 필터링 후 가사가 없으면 다음 provider 시도
+                    // 6. 필터링 후 가사가 없으면 다음 provider 시도
                     window.__ivLyricsDebugLog?.(`[LyricsAddonManager] Lyrics from ${provider.id} filtered out by user settings or empty`);
 
                 } catch (e) {

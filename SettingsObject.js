@@ -173,6 +173,7 @@ const SettingKeys = [
   "ivLyrics:visual:blur-gradient-background",
   "ivLyrics:visual:translate:target-language",
   "ivLyrics:visual:reduce-motion",
+  "ivLyrics:visual:spotify-fake-karaoke-enabled",
 ];
 
 const BYTES_FOR_INDEX = Math.ceil(SettingKeys.length / 255);

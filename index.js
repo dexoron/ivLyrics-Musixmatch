@@ -1522,6 +1522,10 @@ const CONFIG = {
       "ivLyrics:visual:karaoke-mode-enabled",
       true
     ),
+    "spotify-fake-karaoke-enabled": StorageManager.get(
+      "ivLyrics:visual:spotify-fake-karaoke-enabled",
+      false
+    ),
     // Prefetch settings
     "prefetch-enabled": StorageManager.get(
       "ivLyrics:visual:prefetch-enabled",
@@ -5686,6 +5690,8 @@ class LyricsContainer extends react.Component {
       if (event.detail?.name === "karaoke-mode-enabled") {
         // 노래방 모드 설정이 변경되면 현재 모드를 다시 계산
         this.setState({ explicitMode: -1 });
+      } else if (event.detail?.name === "spotify-fake-karaoke-enabled") {
+        this.reloadLyrics?.(false);
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);

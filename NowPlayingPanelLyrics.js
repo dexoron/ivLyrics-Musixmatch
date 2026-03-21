@@ -610,9 +610,28 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     // 노래방 가사 렌더링 헬퍼
     // syllables 또는 vocals 구조에서 syllables 추출
     // ============================================
+    const splitRenderableSyllables = (syllables) => {
+        if (!Array.isArray(syllables) || syllables.length === 0) return [];
+
+        return syllables.flatMap((syllable) => {
+            const text = syllable?.text || '';
+            if (!text || !/\s/.test(text) || text.trim() === '') {
+                return syllable;
+            }
+
+            return text
+                .split(/(\s+)/)
+                .filter((part) => part !== '')
+                .map((part) => ({
+                    ...syllable,
+                    text: part
+                }));
+        });
+    };
+
     const getSyllablesFromLine = (line) => {
         if (line.syllables && line.syllables.length > 0) {
-            return line.syllables;
+            return splitRenderableSyllables(line.syllables);
         }
         if (line.vocals?.lead?.syllables) {
             // lead와 background 병합
@@ -624,8 +643,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     }
                 });
             }
-            // startTime 기준 정렬
-            return allSyllables.sort((a, b) => a.startTime - b.startTime);
+            // startTime 기준 정렬 후 렌더링용으로 공백 분리
+            return splitRenderableSyllables(allSyllables.sort((a, b) => a.startTime - b.startTime));
         }
         return [];
     };

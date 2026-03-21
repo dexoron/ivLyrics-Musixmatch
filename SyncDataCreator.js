@@ -339,6 +339,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const trackName = trackInfo?.name || Spicetify.Player?.data?.item?.name || '';
 	const artistName = trackInfo?.artists?.map(a => a.name).join(', ') ||
 		Spicetify.Player?.data?.item?.artists?.map(a => a.name).join(', ') || '';
+	const isVirtualKaraokeSource =
+		lyrics?.karaokeSource === 'spotify-audio-analysis' ||
+		lyrics?.karaokeSource === 'audio-analysis-pseudo';
 	const albumArt = trackInfo?.album?.images?.[0]?.url ||
 		Spicetify.Player?.data?.item?.album?.images?.[0]?.url || '';
 
@@ -2127,6 +2130,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		trackName: { fontSize: '14px', fontWeight: '600', color: 'var(--spice-text)' },
 		artistName: { fontSize: '12px', color: 'var(--spice-subtext)' },
 		providerRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+		virtualKaraokeBadge: { background: 'rgba(29, 185, 84, 0.18)', color: '#1db954', border: '1px solid rgba(29, 185, 84, 0.35)', borderRadius: '999px', padding: '4px 10px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' },
 		select: { background: 'var(--spice-card)', color: 'var(--spice-text)', border: '1px solid var(--spice-misc)', borderRadius: '6px', padding: '6px 10px', fontSize: '12px' },
 		loadBtn: { background: 'var(--spice-button)', color: 'var(--spice-button-text, #000)', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
 		playbackRow: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--spice-card)', flexShrink: 0 },
@@ -2244,6 +2248,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				),
 				react.createElement('button', { style: { ...s.loadBtn, opacity: isLoading ? 0.5 : 1 }, onClick: () => loadLyrics(addonId), disabled: isLoading },
 					isLoading ? I18n.t('syncCreator.loading') : I18n.t('syncCreator.reload') || '다시 로드'
+				),
+				isVirtualKaraokeSource && react.createElement('span', { style: s.virtualKaraokeBadge },
+					I18n.t('syncCreator.virtualKaraoke') || '가상 노래방 데이터'
 				)
 			)
 		),
