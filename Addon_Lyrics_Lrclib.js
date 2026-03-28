@@ -709,6 +709,23 @@
         return lines.length > 0 ? lines : null;
     }
 
+    function stripLrcTimestamps(text) {
+        if (!text || typeof text !== 'string') return '';
+        return text.replace(/^\[\d+:\d+(?:[.,]\d+)?\]\s*/gm, '').trim();
+    }
+
+    function hasOriginalLyricsScript(text) {
+        if (!text || typeof text !== 'string') return false;
+
+        return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/.test(text);
+    }
+
+    function getCandidateLyricsText(candidate) {
+        if (candidate?.plainLyrics) return candidate.plainLyrics;
+        if (candidate?.syncedLyrics) return stripLrcTimestamps(candidate.syncedLyrics);
+        return '';
+    }
+
     /**
      * ────────────────────────────────────────────────────────────────────────────
      * LRC 형식 파싱 함수 (Ultra-Flexible)
@@ -1115,6 +1132,8 @@
                     }
 
                     const withinTolerance = item => item?.durationDiff <= LRCLIB_DURATION_TOLERANCE_SEC;
+                    const nativeScriptCandidates = rankedCandidates.filter(item => hasOriginalLyricsScript(getCandidateLyricsText(item)));
+                    const fallbackScriptCandidates = rankedCandidates.filter(item => !hasOriginalLyricsScript(getCandidateLyricsText(item)));
 
                     return {
                         fatal: false,
@@ -1122,11 +1141,17 @@
                         resolvedSearch,
                         rankedCandidates,
                         usedFallbackQuery,
-                        bestSyncedCandidate: rankedCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
-                            || rankedCandidates.find(item => item.syncedLyrics)
+                        bestNativeSyncedCandidate: nativeScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || nativeScriptCandidates.find(item => item.syncedLyrics)
                             || null,
-                        bestPlainCandidate: rankedCandidates.find(item => withinTolerance(item) && item.plainLyrics)
-                            || rankedCandidates.find(item => item.plainLyrics)
+                        bestNativePlainCandidate: nativeScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || nativeScriptCandidates.find(item => item.plainLyrics)
+                            || null,
+                        bestFallbackSyncedCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || fallbackScriptCandidates.find(item => item.syncedLyrics)
+                            || null,
+                        bestFallbackPlainCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || fallbackScriptCandidates.find(item => item.plainLyrics)
                             || null,
                         bestInstrumentalCandidate: rankedCandidates.find(item => withinTolerance(item) && item.instrumental)
                             || rankedCandidates.find(item => item.instrumental)
@@ -1152,9 +1177,9 @@
                     return result;
                 }
 
-                let body = primarySearchFlow.bestSyncedCandidate;
+                let body = primarySearchFlow.bestNativeSyncedCandidate;
                 let selectedFlow = primarySearchFlow;
-                let selectedSource = body ? 'primary-synced' : 'primary-none';
+                let selectedSource = body ? 'primary-native-synced' : 'primary-none';
                 let englishSearchFlow = null;
                 let englishMetadata = null;
                 let englishSearchError = null;
@@ -1175,24 +1200,44 @@
                         if (englishSearchFlow.fatal) {
                             englishSearchError = englishSearchFlow.error;
                         }
-                        else if (englishSearchFlow.bestSyncedCandidate) {
-                            body = englishSearchFlow.bestSyncedCandidate;
+                        else if (englishSearchFlow.bestNativeSyncedCandidate) {
+                            body = englishSearchFlow.bestNativeSyncedCandidate;
                             selectedFlow = englishSearchFlow;
-                            selectedSource = 'english-synced';
+                            selectedSource = 'english-native-synced';
                         }
                     }
                 }
 
                 if (!body) {
-                    if (primarySearchFlow.bestPlainCandidate) {
-                        body = primarySearchFlow.bestPlainCandidate;
+                    if (primarySearchFlow.bestNativePlainCandidate) {
+                        body = primarySearchFlow.bestNativePlainCandidate;
                         selectedFlow = primarySearchFlow;
-                        selectedSource = 'primary-plain';
+                        selectedSource = 'primary-native-plain';
                     }
-                    else if (englishSearchFlow?.bestPlainCandidate) {
-                        body = englishSearchFlow.bestPlainCandidate;
+                    else if (englishSearchFlow?.bestNativePlainCandidate) {
+                        body = englishSearchFlow.bestNativePlainCandidate;
                         selectedFlow = englishSearchFlow;
-                        selectedSource = 'english-plain';
+                        selectedSource = 'english-native-plain';
+                    }
+                    else if (primarySearchFlow.bestFallbackSyncedCandidate) {
+                        body = primarySearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-synced';
+                    }
+                    else if (englishSearchFlow?.bestFallbackSyncedCandidate) {
+                        body = englishSearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-synced';
+                    }
+                    else if (primarySearchFlow.bestFallbackPlainCandidate) {
+                        body = primarySearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-plain';
+                    }
+                    else if (englishSearchFlow?.bestFallbackPlainCandidate) {
+                        body = englishSearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-plain';
                     }
                     else if (primarySearchFlow.bestInstrumentalCandidate) {
                         body = primarySearchFlow.bestInstrumentalCandidate;
