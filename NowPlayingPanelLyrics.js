@@ -95,6 +95,7 @@
     const PANEL_CONTAINER_CLASS = "ivlyrics-panel-lyrics-container";
     const PANEL_SECTION_CLASS = "ivlyrics-panel-lyrics-section";
     const PANEL_STYLE_ID = "ivlyrics-panel-lyrics-styles";
+    const PANEL_ACTIVE_BODY_CLASS = "ivlyrics-panel-lyrics-active";
     // Starry Night 테마용 Now Playing Bar 컨테이너
     const NOWPLAYING_BAR_CONTAINER_CLASS = "ivlyrics-nowplaying-bar-lyrics";
 
@@ -150,6 +151,11 @@
 /* JavaScript에서 body에 클래스를 추가하는 방식으로 동작 */
 body.ivlyrics-page-active .ivlyrics-panel-lyrics-container,
 body.ivlyrics-page-active .ivlyrics-panel-lyrics-section {
+  display: none !important;
+}
+
+/* Now Playing Panel 가사가 켜져 있으면 Spotify 기본 미리보기 가사 숨기기 */
+body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   display: none !important;
 }
 
@@ -570,6 +576,10 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             insertTimer = null;
             moduleState.insertTimer = null;
         }
+    };
+
+    const setPanelActiveState = (isActive) => {
+        document.body.classList.toggle(PANEL_ACTIVE_BODY_CLASS, isActive);
     };
 
     const scheduleInsertPanelLyrics = (delay = 100) => {
@@ -1957,6 +1967,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         }
 
         moduleState.runtimeStarted = true;
+        setPanelActiveState(true);
 
         setupPageDetection();
         setupObserver();
@@ -1974,6 +1985,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         teardownLyricsListener();
         teardownPageDetection();
         removePanelLyrics();
+        setPanelActiveState(false);
         document.body.classList.remove('ivlyrics-page-active');
         document.body.classList.remove('ivlyrics-starrynight-theme');
     };
