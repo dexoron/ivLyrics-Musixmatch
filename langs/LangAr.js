@@ -1331,6 +1331,8 @@ window.LANG_AR = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "يلزم تسجيل الدخول عبر Discord.",
+        "checking": "جارٍ التحقق من معلومات الحساب...",
         "title": "ربط الحساب",
         "subtitle": "اربط حسابك على Discord",
         "description": "حساب مساهمة ivLyrics المعتمد على Discord",
@@ -1546,6 +1548,7 @@ window.LANG_AR = {
     "unsynced": "كلمات عادية"
   },
   "communityVideo": {
+    "loginRequired": "يلزم تسجيل الدخول عبر Discord لتسجيل فيديو مجتمعي.",
     "title": "فيديوهات مقترحة من المجتمع",
     "loading": "جارٍ تحميل قائمة الفيديوهات...",
     "loadError": "فشل تحميل قائمة الفيديوهات",
@@ -1794,6 +1797,7 @@ window.LANG_AR = {
     "dismissAll": "إغلاق الكل"
   },
   "syncCreator": {
+    "loginRequired": "يلزم تسجيل الدخول عبر Discord لإنشاء مزامنة الكاراوكي.",
     "title": "إنشاء مزامنة كاريوكي",
     "buttonTooltip": "إنشاء مزامنة كاريوكي",
     "clickHereHint": "انقر هنا لضبط مزامنة الكلمات!",

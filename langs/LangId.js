@@ -1331,6 +1331,8 @@ window.LANG_ID = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Login Discord diperlukan.",
+        "checking": "Memeriksa informasi akun...",
         "title": "Penautan Akun",
         "subtitle": "Tautkan dengan akun Discord Anda",
         "description": "Akun kontribusi ivLyrics berbasis Discord",
@@ -1546,6 +1548,7 @@ window.LANG_ID = {
     "unsynced": "Lirik Umum"
   },
   "communityVideo": {
+    "loginRequired": "Login Discord diperlukan untuk mendaftarkan video komunitas.",
     "title": "Rekomendasi Video Komunitas",
     "loading": "Memuat daftar video...",
     "loadError": "Gagal memuat daftar video",
@@ -1794,6 +1797,7 @@ window.LANG_ID = {
     "dismissAll": "Tutup Semua"
   },
   "syncCreator": {
+    "loginRequired": "Login Discord diperlukan untuk membuat sinkronisasi karaoke.",
     "title": "Buat Sinkronisasi Karaoke",
     "buttonTooltip": "Buat Sinkronisasi Karaoke",
     "clickHereHint": "Klik di sini untuk menyinkronkan lirik!",

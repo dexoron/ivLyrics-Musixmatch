@@ -1331,6 +1331,8 @@ window.LANG_VI = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Cần đăng nhập Discord.",
+        "checking": "Đang kiểm tra thông tin tài khoản...",
         "title": "Liên kết tài khoản",
         "subtitle": "Liên kết với tài khoản Discord của bạn",
         "description": "Tài khoản đóng góp ivLyrics dựa trên Discord",
@@ -1546,6 +1548,7 @@ window.LANG_VI = {
     "unsynced": "Lời thường"
   },
   "communityVideo": {
+    "loginRequired": "Cần đăng nhập Discord để đăng ký video cộng đồng.",
     "title": "Video cộng đồng đề xuất",
     "loading": "Đang tải danh sách video...",
     "loadError": "Không thể tải danh sách video",
@@ -1795,6 +1798,7 @@ window.LANG_VI = {
     "dismissAll": "Đóng tất cả"
   },
   "syncCreator": {
+    "loginRequired": "Cần đăng nhập Discord để tạo đồng bộ karaoke.",
     "title": "Tạo đồng bộ Karaoke",
     "buttonTooltip": "Tạo đồng bộ Karaoke",
     "clickHereHint": "Nhấn vào đây để khớp lời bài hát!",

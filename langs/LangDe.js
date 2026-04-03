@@ -1331,6 +1331,8 @@ window.LANG_DE = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord-Anmeldung ist erforderlich.",
+        "checking": "Kontoinformationen werden geprüft...",
         "title": "Kontoverknüpfung",
         "subtitle": "Mit deinem Discord-Konto verknüpfen",
         "description": "Discord-basiertes ivLyrics-Beitragskonto",
@@ -1546,6 +1548,7 @@ window.LANG_DE = {
     "unsynced": "Text"
   },
   "communityVideo": {
+    "loginRequired": "Zum Registrieren von Community-Videos ist eine Discord-Anmeldung erforderlich.",
     "title": "Community-Video-Empfehlungen",
     "loading": "Lade Videoliste...",
     "loadError": "Videoliste konnte nicht geladen werden",
@@ -1794,6 +1797,7 @@ window.LANG_DE = {
     "dismissAll": "Alle schließen"
   },
   "syncCreator": {
+    "loginRequired": "Zum Erstellen von Karaoke-Sync ist eine Discord-Anmeldung erforderlich.",
     "title": "Karaoke-Sync erstellen",
     "buttonTooltip": "Karaoke-Sync erstellen",
     "clickHereHint": "Klicken Sie hier, um den Songtext zu synchronisieren!",

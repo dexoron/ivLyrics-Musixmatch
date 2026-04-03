@@ -1331,6 +1331,8 @@ window.LANG_PT = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "É necessário fazer login no Discord.",
+        "checking": "Verificando informações da conta...",
         "title": "Vinculação de Conta",
         "subtitle": "Vincule sua conta do Discord",
         "description": "Conta de contribuição do ivLyrics baseada no Discord",
@@ -1546,6 +1548,7 @@ window.LANG_PT = {
     "unsynced": "Letra Normal"
   },
   "communityVideo": {
+    "loginRequired": "É necessário fazer login no Discord para registrar vídeos da comunidade.",
     "title": "Vídeos Recomendados pela Comunidade",
     "loading": "Carregando lista de vídeos...",
     "loadError": "Não foi possível carregar a lista de vídeos",
@@ -1795,6 +1798,7 @@ window.LANG_PT = {
     "dismissAll": "Fechar Tudo"
   },
   "syncCreator": {
+    "loginRequired": "É necessário fazer login no Discord para criar a sincronia de karaokê.",
     "title": "Criar Sync Karaokê",
     "buttonTooltip": "Criar Sync Karaokê",
     "clickHereHint": "Clique aqui para ajustar a sincronização da letra!",

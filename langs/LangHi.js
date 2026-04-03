@@ -1331,6 +1331,8 @@ window.LANG_HI = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord में लॉग इन करना आवश्यक है।",
+        "checking": "खाते की जानकारी जाँची जा रही है...",
         "title": "खाता लिंकिंग",
         "subtitle": "अपने Discord खाते से लिंक करें",
         "description": "Discord-आधारित ivLyrics योगदान खाता",
@@ -1546,6 +1548,7 @@ window.LANG_HI = {
     "unsynced": "सामान्य लिरिक्स"
   },
   "communityVideo": {
+    "loginRequired": "कम्युनिटी वीडियो दर्ज करने के लिए Discord में लॉग इन करना आवश्यक है।",
     "title": "कम्युनिटी वीडियो अनुशंसा",
     "loading": "वीडियो सूची लोड हो रही है...",
     "loadError": "वीडियो सूची लोड करने में विफल",
@@ -1794,6 +1797,7 @@ window.LANG_HI = {
     "dismissAll": "सभी बंद करें"
   },
   "syncCreator": {
+    "loginRequired": "कराओके सिंक बनाने के लिए Discord में लॉग इन करना आवश्यक है।",
     "title": "कराओके सिंक क्रिएटर",
     "buttonTooltip": "कराओके सिंक बनाएं",
     "clickHereHint": "लिरिक्स सिंक करने के लिए यहाँ क्लिक करें!",

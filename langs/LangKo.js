@@ -1331,6 +1331,8 @@ window.LANG_KO = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord 로그인이 필요합니다.",
+        "checking": "계정 정보를 확인하고 있습니다...",
         "title": "계정 연동",
         "subtitle": "Discord 계정으로 연동하세요",
         "description": "Discord 기반 ivLyrics 기여 계정",
@@ -1546,6 +1548,7 @@ window.LANG_KO = {
     "unsynced": "일반가사"
   },
   "communityVideo": {
+    "loginRequired": "커뮤니티 영상 등록은 Discord 로그인이 필요합니다.",
     "title": "커뮤니티 영상 추천",
     "loading": "영상 목록 불러오는 중...",
     "loadError": "영상 목록을 불러오지 못했습니다",
@@ -1795,6 +1798,7 @@ window.LANG_KO = {
     "dismissAll": "모두 닫기"
   },
   "syncCreator": {
+    "loginRequired": "노래방 싱크 생성은 Discord 로그인이 필요합니다.",
     "title": "노래방 싱크 생성",
     "buttonTooltip": "노래방 싱크 생성",
     "clickHereHint": "여기를 눌러 가사의 싱크를 맞춰주세요!",

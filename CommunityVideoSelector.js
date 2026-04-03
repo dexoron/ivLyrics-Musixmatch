@@ -688,6 +688,26 @@ const CommunityVideoSelector = ({
     setIsLoadingTitle(false);
   }, []);
 
+  const openSubmitForm = useCallback(async (video = null) => {
+    try {
+      await Utils.requireDiscordAuth(
+        I18n.t("communityVideo.loginRequired"),
+        { checkingMessage: I18n.t("settingsAdvanced.aboutTab.account.checking") }
+      );
+    } catch (e) {
+      Utils.promptDiscordLoginRequired(e?.message || I18n.t("communityVideo.loginRequired"));
+      return;
+    }
+
+    setEditingVideo(video);
+    setSubmitUrl("");
+    setSubmitStartTime(video?.startTime || 0);
+    setSubmitVideoTitle(video?.youtubeTitle || "");
+    setFormPreviewVideoId(video?.youtubeVideoId || null);
+    setIsLoadingTitle(false);
+    setShowSubmitForm(true);
+  }, []);
+
   // URL 변경 시 YouTube 제목 자동 가져오기
   useEffect(() => {
     if (titleFetchTimeout.current) {
@@ -829,13 +849,7 @@ const CommunityVideoSelector = ({
   // 영상 적용 처리 (모달 닫지 않음)
   const handleEdit = (video, e) => {
     e.stopPropagation();
-    setEditingVideo(video);
-    setShowSubmitForm(true);
-    setSubmitUrl("");
-    setSubmitStartTime(video.startTime || 0);
-    setSubmitVideoTitle(video.youtubeTitle || "");
-    setFormPreviewVideoId(video.youtubeVideoId || null);
-    setIsLoadingTitle(false);
+    void openSubmitForm(video);
   };
 
   const handleApply = (video) => {
@@ -1211,8 +1225,7 @@ const CommunityVideoSelector = ({
                   if (showSubmitForm) {
                     resetSubmitForm();
                   } else {
-                    setEditingVideo(null);
-                    setShowSubmitForm(true);
+                    void openSubmitForm();
                   }
                 },
               },

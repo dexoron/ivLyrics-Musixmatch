@@ -1331,6 +1331,8 @@ window.LANG_FA = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "ورود به دیسکورد الزامی است.",
+        "checking": "در حال بررسی اطلاعات حساب...",
         "title": "اتصال حساب",
         "subtitle": "حساب Discord خود را متصل کنید",
         "description": "حساب مشارکت ivLyrics مبتنی بر Discord",
@@ -1546,6 +1548,7 @@ window.LANG_FA = {
     "unsynced": "متن ساده"
   },
   "communityVideo": {
+    "loginRequired": "برای ثبت ویدیوهای انجمن باید وارد دیسکورد شوید.",
     "title": "پیشنهاد ویدیو انجمن",
     "loading": "در حال بارگذاری لیست ویدیو...",
     "loadError": "بارگذاری لیست ویدیو ناموفق بود",
@@ -1794,6 +1797,7 @@ window.LANG_FA = {
     "dismissAll": "بستن همه"
   },
   "syncCreator": {
+    "loginRequired": "برای ساخت همگام‌سازی کارائوکه باید وارد دیسکورد شوید.",
     "title": "ایجاد سینک کارائوکه",
     "buttonTooltip": "ایجاد سینک کارائوکه",
     "clickHereHint": "برای هماهنگ کردن متن اینجا کلیک کنید!",

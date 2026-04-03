@@ -745,7 +745,7 @@ const Utils = {
   /**
    * Current version of the ivLyrics app
    */
-  currentVersion: "4.3.0",
+  currentVersion: "4.3.1",
 
   /**
    * Check for updates from remote repository
@@ -1202,10 +1202,15 @@ const Utils = {
     return "https://lyrics.api.ivl.is/user";
   },
 
-  async fetchAccountProfile() {
-    const userHash = this.getUserHash();
+  async fetchAccountProfile(options = {}) {
+    const includeUserHash = options.includeUserHash !== false;
+    const requestUrl = new URL(`${this.getAccountApiBase()}/profile`);
+    if (includeUserHash) {
+      requestUrl.searchParams.set("userHash", this.getUserHash());
+    }
+
     const response = await fetch(
-      `${this.getAccountApiBase()}/profile?userHash=${encodeURIComponent(userHash)}`,
+      requestUrl.toString(),
       {
         cache: "no-store",
         headers: this.getApiHeaders({
@@ -1227,17 +1232,39 @@ const Utils = {
     return data;
   },
 
-  async requireDiscordAuth(message) {
-    const profile = await this.fetchAccountProfile();
-    if (!profile?.authenticated || !profile?.linked || !profile?.account) {
-      throw new Error(
-        message ||
-          I18n.t("settingsAdvanced.aboutTab.account.loginButton") ||
-          "Discord login is required."
-      );
+  async requireDiscordAuth(message, options = {}) {
+    const checkingMessage = options.checkingMessage;
+    const showProgress = !!checkingMessage && !!Toast?.progress;
+
+    if (showProgress) {
+      Toast.progress(checkingMessage, 0);
     }
 
-    return profile;
+    try {
+      const profile = await this.fetchAccountProfile({ includeUserHash: false });
+      if (!profile?.authenticated || !profile?.linked || !profile?.account) {
+        throw new Error(message || I18n.t("settingsAdvanced.aboutTab.account.loginRequired"));
+      }
+
+      return profile;
+    } finally {
+      if (showProgress && Toast?.dismissProgress) {
+        Toast.dismissProgress();
+      }
+    }
+  },
+
+  promptDiscordLoginRequired(message, options = {}) {
+    const text = message || I18n.t("settingsAdvanced.aboutTab.account.loginRequired");
+
+    Toast?.error?.(text);
+    this.restoreAccountSettings({
+      initialTab: "about",
+      initialSettingKey: "about-account",
+      reloadDelay: options.reloadDelay || 900,
+    });
+
+    return text;
   },
 
   async startDiscordLogin() {
@@ -1583,8 +1610,7 @@ const Utils = {
     if (!trackId) return null;
 
     await this.requireDiscordAuth(
-      I18n.t("communityVideo.loginRequired") ||
-        "Discord login is required to register community videos."
+      I18n.t("communityVideo.loginRequired")
     );
 
     try {

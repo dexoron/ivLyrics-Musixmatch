@@ -1331,6 +1331,8 @@ window.LANG_JA = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discordへのログインが必要です。",
+        "checking": "アカウント情報を確認しています...",
         "title": "アカウント連携",
         "subtitle": "Discordアカウントと連携",
         "description": "DiscordベースのivLyrics貢献アカウント",
@@ -1546,6 +1548,7 @@ window.LANG_JA = {
     "unsynced": "通常歌詞"
   },
   "communityVideo": {
+    "loginRequired": "コミュニティ動画を登録するにはDiscordへのログインが必要です。",
     "title": "コミュニティ動画推薦",
     "loading": "動画リストを読み込み中...",
     "loadError": "動画リストを読み込めませんでした",
@@ -1795,6 +1798,7 @@ window.LANG_JA = {
     "dismissAll": "すべて閉じる"
   },
   "syncCreator": {
+    "loginRequired": "カラオケ同期を作成するにはDiscordへのログインが必要です。",
     "title": "カラオケ同期作成",
     "buttonTooltip": "カラオケ同期作成",
     "clickHereHint": "ここをクリックして歌詞の同期を合わせてください！",

@@ -1331,6 +1331,8 @@ window.LANG_RU = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Требуется вход через Discord.",
+        "checking": "Проверка данных аккаунта...",
         "title": "Привязка аккаунта",
         "subtitle": "Привяжите свой аккаунт Discord",
         "description": "Аккаунт для вклада в ivLyrics на базе Discord",
@@ -1546,6 +1548,7 @@ window.LANG_RU = {
     "unsynced": "Текст"
   },
   "communityVideo": {
+    "loginRequired": "Чтобы регистрировать видео сообщества, требуется вход через Discord.",
     "title": "Видео от сообщества",
     "loading": "Загрузка списка видео...",
     "loadError": "Не удалось загрузить список",
@@ -1795,6 +1798,7 @@ window.LANG_RU = {
     "dismissAll": "Закрыть все"
   },
   "syncCreator": {
+    "loginRequired": "Чтобы создать караоке-синхронизацию, требуется вход через Discord.",
     "title": "Создание синхронизации",
     "buttonTooltip": "Создать синхронизацию (Караоке)",
     "clickHereHint": "Нажмите здесь, чтобы синхронизировать текст!",

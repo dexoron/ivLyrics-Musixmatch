@@ -1331,6 +1331,8 @@ window.LANG_TH = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "ต้องเข้าสู่ระบบ Discord",
+        "checking": "กำลังตรวจสอบข้อมูลบัญชี...",
         "title": "เชื่อมต่อบัญชี",
         "subtitle": "เชื่อมต่อกับบัญชี Discord ของคุณ",
         "description": "บัญชีผู้ร่วมพัฒนา ivLyrics ที่ใช้ Discord",
@@ -1546,6 +1548,7 @@ window.LANG_TH = {
     "unsynced": "เนื้อเพลงทั่วไป"
   },
   "communityVideo": {
+    "loginRequired": "การลงทะเบียนวิดีโอชุมชนต้องเข้าสู่ระบบ Discord",
     "title": "วิดีโอแนะนำจากชุมชน",
     "loading": "กำลังโหลดรายการวิดีโอ...",
     "loadError": "ไม่สามารถโหลดรายการวิดีโอได้",
@@ -1795,6 +1798,7 @@ window.LANG_TH = {
     "dismissAll": "ปิดทั้งหมด"
   },
   "syncCreator": {
+    "loginRequired": "การสร้างซิงก์คาราโอเกะต้องเข้าสู่ระบบ Discord",
     "title": "สร้างซิงค์คาราโอเกะ",
     "buttonTooltip": "สร้างซิงค์คาราโอเกะ",
     "clickHereHint": "คลิกที่นี่เพื่อจับจังหวะเนื้อเพลง!",

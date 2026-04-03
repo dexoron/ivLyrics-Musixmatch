@@ -1331,6 +1331,8 @@ window.LANG_EN = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord login is required.",
+        "checking": "Checking account information...",
         "title": "Account Linking",
         "subtitle": "Link with your Discord account",
         "description": "Discord-based ivLyrics contribution account",
@@ -1546,6 +1548,7 @@ window.LANG_EN = {
     "unsynced": "Plain Text"
   },
   "communityVideo": {
+    "loginRequired": "Discord login is required to register community videos.",
     "title": "Community Video Recommendations",
     "loading": "Loading video list...",
     "loadError": "Failed to load video list",
@@ -1795,6 +1798,7 @@ window.LANG_EN = {
     "dismissAll": "Close All"
   },
   "syncCreator": {
+    "loginRequired": "Discord login is required to create karaoke sync.",
     "title": "Create Karaoke Sync",
     "buttonTooltip": "Create Karaoke Sync",
     "clickHereHint": "Click here to sync the lyrics!",

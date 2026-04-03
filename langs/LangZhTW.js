@@ -1331,6 +1331,8 @@ window.LANG_ZH_TW = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "需要登入 Discord。",
+        "checking": "正在檢查帳戶資訊...",
         "title": "帳戶連動",
         "subtitle": "與你的 Discord 帳戶連動",
         "description": "基於 Discord 的 ivLyrics 貢獻帳戶",
@@ -1546,6 +1548,7 @@ window.LANG_ZH_TW = {
     "unsynced": "一般歌詞"
   },
   "communityVideo": {
+    "loginRequired": "註冊社群影片需要登入 Discord。",
     "title": "社群影片推薦",
     "loading": "正在載入影片列表...",
     "loadError": "無法載入影片列表",
@@ -1795,6 +1798,7 @@ window.LANG_ZH_TW = {
     "dismissAll": "全部關閉"
   },
   "syncCreator": {
+    "loginRequired": "建立卡拉 OK 同步需要登入 Discord。",
     "title": "建立卡拉OK同步",
     "buttonTooltip": "建立卡拉OK同步",
     "clickHereHint": "點此調整歌詞同步！",

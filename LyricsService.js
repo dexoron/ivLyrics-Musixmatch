@@ -1454,11 +1454,11 @@
 	            const profile = await profileResponse.json();
 
 	            if (!profileResponse.ok) {
-	                throw new Error(profile.error || 'Failed to verify Discord login');
+	                throw new Error(profile.error || I18n.t('settingsAdvanced.aboutTab.account.loadFailed'));
 	            }
 
 	            if (!profile?.authenticated || !profile?.linked || !profile?.account) {
-	                throw new Error('Discord login is required to save karaoke sync.');
+	                throw new Error(I18n.t('syncCreator.loginRequired'));
 	            }
 	
 	            const response = await fetch(`${API_BASE}/lyrics/sync-data`, {

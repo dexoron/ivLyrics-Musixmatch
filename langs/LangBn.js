@@ -1331,6 +1331,8 @@ window.LANG_BN = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord-এ লগইন করা প্রয়োজন।",
+        "checking": "অ্যাকাউন্টের তথ্য যাচাই করা হচ্ছে...",
         "title": "অ্যাকাউন্ট লিঙ্কিং",
         "subtitle": "আপনার Discord অ্যাকাউন্টের সাথে লিঙ্ক করুন",
         "description": "Discord-ভিত্তিক ivLyrics অবদান অ্যাকাউন্ট",
@@ -1546,6 +1548,7 @@ window.LANG_BN = {
     "unsynced": "সাধারণ লিরিক্স"
   },
   "communityVideo": {
+    "loginRequired": "কমিউনিটি ভিডিও নিবন্ধন করতে Discord-এ লগইন করতে হবে।",
     "title": "কমিউনিটি ভিডিও সুপারিশ",
     "loading": "ভিডিও তালিকা লোড হচ্ছে...",
     "loadError": "ভিডিও তালিকা লোড করা যায়নি",
@@ -1795,6 +1798,7 @@ window.LANG_BN = {
     "dismissAll": "সব বন্ধ করুন"
   },
   "syncCreator": {
+    "loginRequired": "কারাওকে সিঙ্ক তৈরি করতে Discord-এ লগইন করতে হবে।",
     "title": "কারাওকে সিঙ্ক তৈরি",
     "buttonTooltip": "কারাওকে সিঙ্ক তৈরি করুন",
     "clickHereHint": "গানের লিরিক্স সিঙ্ক মেলাতে এখানে ক্লিক করুন!",

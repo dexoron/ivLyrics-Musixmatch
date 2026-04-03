@@ -1331,6 +1331,8 @@ window.LANG_ZH_CN = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "需要登录 Discord。",
+        "checking": "正在检查账户信息...",
         "title": "账户关联",
         "subtitle": "关联你的 Discord 账户",
         "description": "基于 Discord 的 ivLyrics 贡献账户",
@@ -1546,6 +1548,7 @@ window.LANG_ZH_CN = {
     "unsynced": "纯文本"
   },
   "communityVideo": {
+    "loginRequired": "注册社区视频需要登录 Discord。",
     "title": "社区视频推荐",
     "loading": "正在加载视频列表...",
     "loadError": "无法加载视频列表",
@@ -1795,6 +1798,7 @@ window.LANG_ZH_CN = {
     "dismissAll": "全部关闭"
   },
   "syncCreator": {
+    "loginRequired": "创建卡拉 OK 同步需要登录 Discord。",
     "title": "创建卡拉OK同步",
     "buttonTooltip": "创建卡拉OK同步",
     "clickHereHint": "点击这里调整歌词同步！",

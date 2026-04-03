@@ -1331,6 +1331,8 @@ window.LANG_FR = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "La connexion à Discord est requise.",
+        "checking": "Vérification des informations du compte...",
         "title": "Liaison de compte",
         "subtitle": "Liez votre compte Discord",
         "description": "Compte de contribution ivLyrics basé sur Discord",
@@ -1546,6 +1548,7 @@ window.LANG_FR = {
     "unsynced": "Paroles"
   },
   "communityVideo": {
+    "loginRequired": "La connexion à Discord est requise pour enregistrer des vidéos communautaires.",
     "title": "Vidéos recommandées",
     "loading": "Chargement liste vidéos...",
     "loadError": "Impossible de charger la liste",
@@ -1795,6 +1798,7 @@ window.LANG_FR = {
     "dismissAll": "Tout fermer"
   },
   "syncCreator": {
+    "loginRequired": "La connexion à Discord est requise pour créer une synchro karaoké.",
     "title": "Créateur Synchro Karaoké",
     "buttonTooltip": "Créer synchro karaoké",
     "clickHereHint": "Cliquez ici pour synchroniser les paroles !",
