@@ -177,6 +177,18 @@
             lastRawProgress: 0,
             lastAdjustedProgress: 0,
             lastSampleAt: 0,
+            applyCurrentState() {
+                const uri = Spicetify.Player?.data?.item?.uri || "";
+                const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
+                const now = performance.now();
+
+                this.currentUri = uri;
+                this.songChangeAt = now;
+                this.correctionMs = 0;
+                this.lastRawProgress = rawProgress;
+                this.lastAdjustedProgress = rawProgress;
+                this.lastSampleAt = now;
+            },
             applySongChangeState() {
                 const uri = Spicetify.Player?.data?.item?.uri || "";
                 const rawProgress = clampPlayerProgress(Spicetify.Player?.getProgress?.());
@@ -201,7 +213,7 @@
                 Spicetify.Player.addEventListener("songchange", () => {
                     this.applySongChangeState();
                 });
-                this.applySongChangeState();
+                this.applyCurrentState();
             },
             clearCorrection() {
                 this.correctionMs = 0;
