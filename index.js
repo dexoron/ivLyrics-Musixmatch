@@ -3017,10 +3017,34 @@ class LyricsContainer extends react.Component {
     return this.shouldReduceMotion() ? 24 : 280;
   }
 
+  getFloatingMenuContentTopOffset() {
+    if (!this.state?.isFullscreen || typeof document === "undefined") {
+      return 0;
+    }
+
+    const isBrowserFullscreen =
+      CONFIG.visual["fullscreen-browser-fullscreen"] === true ||
+      !!document.fullscreenElement;
+    return isBrowserFullscreen ? 0 : 130;
+  }
+
   clearFloatingMenuCloseTimer() {
     if (this.floatingMenuCloseTimer) {
       clearTimeout(this.floatingMenuCloseTimer);
       this.floatingMenuCloseTimer = null;
+    }
+  }
+
+  resetFloatingMenuScroll() {
+    const reset = () => {
+      if (this.floatingMenuContentRef) {
+        this.floatingMenuContentRef.scrollTop = 0;
+      }
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(reset);
+    } else {
+      setTimeout(reset, 0);
     }
   }
 
@@ -3029,7 +3053,7 @@ class LyricsContainer extends react.Component {
     this.setState({
       isFloatingMenuOpen: true,
       isFloatingMenuClosing: false,
-    });
+    }, () => this.resetFloatingMenuScroll());
   }
 
   closeFloatingMenu() {
@@ -6309,6 +6333,9 @@ class LyricsContainer extends react.Component {
       !this.state.isFullscreen ||
       this.state.isFloatingMenuOpen ||
       this.state.isFloatingMenuClosing;
+    const floatingToolbarStyle = this.state.isFullscreen
+      ? { "--iv-floating-menu-content-top-offset": `${this.getFloatingMenuContentTopOffset()}px` }
+      : undefined;
     const modeButtons = [
       this.state.karaoke &&
       CONFIG.visual["karaoke-mode-enabled"] &&
@@ -6537,6 +6564,7 @@ class LyricsContainer extends react.Component {
             (this.state.isFullscreen ? " fullscreen-mode-container" : "") +
             (this.state.isFullscreen && this.state.isFloatingMenuOpen ? " menu-open" : "") +
             (this.state.isFullscreen && this.state.isFloatingMenuClosing ? " menu-closing" : ""),
+          style: floatingToolbarStyle,
           ref: (el) => {
             if (this._cleanupFloatingMenuOutsideClick) {
               this._cleanupFloatingMenuOutsideClick();
@@ -6589,6 +6617,13 @@ class LyricsContainer extends react.Component {
           "div",
           {
             className: `lyrics-floating-menu-content${this.state.isFullscreen && this.state.isFloatingMenuOpen ? " menu-open" : ""}${this.state.isFullscreen && this.state.isFloatingMenuClosing ? " menu-closing" : ""}`,
+            ref: (el) => {
+              this.floatingMenuContentRef = el;
+              if (el && !el.__ivLyricsScrollInitialized) {
+                el.__ivLyricsScrollInitialized = true;
+                this.resetFloatingMenuScroll();
+              }
+            },
           },
           showTranslationButton &&
           react.createElement(TranslationMenu, {
@@ -6746,7 +6781,8 @@ class LyricsContainer extends react.Component {
             },
             showHint: true,
             provider: this.state.provider,
-            initialLyrics: this.state.currentLyrics
+            initialLyrics: this.state.currentLyrics,
+            isFullscreen: this.state.isFullscreen
           })
         )
       ),

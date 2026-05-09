@@ -1216,12 +1216,14 @@ div.lyrics-tabBar-headerItemLink {
 
 #lyrics-fullscreen-container {
   position: fixed;
+  inset: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   cursor: default;
   left: 0;
   top: 0;
-  z-index: 9999;
+  z-index: 2147483647;
   overflow: hidden;
 }
 
@@ -1274,12 +1276,14 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-lyricsContainer-LyricsContainer.fad-enabled .lyrics-config-button-container {
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateX(10px) scale(0.95);
 }
 
 .lyrics-lyricsContainer-LyricsContainer.fad-enabled:hover .lyrics-config-button-container {
   opacity: 1;
+  pointer-events: auto;
   transform: translateX(0) scale(1);
 }
 
@@ -1315,9 +1319,15 @@ div.lyrics-tabBar-headerItemLink {
 }
 
 .lyrics-config-button-container {
-  pointer-events: none;
+  --iv-floating-toolbar-top-gap: 20px;
+  --iv-floating-toolbar-bottom-gap: 20px;
+  --iv-floating-toolbar-padding: 10px;
+  --iv-floating-toolbar-padding-block: 50px;
+  --iv-floating-toolbar-menu-offset: 0px;
+  --iv-floating-menu-content-top-offset: 0px;
+  pointer-events: auto;
   position: fixed;
-  bottom: 20px;
+  bottom: var(--iv-floating-toolbar-bottom-gap);
   right: 20px;
   display: flex;
   flex-direction: column;
@@ -1331,6 +1341,10 @@ div.lyrics-tabBar-headerItemLink {
   -webkit-backdrop-filter: blur(24px) saturate(120%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.16);
+  box-sizing: border-box;
+  max-height: calc(100vh - var(--iv-floating-toolbar-top-gap) - var(--iv-floating-toolbar-bottom-gap));
+  max-height: calc(100dvh - var(--iv-floating-toolbar-top-gap) - var(--iv-floating-toolbar-bottom-gap));
+  overflow: visible;
 
   /* Auto-hide functionality */
   opacity: 1;
@@ -1362,6 +1376,7 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-config-button-container>* {
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
 @-webkit-keyframes spin {
@@ -1399,6 +1414,7 @@ div.lyrics-tabBar-headerItemLink {
   height: 44px;
   width: 44px;
   position: relative;
+  flex-shrink: 0;
   transition: all var(--iv-motion-duration-fast) var(--iv-motion-ease-standard);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
@@ -2531,6 +2547,9 @@ ruby rt {
 
 /* Menu buttons in fullscreen - hidden by default, show on mouse move */
 .lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-config-button-container {
+  --iv-floating-toolbar-top-gap: 20px;
+  --iv-floating-toolbar-bottom-gap: 40px;
+  --iv-floating-menu-content-top-offset: 130px;
   opacity: 1;
   transform: translateY(0) scale(1);
   transition:
@@ -3564,6 +3583,8 @@ ruby rt {
 }
 
 .portrait-mode .lyrics-config-button-container {
+  --iv-floating-toolbar-top-gap: 20px;
+  --iv-floating-toolbar-bottom-gap: 20px;
   bottom: 20px;
   right: 20px;
 }
@@ -6029,10 +6050,10 @@ ruby rt {
 }
 
 .sync-creator-hint {
-  position: absolute;
-  right: 45px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: fixed;
+  right: calc(var(--iv-floating-toolbar-bottom-gap, 20px) + 56px);
+  bottom: calc(var(--iv-floating-toolbar-bottom-gap, 20px) + 12px);
+  transform: none;
   background: var(--spice-card);
   color: var(--spice-text);
   padding: 8px 12px;
@@ -6062,29 +6083,29 @@ ruby rt {
 @keyframes hint-fade-in-out {
   0% {
     opacity: 0;
-    transform: translateY(-50%) translateX(10px);
+    transform: translateX(10px);
   }
 
   15% {
     opacity: 1;
-    transform: translateY(-50%) translateX(0);
+    transform: translateX(0);
   }
 
   85% {
     opacity: 1;
-    transform: translateY(-50%) translateX(0);
+    transform: translateX(0);
   }
 
   100% {
     opacity: 0;
-    transform: translateY(-50%) translateX(10px);
+    transform: translateX(10px);
   }
 }
 
 /* Fluent floating toolbar refresh */
 .lyrics-fluent-floating-toolbar {
-  --iv-floating-toolbar-shell: rgba(18, 22, 28, 0.9);
-  --iv-floating-toolbar-border: rgba(255, 255, 255, 0.12);
+  --iv-floating-toolbar-shell: transparent;
+  --iv-floating-toolbar-border: transparent;
   --iv-floating-button-shell: rgba(255, 255, 255, 0.06);
   --iv-floating-button-shell-hover: rgba(255, 255, 255, 0.1);
   --iv-floating-button-border: rgba(255, 255, 255, 0.1);
@@ -6096,11 +6117,9 @@ ruby rt {
   border-radius: 0;
   background: var(--iv-floating-toolbar-shell);
   border: 1px solid var(--iv-floating-toolbar-border);
-  backdrop-filter: blur(24px) saturate(120%);
-  -webkit-backdrop-filter: blur(24px) saturate(120%);
-  box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.28),
-    0 4px 12px rgba(0, 0, 0, 0.16);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
   isolation: isolate;
 }
 
@@ -6109,17 +6128,82 @@ ruby rt {
 }
 
 .lyrics-fluent-floating-toolbar:hover {
-  box-shadow:
-    0 18px 36px rgba(0, 0, 0, 0.3),
-    0 6px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
+}
+
+.lyrics-config-button-container.lyrics-fluent-floating-toolbar,
+.lyrics-config-button-container.lyrics-fluent-floating-toolbar:hover,
+.lyrics-lyricsContainer-LyricsContainer.fullscreen-active .lyrics-config-button-container.lyrics-fluent-floating-toolbar {
+  background: transparent !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .lyrics-fluent-floating-toolbar .lyrics-floating-menu-content {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 0;
+  max-height: calc(
+    100vh
+    - var(--iv-floating-toolbar-top-gap, 20px)
+    - var(--iv-floating-toolbar-bottom-gap, 20px)
+    - var(--iv-floating-toolbar-padding-block, 20px)
+    - var(--iv-floating-toolbar-menu-offset, 0px)
+    - var(--iv-floating-menu-content-top-offset, 0px)
+  );
+  max-height: calc(
+    100dvh
+    - var(--iv-floating-toolbar-top-gap, 20px)
+    - var(--iv-floating-toolbar-bottom-gap, 20px)
+    - var(--iv-floating-toolbar-padding-block, 20px)
+    - var(--iv-floating-toolbar-menu-offset, 0px)
+    - var(--iv-floating-menu-content-top-offset, 0px)
+  );
+  margin-top: var(--iv-floating-menu-content-top-offset, 0px);
+  padding: 25px 3px;
+  scroll-padding-block: 25px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  touch-action: pan-y;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.lyrics-config-button-container>.lyrics-floating-menu-content {
+  flex-shrink: 1;
+}
+
+.lyrics-fluent-floating-toolbar .lyrics-floating-menu-content>* {
+  flex-shrink: 0;
+}
+
+.lyrics-fluent-floating-toolbar .lyrics-floating-menu-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lyrics-fluent-floating-toolbar .lyrics-floating-menu-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lyrics-fluent-floating-toolbar .lyrics-floating-menu-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.lyrics-fluent-floating-toolbar .lyrics-floating-menu-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.34);
 }
 
 .lyrics-fluent-floating-toolbar .lyrics-config-button {
@@ -6266,12 +6350,27 @@ ruby rt {
   background: rgba(255, 255, 255, 0.04) !important;
 }
 
-.lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-open {
+.lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-open,
+.lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-closing {
+  --iv-floating-toolbar-menu-offset: 0px;
+  top: var(--iv-floating-toolbar-top-gap, 20px);
+  bottom: var(--iv-floating-toolbar-bottom-gap, 40px);
   width: auto;
   height: auto;
+  max-height: none;
   padding: 10px;
   gap: 10px;
   border-radius: 0;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-open .lyrics-floating-menu-content,
+.lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-closing .lyrics-floating-menu-content {
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+  min-height: 0;
 }
 
 .lyrics-fluent-floating-toolbar.fullscreen-mode-container.menu-open .lyrics-floating-menu-toggle {

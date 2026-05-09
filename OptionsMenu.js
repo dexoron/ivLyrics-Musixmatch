@@ -3820,7 +3820,7 @@ async function openSyncDataCreator(trackInfo, initialData = null) {
 }
 
 // Sync Data Creator Button
-const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initialLyrics }) => {
+const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initialLyrics, isFullscreen = false }) => {
   const handleClick = () => {
     let initialData = null;
     if (provider && initialLyrics) {
@@ -3831,11 +3831,20 @@ const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initi
     }
     void openSyncDataCreator(trackInfo, initialData);
   };
+  const reactDom = resolveOptionsReactDom();
+  const hint = showHint
+    ? react.createElement("div", {
+      className: "sync-creator-hint",
+      style: { "--iv-floating-toolbar-bottom-gap": isFullscreen ? "40px" : "20px" },
+    }, I18n.t("syncCreator.clickHereHint") || "")
+    : null;
 
   return react.createElement(
     "div",
     { style: { position: "relative" } },
-    showHint && react.createElement("div", { className: "sync-creator-hint" }, I18n.t("syncCreator.clickHereHint") || ""),
+    hint && reactDom?.createPortal && document.body
+      ? reactDom.createPortal(hint, document.body)
+      : hint,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
       { label: I18n.t("syncCreator.buttonTooltip") || "Create Karaoke Sync" },
