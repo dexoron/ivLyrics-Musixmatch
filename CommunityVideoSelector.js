@@ -799,33 +799,37 @@ const CommunityVideoSelector = ({
 
 	    setIsSubmitting(true);
 
-	    try {
-	      // YouTube 영상 유효성 검사 (실제로 존재하고 재생 가능한지 확인)
-	      const validation = await Utils.validateYouTubeVideo(videoId);
+    try {
+      let videoTitle = submitVideoTitle || editingVideo?.youtubeTitle || videoId;
 
-      if (!validation.valid) {
-        // 에러 유형에 따른 메시지
-        let errorMsg;
-        switch (validation.error) {
-          case "notFound":
-            errorMsg = I18n.t("communityVideo.videoNotFound");
-            break;
-          case "private":
-            errorMsg = I18n.t("communityVideo.videoPrivate");
-            break;
-          case "invalidFormat":
-            errorMsg = I18n.t("communityVideo.invalidUrl");
-            break;
-          default:
-            errorMsg = I18n.t("communityVideo.validationError");
+      if (!editingVideo) {
+        // YouTube 영상 유효성 검사 (실제로 존재하고 재생 가능한지 확인)
+        const validation = await Utils.validateYouTubeVideo(videoId);
+
+        if (!validation.valid) {
+          // 에러 유형에 따른 메시지
+          let errorMsg;
+          switch (validation.error) {
+            case "notFound":
+              errorMsg = I18n.t("communityVideo.videoNotFound");
+              break;
+            case "private":
+              errorMsg = I18n.t("communityVideo.videoPrivate");
+              break;
+            case "invalidFormat":
+              errorMsg = I18n.t("communityVideo.invalidUrl");
+              break;
+            default:
+              errorMsg = I18n.t("communityVideo.validationError");
+          }
+          Toast.error(errorMsg);
+          setIsSubmitting(false);
+          return;
         }
-        Toast.error(errorMsg);
-        setIsSubmitting(false);
-        return;
-      }
 
-      // 유효성 검사에서 가져온 제목 사용
-      const videoTitle = validation.title || submitVideoTitle || videoId;
+        // 유효성 검사에서 가져온 제목 사용
+        videoTitle = validation.title || videoTitle;
+      }
 
       const result = await Utils.submitCommunityVideo(
         trackUri,
@@ -1116,10 +1120,9 @@ const CommunityVideoSelector = ({
 	                          },
 	                          I18n.t("communityVideo.applyShort")
 	                        ),
-	                        (video.submitterId === currentUserHash || video.submitterId === "system") &&
-	                        react.createElement(
-	                          "button",
-	                          {
+		                        react.createElement(
+		                          "button",
+		                          {
 	                            className: "action-btn preview",
 	                            onClick: (e) => handleEdit(video, e),
 	                            title: I18n.t("communityVideo.edit"),
