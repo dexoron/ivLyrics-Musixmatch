@@ -2279,6 +2279,10 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 		return "";
 	}
 
+	const furiganaEnabled = CONFIG?.visual?.["furigana-enabled"] === true;
+	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
+	const detectedLanguage = Utils.getDetectedLanguage?.() || null;
+
 	const { furiganaMap, timedChars, endTime } = useMemo(() => {
 		const rawLineText = line.syllables?.map((syllable) => syllable?.text || "").join("")
 			|| getCopyableText(line.text)
@@ -2294,7 +2298,7 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 				getKaraokeLineBounds(line).endTime
 			),
 		};
-	}, [line]);
+	}, [line, furiganaEnabled, furiganaReady, detectedLanguage]);
 	const isComplete = isActive && position >= endTime;
 
 	const charElements = timedChars.map((charInfo, index) => {

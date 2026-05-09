@@ -12,8 +12,63 @@ const FuriganaConverter = (() => {
   // Debug mode - set to false to reduce console logs
   const DEBUG_MODE = false;
   const MAX_CONVERSION_CACHE_SIZE = 1000;
-  const KUROMOJI_DICT_PATH = "https://unpkg.com/kuromoji@0.1.2/dict";
+  const KUROMOJI_DICT_PATHS = [
+    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict",
+    "https://unpkg.com/kuromoji@0.1.2/dict",
+  ];
   let hasLoggedKuromojiWarning = false;
+
+  const normalizeKuromojiDictUrl = (url) => {
+    if (typeof url !== "string" || !url.includes(".dat.gz")) {
+      return url;
+    }
+
+    const fileName = url.split("/").pop();
+    if (!fileName) {
+      return url;
+    }
+
+    if (url.includes("kuromoji@0.1.2/dict/") && url.startsWith("https:/") && !url.startsWith("https://")) {
+      return url.replace(/^https:\//, "https://");
+    }
+
+    if (url.includes("/dict/") && (!url.startsWith("http://") && !url.startsWith("https://"))) {
+      return `${KUROMOJI_DICT_PATHS[0]}/${fileName}`;
+    }
+
+    if (url.includes("xpui.app.spotify.com") && url.includes("/dict/")) {
+      return `${KUROMOJI_DICT_PATHS[0]}/${fileName}`;
+    }
+
+    return url;
+  };
+
+  const patchKuromojiDictionaryRequests = () => {
+    if (XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) return;
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function patchedFuriganaOpen(method, url, ...args) {
+      return originalOpen.call(this, method, normalizeKuromojiDictUrl(url), ...args);
+    };
+    XMLHttpRequest.prototype.__ivLyricsFuriganaPatched = true;
+  };
+
+  patchKuromojiDictionaryRequests();
+
+  const buildTokenizer = (dictPath) =>
+    new Promise((resolve, reject) => {
+      window.kuromoji
+        .builder({
+          dicPath: dictPath,
+        })
+        .build((err, tokenizer) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(tokenizer);
+        });
+    });
 
   const init = async () => {
     if (kuromojiInstance) {
@@ -25,33 +80,32 @@ const FuriganaConverter = (() => {
     }
 
     isInitializing = true;
-    initPromise = new Promise((resolve, reject) => {
+    initPromise = (async () => {
       if (typeof window.kuromoji === "undefined") {
-        reject(new Error("Kuromoji library not loaded"));
-        return;
+        throw new Error("Kuromoji library not loaded");
       }
 
-      window.kuromoji
-        .builder({
-          dicPath: KUROMOJI_DICT_PATH,
-        })
-        .build((err, tokenizer) => {
-          if (err) {
-            isInitializing = false;
-            reject(err);
-            return;
-          }
-
-          kuromojiInstance = tokenizer;
+      let lastError = null;
+      for (const dictPath of KUROMOJI_DICT_PATHS) {
+        try {
+          kuromojiInstance = await buildTokenizer(dictPath);
           isInitializing = false;
 
-          // Trigger re-render by dispatching a custom event
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent("furigana-ready"));
           }, 100);
 
-          resolve();
-        });
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      isInitializing = false;
+      throw lastError || new Error("Kuromoji dictionary load failed");
+    })().catch((err) => {
+      isInitializing = false;
+      throw err;
     });
 
     return initPromise;
@@ -213,39 +267,44 @@ const FuriganaConverter = (() => {
 
 window.FuriganaConverter = FuriganaConverter;
 
+const initializeFuriganaConverter = () => {
+  if (typeof window.FuriganaConverter === "undefined") return;
+
+  window.FuriganaConverter.init()
+    .then(() => {
+      if (window.CONFIG?.visual?.["furigana-enabled"] && window.lyricContainer) {
+        try {
+          window.lyricContainer.forceUpdate();
+        } catch (e) { }
+      }
+    })
+    .catch((err) => { });
+};
+
 // Load Kuromoji library for furigana conversion
 if (typeof window.kuromoji === "undefined") {
-  const kuromojiScript = document.createElement("script");
-  kuromojiScript.src =
-    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js";
-  kuromojiScript.async = false; // Load synchronously to ensure it's available
-  kuromojiScript.onload = () => {
-    // Initialize immediately
-    if (typeof window.FuriganaConverter !== "undefined") {
-      window.FuriganaConverter.init()
-        .then(() => {
-          // Trigger lyrics re-render if furigana is enabled
-          if (CONFIG?.visual?.["furigana-enabled"]) {
-            // Try multiple methods to trigger re-render
-            if (window.lyricContainer) {
-              try {
-                window.lyricContainer.forceUpdate();
-              } catch (e) { }
-            }
-          }
-        })
-        .catch((err) => { });
-    }
+  const kuromojiScriptUrls = [
+    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js",
+    "https://unpkg.com/kuromoji@0.1.2/build/kuromoji.js",
+  ];
+
+  const loadKuromojiScript = (index = 0) => {
+    if (index >= kuromojiScriptUrls.length) return;
+
+    const kuromojiScript = document.createElement("script");
+    kuromojiScript.src = kuromojiScriptUrls[index];
+    kuromojiScript.async = false; // Load synchronously to ensure it's available
+    kuromojiScript.onload = initializeFuriganaConverter;
+    kuromojiScript.onerror = () => {
+      kuromojiScript.remove();
+      loadKuromojiScript(index + 1);
+    };
+    document.head.appendChild(kuromojiScript);
   };
-  kuromojiScript.onerror = (err) => { };
-  document.head.appendChild(kuromojiScript);
+
+  loadKuromojiScript();
 } else {
-  // If Kuromoji is already loaded, initialize immediately
-  if (typeof window.FuriganaConverter !== "undefined") {
-    window.FuriganaConverter.init()
-      .then(() => { })
-      .catch((err) => { });
-  }
+  initializeFuriganaConverter();
 }
 
 // === ivLyrics-overlay 전송 모듈 ===
@@ -5675,6 +5734,13 @@ class LyricsContainer extends react.Component {
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
 
+    this.handleFuriganaReady = () => {
+      if (window.CONFIG?.visual?.["furigana-enabled"]) {
+        this.forceUpdate();
+      }
+    };
+    window.addEventListener("furigana-ready", this.handleFuriganaReady);
+
     // Listen for lyric index changes from Pages.js
     this.handleLyricIndexChange = (event) => {
       if (event.detail && typeof event.detail.index === 'number') {
@@ -5707,6 +5773,7 @@ class LyricsContainer extends react.Component {
     this.mousetrap?.reset();
     window.removeEventListener("fad-request", lyricContainerUpdate);
     window.removeEventListener("ivLyrics", this.handleConfigChange);
+    window.removeEventListener("furigana-ready", this.handleFuriganaReady);
     window.removeEventListener("ivLyrics:lyric-index-changed", this.handleLyricIndexChange);
     if (this._cleanupFloatingMenuOutsideClick) {
       this._cleanupFloatingMenuOutsideClick();
