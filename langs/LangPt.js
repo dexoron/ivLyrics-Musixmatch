@@ -376,6 +376,14 @@ window.LANG_PT = {
     },
     "solidBackgroundInUse": "ℹ️ Fundo sólido em uso",
     "fontPlaceholder": "Nome da fonte (Ex: Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Primária",
+      "secondary": "Secundária"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Atalhos do Sync Creator",
+      "subtitle": "Configure as teclas primária e secundária para gravação no Sync Creator."
+    },
     "aiProviders": {
       "title": "Provedores de IA",
       "description": "Selecione e priorize os provedores de IA. Os provedores no topo são tentados primeiro. Em caso de falha, o próximo provedor será usado automaticamente.",
@@ -695,6 +703,36 @@ window.LANG_PT = {
     "lyricsProvider": "Provedor de letras",
     "syncContributor": "Contribuidor de sincronia"
   },
+  "creatorProfile": {
+    "title": "Criador de sincronização",
+    "anonymous": "Anônimo",
+    "openProfile": "Abrir perfil do criador",
+    "loading": "Carregando perfil do criador...",
+    "loadFailed": "Falha ao carregar o perfil do criador.",
+    "back": "Voltar",
+    "contributions": "Sincronizações adicionadas",
+    "tracks": "Faixas sincronizadas",
+    "likes": "Curtidas",
+    "like": "Curtir",
+    "liked": "Curtido",
+    "likeActionFailed": "Falha ao atualizar a curtida do criador.",
+    "likeLoginRequired": "É necessário entrar com o Discord para curtir criadores.",
+    "ownProfile": "Este é o seu perfil.",
+    "loadMore": "Carregar mais",
+    "loadingMore": "A carregar mais...",
+    "noContributions": "Ainda não há sincronizações adicionadas.",
+    "unknownTrack": "Faixa desconhecida",
+    "updated": "Atualizado",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Nenhuma nota de patch."
@@ -971,6 +1009,14 @@ window.LANG_PT = {
       "bounce": {
         "label": "Efeito Bounce na Letra",
         "desc": "Aplica animação de pulo na letra atual no modo karaokê"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaokê virtual",
+        "desc": "Quando a letra fornece apenas sincronização por linha, o tempo de karaokê é sintetizado a partir da análise de áudio do Spotify. Linhas em coreano, japonês e chinês são divididas com mais detalhe quando a confiança é alta."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Avanço de renderização do karaokê virtual",
+        "desc": "Aplica um deslocamento de tempo na renderização apenas ao karaokê virtual. Valores positivos fazem o destaque aparecer mais cedo."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_PT = {
       "browserFullscreen": {
         "desc": "Spotify em Tela Cheia",
         "info": "Coloca o navegador/Spotify em tela cheia ao entrar no modo tela cheia da extensão"
+      },
+      "hideOverlay": {
+        "desc": "Ocultar overlay na tela cheia do ivLyrics",
+        "info": "Envia ao app de overlay um estado de reprodução pausada enquanto a tela cheia do ivLyrics estiver aberta, para que as letras do overlay da área de trabalho desapareçam"
       }
     },
     "normalMode": {
@@ -1285,17 +1335,26 @@ window.LANG_PT = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "É necessário fazer login no Discord.",
+        "checking": "Verificando informações da conta...",
         "title": "Vinculação de Conta",
-        "subtitle": "Vincule com sua conta ivLogin",
-        "description": "Serviço de conta unificada ivLis STUDIO",
-        "info": "Vincule com ivLogin para usar recursos como sincronização de configurações. Insira seu User Hash na página de login para vincular.",
-        "loginButton": "Vincular com ivLogin",
+        "subtitle": "Vincule sua conta do Discord",
+        "description": "Conta de contribuição do ivLyrics baseada no Discord",
+        "info": "Quando você entrar com o Discord, seu user hash atual será substituído pelo seu ID do Discord e os dados de contribuição existentes serão migrados.",
+        "loginButton": "Entrar com Discord",
         "loading": "Carregando informações da conta...",
         "linked": "Vinculado",
         "linkedAt": "Vinculado em",
-        "lastSync": "Última sincronização",
-        "manageAccount": "Gerenciar conta",
+        "lastSync": "Último login",
+        "manageAccount": "Trocar conta",
         "refresh": "Atualizar",
+        "loggingIn": "Abrindo navegador...",
+        "startHint": "Conclua o login do Discord no navegador.",
+        "failed": "Falha no login do Discord.",
+        "loadFailed": "Falha ao carregar as informações da conta.",
+        "discordLoginSuccess": "Conta do Discord vinculada com sucesso.",
+        "logout": "Sair",
+        "logoutSuccess": "Sessão do Discord encerrada e novo user_hash criado.",
         "nickname": {
           "label": "Apelido",
           "enter": "Por favor, insira um apelido.",
@@ -1493,6 +1552,7 @@ window.LANG_PT = {
     "unsynced": "Letra Normal"
   },
   "communityVideo": {
+    "loginRequired": "É necessário fazer login no Discord para registrar vídeos da comunidade.",
     "title": "Vídeos Recomendados pela Comunidade",
     "loading": "Carregando lista de vídeos...",
     "loadError": "Não foi possível carregar a lista de vídeos",
@@ -1595,7 +1655,7 @@ window.LANG_PT = {
     "copied": "✓ Copiado para o Clipboard",
     "downloaded": "✓ Baixado",
     "shared": "✓ Compartilhado",
-    "maxLinesReached": "Você pode selecionar até 3 linhas",
+    "maxLinesReached": "Você pode selecionar até 10 linhas",
     "noSelection": "Selecione a letra"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_PT = {
       "description": "Exibe a letra atual no painel 'Tocando Agora' do Spotify. Você pode ver a letra sem o modo tela cheia.",
       "enabled": "Mostrar Letra no Painel",
       "linesCount": "Linhas para exibir"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Karaokê virtual",
+      "subtitle": "Ative o destaque estilo karaokê em quase todas as músicas",
+      "description": "Usa a análise de áudio do Spotify para sintetizar o timing de karaokê a partir de letras sincronizadas por linha. Isso faz o modo karaokê funcionar em quase todas as músicas, mas o timing é aproximado e pode não ser preciso.",
+      "enabled": "Ativar karaokê virtual"
     },
     "complete": {
       "title": "Tudo Pronto!",
@@ -1736,6 +1802,7 @@ window.LANG_PT = {
     "dismissAll": "Fechar Tudo"
   },
   "syncCreator": {
+    "loginRequired": "É necessário fazer login no Discord para criar a sincronia de karaokê.",
     "title": "Criar Sync Karaokê",
     "buttonTooltip": "Criar Sync Karaokê",
     "clickHereHint": "Clique aqui para ajustar a sincronização da letra!",
@@ -1774,6 +1841,21 @@ window.LANG_PT = {
     "loadedExistingSyncData": "Dados de sync existentes carregados",
     "providerMismatch": "Os dados de sync existentes usam um provedor diferente. Você precisa criar novos dados para o provedor da sua conta.",
     "back": "Fechar",
+    "lrclibSearchResults": "Resultados de busca do LRCLIB",
+    "showLrclibSearchResults": "Mostrar resultados de busca",
+    "hideLrclibSearchResults": "Ocultar resultados de busca",
+    "lrclibNoCandidates": "Nenhum candidato do LRCLIB encontrado",
+    "lrclibSelectCandidate": "Selecione um candidato",
+    "lrclibApplyCandidate": "Carregar esta letra",
+    "lrclibLoaded": "Carregado",
+    "lrclibBadgeExact": "Exato",
+    "lrclibBadgeSynced": "Sincronizada",
+    "lrclibBadgePlain": "Texto simples",
+    "lrclibBadgePrimary": "Principal",
+    "lrclibBadgeEnglish": "Inglês",
+    "lrclibMetricArtist": "artista",
+    "lrclibMetricTitle": "título",
+    "lrclibMetricDiff": "dif.",
     "lrclib": {
       "registerLyrics": "Registrar letra no LRCLIB",
       "title": "Registrar no LRCLIB",
@@ -1808,6 +1890,7 @@ window.LANG_PT = {
       "syllable": "Sílaba"
     },
     "copyLyrics": "Copiar letra",
+    "virtualKaraoke": "Dados de karaokê virtual",
     "lyricsCopied": "Letra copiada para a área de transferência",
     "copyError": "Falha ao copiar",
     "export": "Exportar",

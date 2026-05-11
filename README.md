@@ -1,4 +1,4 @@
-<img width="2208" height="512" alt="ko" src="https://github.com/user-attachments/assets/e4723922-2b91-466f-9f5e-b0b1604f8ebe" />
+<img width="2208" height="512" alt="ko" src="https://github.com/ivLis-Studio/ivLyrics/blob/main/preview_readme_ko.png?raw=true" />
 
 ---
 
@@ -12,7 +12,7 @@
 ### ivLyrics - 당신의 언어로 즐기는, 그런 음악.
 
 
-Spicetify용 가사 확장 프로그램입니다. Google Gemini API를 활용하여 다양한 언어의 발음 표기와 번역을 지원합니다.
+Spicetify용 가사 확장 프로그램입니다. AI API를 활용하여 다양한 언어의 발음 표기와 번역을 지원합니다.
 
 버그 리포트 및 기능 제안은 GitHub Issues 또는 [Discord](https://discord.gg/2fu36fUzdE)를 통해 문의해주세요.
 
@@ -57,7 +57,7 @@ Spicetify용 가사 확장 프로그램입니다. Google Gemini API를 활용하
 - 다양한 폰트, 색상, 레이아웃 커스터마이징
 
 ### 지원 언어
-한국어, 영어, 일본어, 중국어(간체/번체), 스페인어, 프랑스어, 독일어, 이탈리아어, 포르투갈어, 러시아어, 아랍어, 페르시아어, 힌디어, 벵골어, 태국어, 베트남어, 인도네시아어
+한국어, 영어, 일본어, 중국어(간체/번체), 스페인어, 프랑스어, 독일어, 이탈리아어, 러시아어, 스웨덴어, 포르투갈어, 아랍어, 페르시아어, 힌디어, 벵골어, 태국어, 베트남어, 인도네시아어
 
 ---
 

@@ -45,7 +45,28 @@ const SwapButton = ({ icon, disabled, onClick }) => {
   );
 };
 
+function buildOrderedProviderList(providers, providerOrder) {
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  const safeProviderOrder = Array.isArray(providerOrder) ? providerOrder : [];
+  const providersById = new Map(safeProviders.map((provider) => [provider.id, provider]));
+  const orderedIds = new Set(safeProviderOrder);
+  const sortedProviders = [];
 
+  safeProviderOrder.forEach((id) => {
+    const provider = providersById.get(id);
+    if (provider) {
+      sortedProviders.push(provider);
+    }
+  });
+
+  safeProviders.forEach((provider) => {
+    if (!orderedIds.has(provider.id)) {
+      sortedProviders.push(provider);
+    }
+  });
+
+  return sortedProviders;
+}
 
 // 데스크탑 오버레이 설정 컴포넌트
 const OverlaySettings = () => {
@@ -257,44 +278,6 @@ const OverlaySettings = () => {
   );
 };
 
-// 설정 백업/복원 컴포넌트
-const SETTINGS_BACKUP_PREFIX = "lpconfig-base64:";
-
-function uint8ArrayToBase64(bytes) {
-  let binary = "";
-  const chunkSize = 0x8000;
-
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-
-  return btoa(binary);
-}
-
-function base64ToUint8Array(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
-function decodeServerBackupContent(rawContent) {
-  if (typeof rawContent !== "string" || !rawContent.trim()) {
-    throw new Error("Empty backup content");
-  }
-
-  if (rawContent.startsWith(SETTINGS_BACKUP_PREFIX)) {
-    const encoded = rawContent.slice(SETTINGS_BACKUP_PREFIX.length);
-    return settingsObject.deserialize(base64ToUint8Array(encoded));
-  }
-
-  return JSON.parse(rawContent);
-}
-
 function getAboutAccountThemeTokens() {
   const isLightTheme = getSettingsUiTheme() === "light";
 
@@ -317,177 +300,52 @@ function getAboutAccountThemeTokens() {
   };
 }
 
-const SettingsBackup = ({ userHash }) => {
-  const [settingsList, setSettingsList] = useState([]);
-  const [backupName, setBackupName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const themeTokens = getAboutAccountThemeTokens();
+const SettingsBackup = () => null;
 
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/settings.php?action=list&user_hash=${encodeURIComponent(userHash)}`);
-      const data = await res.json();
-      if (data.settings) {
-        setSettingsList(data.settings);
-      }
-    } catch (e) {
-      console.error("Failed to fetch settings:", e);
-    } finally {
-      setLoading(false);
-    }
+function getDiscordAccountCopy() {
+  const baseKey = "settingsAdvanced.aboutTab.account";
+  return {
+    provider: "Discord",
+    description:
+      I18n.t(`${baseKey}.description`) ||
+      "Connect your ivLyrics contributions and nickname with Discord.",
+    info:
+      I18n.t(`${baseKey}.info`) ||
+      "When you log in, the current user hash is replaced with your Discord ID and existing contribution data is migrated.",
+    loginButton:
+      I18n.t(`${baseKey}.loginButton`) || "Sign In With Discord",
+    loggingIn:
+      I18n.t(`${baseKey}.loggingIn`) || "Opening browser...",
+    loading:
+      I18n.t(`${baseKey}.loading`) || "Loading Discord account information...",
+    linked:
+      I18n.t(`${baseKey}.linked`) || "Connected",
+    refresh:
+      I18n.t(`${baseKey}.refresh`) || "Refresh",
+    linkedAt:
+      I18n.t(`${baseKey}.linkedAt`) || "Linked",
+    lastLoginAt:
+      I18n.t(`${baseKey}.lastSync`) || "Last login",
+    switchAccount:
+      I18n.t(`${baseKey}.manageAccount`) || "Change Account",
+    startHint:
+      I18n.t(`${baseKey}.startHint`) || "Complete the Discord sign-in flow in your browser.",
+    failed:
+      I18n.t(`${baseKey}.failed`) || "Discord login failed.",
+    loadFailed:
+      I18n.t(`${baseKey}.loadFailed`) || "Failed to load account information.",
+    logout:
+      I18n.t(`${baseKey}.logout`) || "Log Out",
+    logoutSuccess:
+      I18n.t(`${baseKey}.logoutSuccess`) ||
+      "Signed out from Discord and created a new user hash.",
   };
+}
 
-  useEffect(() => {
-    fetchSettings();
-  }, [userHash]);
-
-  const handleUpload = async () => {
-    if (!backupName.trim()) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.enterName"));
-      return;
-    }
-
-    try {
-      const config = await StorageManager.exportConfig();
-      const content =
-        SETTINGS_BACKUP_PREFIX +
-        uint8ArrayToBase64(settingsObject.serialize(config));
-
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/settings.php?action=upload&user_hash=${encodeURIComponent(userHash)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: backupName,
-          content: content
-        })
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        Toast.success(I18n.t("settingsAdvanced.aboutTab.account.backup.success"));
-        setBackupName("");
-        fetchSettings();
-      } else {
-        Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.fail") + ": " + (data.error || "Unknown error"));
-      }
-    } catch (e) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.error"));
-      console.error(e);
-    }
-  };
-
-  const handleDownload = async (id) => {
-    try {
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/settings.php?action=download&id=${id}&user_hash=${encodeURIComponent(userHash)}`);
-      const data = await res.json();
-
-      if (data.data) {
-        try {
-          const config = decodeServerBackupContent(data.data);
-          await StorageManager.importConfig(config);
-          Toast.success(I18n.t("settingsAdvanced.aboutTab.account.backup.restoreSuccess"));
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        } catch (e) {
-          Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.invalidFormat"));
-        }
-      } else {
-        Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.downloadFail"));
-      }
-    } catch (e) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.downloadError"));
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm(I18n.t("settingsAdvanced.aboutTab.account.backup.deleteConfirm"))) return;
-
-    try {
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/settings.php?action=delete&id=${id}&user_hash=${encodeURIComponent(userHash)}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (data.success) {
-        Toast.success(I18n.t("settingsAdvanced.aboutTab.account.backup.deleted"));
-        fetchSettings();
-      } else {
-        Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.deleteFail"));
-      }
-    } catch (e) {
-      Toast.error(I18n.t("settingsAdvanced.aboutTab.account.backup.deleteError"));
-    }
-  };
-
-  return react.createElement("div", { className: "settings-backup-section", style: { marginTop: "20px", borderTop: `1px solid ${themeTokens.sectionDivider}`, paddingTop: "20px" } },
-    react.createElement("h3", { style: { fontSize: "14px", marginBottom: "12px", color: themeTokens.textPrimary } }, I18n.t("settingsAdvanced.aboutTab.account.backup.title")),
-
-    // 업로드 폼
-    react.createElement("div", { style: { display: "flex", gap: "8px", marginBottom: "16px" } },
-      react.createElement("input", {
-        type: "text",
-        value: backupName,
-        onChange: (e) => setBackupName(e.target.value),
-        placeholder: I18n.t("settingsAdvanced.aboutTab.account.backup.placeholder"),
-        style: {
-          flex: 1,
-          padding: "8px 12px",
-          borderRadius: "6px",
-          border: `1px solid ${themeTokens.inputBorder}`,
-          background: themeTokens.inputBackground,
-          color: themeTokens.textPrimary,
-          fontSize: "13px"
-        }
-      }),
-      react.createElement("button", {
-        onClick: handleUpload,
-        className: "btn-backup",
-        style: {
-          padding: "8px 16px",
-          borderRadius: "6px",
-          background: "#6366f1",
-          color: "#fff",
-          border: "none",
-          cursor: "pointer",
-          fontSize: "13px",
-          fontWeight: "600"
-        }
-      }, I18n.t("settingsAdvanced.aboutTab.account.backup.backupBtn"))
-    ),
-
-    // 목록
-    react.createElement("div", { className: "backup-list", style: { display: "flex", flexDirection: "column", gap: "8px" } },
-      settingsList.length === 0 ?
-        react.createElement("div", { style: { color: themeTokens.emptyText, fontSize: "12px", textAlign: "center", padding: "10px" } }, I18n.t("settingsAdvanced.aboutTab.account.backup.noBackups")) :
-        settingsList.map(item =>
-          react.createElement("div", {
-            key: item.id, style: {
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 12px", background: themeTokens.panelBackground, border: `1px solid ${themeTokens.panelBorder}`, borderRadius: "8px"
-            }
-          },
-            react.createElement("div", { style: { display: "flex", flexDirection: "column" } },
-              react.createElement("span", { style: { color: themeTokens.textPrimary, fontSize: "13px", fontWeight: "500" } }, item.settings_name),
-              react.createElement("span", { style: { color: themeTokens.emptyText, fontSize: "11px" } }, new Date(item.updated_at).toLocaleString())
-            ),
-            react.createElement("div", { style: { display: "flex", gap: "8px" } },
-              react.createElement("button", {
-                onClick: () => handleDownload(item.id),
-                style: { padding: "4px 8px", fontSize: "11px", background: "rgba(34, 197, 94, 0.2)", color: "#4ade80", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: "4px", cursor: "pointer" }
-              }, I18n.t("settingsAdvanced.aboutTab.account.backup.restoreBtn")),
-              react.createElement("button", {
-                onClick: () => handleDelete(item.id),
-                style: { padding: "4px 8px", fontSize: "11px", background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "4px", cursor: "pointer" }
-              }, I18n.t("settingsAdvanced.aboutTab.account.backup.deleteBtn"))
-            )
-          )
-        )
-      )
-  );
-};
+function formatEpochLabel(epochSeconds) {
+  if (!epochSeconds) return null;
+  return new Date(epochSeconds * 1000).toLocaleString();
+}
 
 // 닉네임 설정 컴포넌트
 const NicknameSection = ({ userHash }) => {
@@ -499,11 +357,23 @@ const NicknameSection = ({ userHash }) => {
 
   const fetchNickname = async () => {
     try {
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/nickname.php?user_hash=${encodeURIComponent(userHash)}`);
+      const res = await fetch(
+        `${Utils.getAccountApiBase()}/nickname?userHash=${encodeURIComponent(userHash)}`,
+        {
+          cache: "no-store",
+          headers: Utils.getApiHeaders({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          }),
+        }
+      );
       const data = await res.json();
       if (data.nickname) {
         setNickname(data.nickname);
         setInputNickname(data.nickname);
+      } else {
+        setNickname("");
+        setInputNickname("");
       }
     } catch (e) {
       console.error("Failed to fetch nickname:", e);
@@ -522,20 +392,20 @@ const NicknameSection = ({ userHash }) => {
 
     try {
       setLoading(true);
-      const res = await fetch(`https://sso.ivl.is/ivlyrics/api/nickname.php?user_hash=${encodeURIComponent(userHash)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ nickname: inputNickname })
+      const res = await fetch(`${Utils.getAccountApiBase()}/nickname`, {
+        method: "POST",
+        headers: Utils.getApiHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ userHash, nickname: inputNickname }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setNickname(data.nickname);
+        setInputNickname(data.nickname);
         setEditing(false);
         Toast.success(I18n.t("settingsAdvanced.aboutTab.account.nickname.changed"));
-        // 닉네임 변경 후 싱크 데이터 캐시 무효화 (기여자 닉네임 갱신)
-        window.SyncDataService?.clearCache();
+        window.SyncDataService?.clearCache?.();
       } else {
         Toast.error(data.error || I18n.t("settingsAdvanced.aboutTab.account.nickname.failed"));
       }
@@ -546,85 +416,109 @@ const NicknameSection = ({ userHash }) => {
     }
   };
 
-  return react.createElement("div", {
-    style: {
-      padding: "16px",
-      background: themeTokens.panelBackground,
-      borderRadius: "12px",
-      border: `1px solid ${themeTokens.panelBorder}`,
-      marginTop: "16px",
-      marginBottom: "16px"
-    }
-  },
-    react.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
-      react.createElement("div", null,
-        react.createElement("div", { style: { fontSize: "12px", color: themeTokens.textTertiary, marginBottom: "4px" } }, I18n.t("settingsAdvanced.aboutTab.account.nickname.label")),
-        editing ?
-          react.createElement("input", {
-            type: "text",
-            value: inputNickname,
-            onChange: (e) => setInputNickname(e.target.value),
-            placeholder: I18n.t("settingsAdvanced.aboutTab.account.nickname.placeholder"),
-            autoFocus: true,
-            style: {
-              background: themeTokens.inputBackground,
-              border: "1px solid #6366f1",
-              borderRadius: "4px",
-              color: themeTokens.textPrimary,
-              padding: "4px 8px",
-              fontSize: "14px",
-              width: "150px"
-            }
-          }) :
-          react.createElement("div", { style: { fontSize: "16px", fontWeight: "600", color: themeTokens.textPrimary } }, nickname || I18n.t("settingsAdvanced.aboutTab.account.nickname.none"))
-      ),
-      react.createElement("button", {
-        onClick: editing ? handleSave : () => setEditing(true),
-        disabled: loading,
+  return react.createElement(
+    "div",
+    {
+      style: {
+        padding: "16px",
+        background: themeTokens.panelBackground,
+        borderRadius: "12px",
+        border: `1px solid ${themeTokens.panelBorder}`,
+        marginTop: "16px",
+        marginBottom: "16px",
+      },
+    },
+    react.createElement(
+      "div",
+      {
         style: {
-          padding: "6px 12px",
-          borderRadius: "6px",
-          background: editing ? "#6366f1" : themeTokens.subtleButtonBackground,
-          color: editing ? "#fff" : themeTokens.subtleButtonText,
-          border: "none",
-          fontSize: "12px",
-          cursor: "pointer",
-          transition: "all 0.2s"
-        }
-      }, loading ? I18n.t("settingsAdvanced.aboutTab.account.nickname.saving") : (editing ? I18n.t("settingsAdvanced.aboutTab.account.nickname.save") : I18n.t("settingsAdvanced.aboutTab.account.nickname.change")))
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "12px",
+        },
+      },
+      react.createElement(
+        "div",
+        { style: { minWidth: 0 } },
+        react.createElement(
+          "div",
+          { style: { fontSize: "12px", color: themeTokens.textTertiary, marginBottom: "4px" } },
+          I18n.t("settingsAdvanced.aboutTab.account.nickname.label")
+        ),
+        editing
+          ? react.createElement("input", {
+              type: "text",
+              value: inputNickname,
+              onChange: (e) => setInputNickname(e.target.value),
+              placeholder: I18n.t("settingsAdvanced.aboutTab.account.nickname.placeholder"),
+              autoFocus: true,
+              maxLength: 20,
+              style: {
+                background: themeTokens.inputBackground,
+                border: "1px solid #5865f2",
+                borderRadius: "6px",
+                color: themeTokens.textPrimary,
+                padding: "8px 10px",
+                fontSize: "14px",
+                width: "180px",
+                maxWidth: "100%",
+              },
+            })
+          : react.createElement(
+              "div",
+              { style: { fontSize: "16px", fontWeight: "600", color: themeTokens.textPrimary } },
+              nickname || I18n.t("settingsAdvanced.aboutTab.account.nickname.none")
+            )
+      ),
+      react.createElement(
+        "button",
+        {
+          onClick: editing ? handleSave : () => setEditing(true),
+          disabled: loading,
+          style: {
+            padding: "8px 12px",
+            borderRadius: "8px",
+            background: editing ? "#5865f2" : themeTokens.subtleButtonBackground,
+            color: editing ? "#fff" : themeTokens.subtleButtonText,
+            border: "none",
+            fontSize: "12px",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            whiteSpace: "nowrap",
+          },
+        },
+        loading
+          ? I18n.t("settingsAdvanced.aboutTab.account.nickname.saving")
+          : editing
+            ? I18n.t("settingsAdvanced.aboutTab.account.nickname.save")
+            : I18n.t("settingsAdvanced.aboutTab.account.nickname.change")
+      )
     )
   );
 };
 
-// ivLogin 계정 연동 섹션 컴포넌트
 const AccountSection = () => {
   const [accountInfo, setAccountInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState(null);
   const themeTokens = getAboutAccountThemeTokens();
+  const copy = getDiscordAccountCopy();
 
-  /* polling state added */
-  const [isPolling, setIsPolling] = useState(false);
-
-  // 계정 정보 로드
   const loadAccountInfo = async () => {
     try {
-      // 폴링 중일 때는 로딩 표시 안 함 (깜빡임 방지)
-      if (!isPolling) setLoading(true);
+      setLoading(true);
       setError(null);
-      const userHash = Utils.getUserHash();
-      const response = await fetch(`https://sso.ivl.is/ivlyrics/api/account.php?user_hash=${encodeURIComponent(userHash)}`);
-      const data = await response.json();
-
-      if (data.linked && data.account) {
+      const data = await Utils.fetchAccountProfile();
+      if (data.authenticated && data.linked && data.account) {
         setAccountInfo(data.account);
-        setIsPolling(false); // 연동 성공 시 폴링 중단
       } else {
         setAccountInfo(null);
       }
     } catch (err) {
-      console.error("Failed to load account info:", err);
-      setError(err.message);
+      console.error("Failed to load Discord account info:", err);
+      setError(err.message || copy.loadFailed);
       setAccountInfo(null);
     } finally {
       setLoading(false);
@@ -633,44 +527,88 @@ const AccountSection = () => {
 
   useEffect(() => {
     loadAccountInfo();
+
+    const handleAccountChanged = () => {
+      loadAccountInfo();
+    };
+    window.addEventListener("ivLyrics:account-changed", handleAccountChanged);
+
+    return () => {
+      window.removeEventListener("ivLyrics:account-changed", handleAccountChanged);
+    };
   }, []);
 
-  // 폴링 로직
-  useEffect(() => {
-    let intervalId;
-    if (isPolling && !accountInfo) {
-      intervalId = setInterval(() => {
-        loadAccountInfo();
-      }, 5000);
+  const openLoginPage = async () => {
+    try {
+      setLoginLoading(true);
+      await Utils.startDiscordLogin();
+      Toast.success(copy.startHint);
+    } catch (err) {
+      Toast.error(err.message || copy.failed);
+    } finally {
+      setLoginLoading(false);
     }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [isPolling, accountInfo]);
-
-  // 로그인 페이지 열기
-  const openLoginPage = () => {
-    const userHash = Utils.getUserHash();
-    const loginUrl = `https://sso.ivl.is/ivlyrics/index.php?user_hash=${encodeURIComponent(userHash)}`;
-    window.open(loginUrl, "_blank", "noopener,noreferrer");
-    setIsPolling(true); // 폴링 시작
   };
 
-  // 새로고침
   const handleRefresh = () => {
     loadAccountInfo();
   };
 
-  // 연동되지 않은 상태
-  if (!loading && !accountInfo) {
+  const handleLogout = async () => {
+    await Utils.logoutDiscordSession();
+    const nextUserHash = Utils.resetUserHash();
+    setAccountInfo(null);
+    setError(null);
+    window.SyncDataService?.clearCache?.();
+    window.dispatchEvent(
+      new CustomEvent("ivLyrics:account-changed", {
+        detail: {
+          linked: false,
+          userHash: nextUserHash,
+        },
+      })
+    );
+    Toast.success(copy.logoutSuccess);
+    Utils.restoreAccountSettings({
+      initialTab: "about",
+      initialSettingKey: "about-account",
+    });
+  };
+
+  if (loading) {
     return react.createElement(
       "div",
       {
         className: "info-card",
         style: {
           padding: "20px",
-          background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)",
-          border: "1px solid rgba(99, 102, 241, 0.2)",
+          background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(46, 51, 122, 0.16) 100%)",
+          border: "1px solid rgba(88, 101, 242, 0.22)",
+          borderRadius: "0 0 12px 12px",
+          marginBottom: "24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "110px",
+        },
+      },
+      react.createElement(
+        "span",
+        { style: { color: themeTokens.textSecondary, fontSize: "14px" } },
+        copy.loading
+      )
+    );
+  }
+
+  if (!accountInfo) {
+    return react.createElement(
+      "div",
+      {
+        className: "info-card",
+        style: {
+          padding: "20px",
+          background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(46, 51, 122, 0.16) 100%)",
+          border: "1px solid rgba(88, 101, 242, 0.22)",
           borderRadius: "0 0 12px 12px",
           backdropFilter: "blur(30px) saturate(150%)",
           WebkitBackdropFilter: "blur(30px) saturate(150%)",
@@ -691,20 +629,29 @@ const AccountSection = () => {
           "div",
           {
             style: {
-              width: "48px",
-              height: "48px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+              width: "52px",
+              height: "52px",
+              borderRadius: "16px",
+              background: "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "20px",
-              fontWeight: "700",
-              color: "#ffffff",
+              color: "#fff",
               flexShrink: 0,
             },
           },
-          "iv"
+          react.createElement(
+            "svg",
+            {
+              width: "24",
+              height: "24",
+              viewBox: "0 0 24 24",
+              fill: "currentColor",
+            },
+            react.createElement("path", {
+              d: "M20.317 4.369A19.791 19.791 0 0 0 15.126 3c-.23.408-.499.957-.682 1.384a18.27 18.27 0 0 0-4.888 0A13.67 13.67 0 0 0 8.874 3a19.736 19.736 0 0 0-5.19 1.368C.533 9.067-.321 13.65.106 18.168a19.9 19.9 0 0 0 6.357 3.208c.513-.693.97-1.425 1.36-2.197-.748-.284-1.462-.634-2.134-1.04.178-.13.353-.267.522-.408 4.118 1.88 8.59 1.88 12.66 0 .17.141.344.278.523.408-.673.407-1.388.757-2.136 1.041.39.771.847 1.503 1.36 2.196a19.873 19.873 0 0 0 6.36-3.209c.5-5.238-.854-9.78-3.16-13.799ZM8.02 15.331c-1.24 0-2.26-1.131-2.26-2.525 0-1.394 1-2.525 2.26-2.525 1.26 0 2.279 1.15 2.26 2.525 0 1.394-1 2.525-2.26 2.525Zm7.96 0c-1.24 0-2.26-1.131-2.26-2.525 0-1.394 1-2.525 2.26-2.525 1.26 0 2.279 1.15 2.26 2.525 0 1.394-1 2.525-2.26 2.525Z",
+            })
+          )
         ),
         react.createElement(
           "div",
@@ -714,12 +661,12 @@ const AccountSection = () => {
             {
               style: {
                 margin: "0 0 4px",
-                fontSize: "16px",
+                fontSize: "17px",
                 color: themeTokens.textPrimary,
-                fontWeight: "600",
+                fontWeight: "700",
               },
             },
-            "ivLogin"
+            copy.provider
           ),
           react.createElement(
             "p",
@@ -730,7 +677,7 @@ const AccountSection = () => {
                 color: themeTokens.textSecondary,
               },
             },
-            I18n.t("settingsAdvanced.aboutTab.account.description")
+            copy.description
           )
         )
       ),
@@ -741,103 +688,63 @@ const AccountSection = () => {
             margin: "0 0 16px",
             fontSize: "13px",
             color: themeTokens.textSecondary,
-            lineHeight: "1.6",
+            lineHeight: "1.7",
           },
         },
-        I18n.t("settingsAdvanced.aboutTab.account.info")
+        copy.info
       ),
+      error &&
+        react.createElement(
+          "p",
+          {
+            style: {
+              margin: "0 0 12px",
+              fontSize: "12px",
+              color: "#f87171",
+            },
+          },
+          error
+        ),
       react.createElement(
         "button",
         {
           onClick: openLoginPage,
+          disabled: loginLoading,
           style: {
             width: "100%",
             padding: "12px 20px",
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            background: "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
             border: "none",
-            borderRadius: "8px",
+            borderRadius: "10px",
             color: "#ffffff",
             fontSize: "14px",
-            fontWeight: "600",
+            fontWeight: "700",
             cursor: "pointer",
-            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
           },
-          onMouseEnter: (e) => {
-            e.target.style.transform = "translateY(-1px)";
-            e.target.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.4)";
-          },
-          onMouseLeave: (e) => {
-            e.target.style.transform = "translateY(0)";
-            e.target.style.boxShadow = "none";
-          },
         },
-        react.createElement(
-          "svg",
-          {
-            width: "16",
-            height: "16",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-          },
-          react.createElement("path", { d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" }),
-          react.createElement("polyline", { points: "10 17 15 12 10 7" }),
-          react.createElement("line", { x1: "15", y1: "12", x2: "3", y2: "12" })
-        ),
-        I18n.t("settingsAdvanced.aboutTab.account.loginButton")
+        loginLoading ? copy.loggingIn : copy.loginButton
       )
     );
   }
 
-  // 로딩 중
-  if (loading) {
-    return react.createElement(
-      "div",
-      {
-        className: "info-card",
-        style: {
-          padding: "20px",
-          background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)",
-          border: "1px solid rgba(99, 102, 241, 0.2)",
-          borderRadius: "0 0 12px 12px",
-          marginBottom: "24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "100px",
-        },
-      },
-      react.createElement(
-        "span",
-        { style: { color: themeTokens.textSecondary, fontSize: "14px" } },
-        I18n.t("settingsAdvanced.aboutTab.account.loading") || "Loading..."
-      )
-    );
-  }
-
-  // 연동된 상태 - 계정 정보 표시
   return react.createElement(
     "div",
     {
       className: "info-card",
       style: {
         padding: "20px",
-        background: "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)",
-        border: "1px solid rgba(34, 197, 94, 0.25)",
+        background: "linear-gradient(145deg, rgba(88, 101, 242, 0.1) 0%, rgba(34, 197, 94, 0.08) 100%)",
+        border: "1px solid rgba(88, 101, 242, 0.22)",
         borderRadius: "0 0 12px 12px",
         backdropFilter: "blur(30px) saturate(150%)",
         WebkitBackdropFilter: "blur(30px) saturate(150%)",
         marginBottom: "24px",
       },
     },
-    // 상단: 프로필 정보
     react.createElement(
       "div",
       {
@@ -848,37 +755,27 @@ const AccountSection = () => {
           marginBottom: "16px",
         },
       },
-      // 프로필 이미지 또는 기본 아이콘
       react.createElement(
         "div",
         {
           style: {
-            width: "48px",
-            height: "48px",
+            width: "52px",
+            height: "52px",
             borderRadius: "50%",
             background: accountInfo.profileImage
               ? `url(${accountInfo.profileImage}) center/cover no-repeat`
-              : "linear-gradient(135deg, #22c55e 0%, #10b981 100%)",
+              : "linear-gradient(135deg, #5865f2 0%, #7983f5 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            border: "2px solid rgba(34, 197, 94, 0.3)",
+            border: "2px solid rgba(88, 101, 242, 0.25)",
+            color: "#fff",
+            fontSize: "18px",
+            fontWeight: "700",
           },
         },
-        !accountInfo.profileImage && react.createElement(
-          "svg",
-          {
-            width: "24",
-            height: "24",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "#ffffff",
-            strokeWidth: "2",
-          },
-          react.createElement("path", { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }),
-          react.createElement("circle", { cx: "12", cy: "7", r: "4" })
-        )
+        !accountInfo.profileImage && (accountInfo.displayName || "D").slice(0, 1).toUpperCase()
       ),
       react.createElement(
         "div",
@@ -891,6 +788,7 @@ const AccountSection = () => {
               alignItems: "center",
               gap: "8px",
               marginBottom: "4px",
+              flexWrap: "wrap",
             },
           },
           react.createElement(
@@ -898,46 +796,46 @@ const AccountSection = () => {
             {
               style: {
                 margin: 0,
-                fontSize: "16px",
+                fontSize: "17px",
                 color: themeTokens.textPrimary,
-                fontWeight: "600",
+                fontWeight: "700",
               },
             },
-            accountInfo.name || "User"
+            accountInfo.displayName || accountInfo.username || copy.provider
           ),
           react.createElement(
             "span",
             {
               style: {
                 fontSize: "10px",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                backgroundColor: "rgba(34, 197, 94, 0.2)",
+                padding: "3px 8px",
+                borderRadius: "999px",
+                backgroundColor: "rgba(34, 197, 94, 0.14)",
                 color: "#4ade80",
-                border: "1px solid rgba(34, 197, 94, 0.3)",
-                fontWeight: "600",
+                border: "1px solid rgba(34, 197, 94, 0.24)",
+                fontWeight: "700",
               },
             },
-            I18n.t("settingsAdvanced.aboutTab.account.linked") || "Linked"
+            copy.linked
           )
         ),
         react.createElement(
           "p",
           {
-              style: {
-                margin: 0,
-                fontSize: "13px",
-                color: themeTokens.textSecondary,
-              },
+            style: {
+              margin: 0,
+              fontSize: "13px",
+              color: themeTokens.textSecondary,
             },
-            accountInfo.email
+          },
+          `@${accountInfo.username || "discord"}`
         )
       ),
-      // 새로고침 버튼
       react.createElement(
         "button",
         {
           onClick: handleRefresh,
+          title: copy.refresh,
           style: {
             padding: "8px",
             background: themeTokens.subtleButtonBackground,
@@ -950,17 +848,6 @@ const AccountSection = () => {
             alignItems: "center",
             justifyContent: "center",
           },
-          onMouseEnter: (e) => {
-            e.currentTarget.style.background = themeTokens.subtleButtonBackgroundHover;
-            e.currentTarget.style.borderColor = themeTokens.subtleButtonBorderHover;
-            e.currentTarget.style.color = themeTokens.subtleButtonTextHover;
-          },
-          onMouseLeave: (e) => {
-            e.currentTarget.style.background = themeTokens.subtleButtonBackground;
-            e.currentTarget.style.borderColor = themeTokens.subtleButtonBorder;
-            e.currentTarget.style.color = themeTokens.subtleButtonText;
-          },
-          title: I18n.t("settingsAdvanced.aboutTab.account.refresh") || "Refresh",
         },
         react.createElement(
           "svg",
@@ -977,7 +864,6 @@ const AccountSection = () => {
         )
       )
     ),
-    // 연동 정보
     react.createElement(
       "div",
       {
@@ -987,72 +873,73 @@ const AccountSection = () => {
           fontSize: "12px",
           color: themeTokens.textTertiary,
           marginBottom: "16px",
+          flexWrap: "wrap",
+        },
+      },
+      accountInfo.linkedAt &&
+        react.createElement(
+          "span",
+          null,
+          `${copy.linkedAt}: ${formatEpochLabel(accountInfo.linkedAt)}`
+        ),
+      accountInfo.lastLoginAt &&
+        react.createElement(
+          "span",
+          null,
+          `${copy.lastLoginAt}: ${formatEpochLabel(accountInfo.lastLoginAt)}`
+        )
+    ),
+    react.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          gap: "10px",
+          marginBottom: "16px",
+          flexWrap: "wrap",
         },
       },
       react.createElement(
-        "span",
-        null,
-        (I18n.t("settingsAdvanced.aboutTab.account.linkedAt") || "Linked") + ": " +
-        new Date(accountInfo.linkedAt).toLocaleDateString()
+        "button",
+        {
+          onClick: openLoginPage,
+          disabled: loginLoading,
+          style: {
+            flex: "1 1 220px",
+            padding: "10px 16px",
+            background: themeTokens.subtleButtonBackground,
+            border: `1px solid ${themeTokens.subtleButtonBorder}`,
+            borderRadius: "8px",
+            color: themeTokens.subtleButtonText,
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: "pointer",
+          },
+        },
+        loginLoading ? copy.loggingIn : copy.switchAccount
       ),
-      accountInfo.lastSyncAt && react.createElement(
-        "span",
-        null,
-        (I18n.t("settingsAdvanced.aboutTab.account.lastSync") || "Last sync") + ": " +
-        new Date(accountInfo.lastSyncAt).toLocaleString()
+      react.createElement(
+        "button",
+        {
+          onClick: handleLogout,
+          disabled: loginLoading,
+          style: {
+            flex: "1 1 160px",
+            padding: "10px 16px",
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.2)",
+            borderRadius: "8px",
+            color: "#f87171",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: "pointer",
+          },
+        },
+        copy.logout
       )
     ),
-    // 계정 관리 버튼
-    react.createElement(
-      "button",
-      {
-        onClick: openLoginPage,
-        style: {
-          width: "100%",
-          padding: "10px 16px",
-          background: themeTokens.subtleButtonBackground,
-          border: `1px solid ${themeTokens.subtleButtonBorder}`,
-          borderRadius: "8px",
-          color: themeTokens.subtleButtonText,
-          fontSize: "13px",
-          fontWeight: "500",
-          cursor: "pointer",
-          transition: "all 0.2s",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-        },
-        onMouseEnter: (e) => {
-          e.currentTarget.style.background = themeTokens.subtleButtonBackgroundHover;
-          e.currentTarget.style.borderColor = themeTokens.subtleButtonBorderHover;
-          e.currentTarget.style.color = themeTokens.subtleButtonTextHover;
-        },
-        onMouseLeave: (e) => {
-          e.currentTarget.style.background = themeTokens.subtleButtonBackground;
-          e.currentTarget.style.borderColor = themeTokens.subtleButtonBorder;
-          e.currentTarget.style.color = themeTokens.subtleButtonText;
-        },
-      },
-      react.createElement(
-        "svg",
-        {
-          width: "14",
-          height: "14",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-        },
-        react.createElement("circle", { cx: "12", cy: "12", r: "3" }),
-        react.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })
-      ),
-      I18n.t("settingsAdvanced.aboutTab.account.manageAccount") || "Manage Account"
-    ),
-    // 닉네임 설정 UI (로그인 시에만 표시)
-    accountInfo && react.createElement(NicknameSection, { userHash: Utils.getUserHash() }),
-    // 설정 백업/복원 UI (로그인 시에만 표시)
-    accountInfo && react.createElement(SettingsBackup, { userHash: Utils.getUserHash() })
+    react.createElement(NicknameSection, { userHash: Utils.getUserHash() }),
+    react.createElement(SettingsBackup, { userHash: Utils.getUserHash() })
   );
 };
 
@@ -1084,9 +971,13 @@ const AddonSettingsCard = ({ addon, isEnabled, onToggle, isExpanded, onExpandTog
 
   const getLocalizedDescription = (desc) => {
     if (typeof desc === 'string') return desc;
-    const storedLang = Spicetify.LocalStorage.get("ivLyrics:visual:language");
-    const lang = storedLang?.replace(/"/g, '')?.split('-')[0] || 'en'; // StorageManager 대신 Spicetify.LocalStorage 사용 (안전하게)
-    return desc[lang] || desc['en'] || Object.values(desc)[0] || '';
+    const storedLang = (Spicetify.LocalStorage.get("ivLyrics:visual:language") || window.I18n?.getCurrentLanguage?.() || 'en')
+      .replace(/"/g, '');
+    const baseLang = storedLang.split('-')[0] || 'en';
+    const normalizedZh = baseLang === 'zh'
+      ? ((/tw|hant/i.test(storedLang) || storedLang === 'zh-TW') ? 'zh-TW' : 'zh-CN')
+      : null;
+    return desc[storedLang] || (normalizedZh && desc[normalizedZh]) || desc[baseLang] || desc['en'] || Object.values(desc)[0] || '';
   };
 
   // 아코디언 헤더 클릭 핸들러
@@ -1192,9 +1083,13 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
 
   const getLocalizedDescription = (desc) => {
     if (typeof desc === 'string') return desc;
-    const storedLang = StorageManager.getItem("ivLyrics:visual:language");
-    const lang = storedLang?.split('-')[0] || 'en';
-    return desc[lang] || desc['en'] || Object.values(desc)[0] || '';
+    const storedLang = (StorageManager.getItem("ivLyrics:visual:language") || window.I18n?.getCurrentLanguage?.() || 'en')
+      .replace(/"/g, '');
+    const baseLang = storedLang.split('-')[0] || 'en';
+    const normalizedZh = baseLang === 'zh'
+      ? ((/tw|hant/i.test(storedLang) || storedLang === 'zh-TW') ? 'zh-TW' : 'zh-CN')
+      : null;
+    return desc[storedLang] || (normalizedZh && desc[normalizedZh]) || desc[baseLang] || desc['en'] || Object.values(desc)[0] || '';
   };
 
   const handleHeaderClick = (e) => {
@@ -1605,16 +1500,7 @@ const LyricsProvidersTab = () => {
   };
 
   // 정렬된 provider 목록
-  const sortedProviders = providerOrder
-    .map(id => providers.find(p => p.id === id))
-    .filter(Boolean);
-
-  // 등록되었지만 순서에 없는 provider 추가
-  providers.forEach(p => {
-    if (!providerOrder.includes(p.id)) {
-      sortedProviders.push(p);
-    }
-  });
+  const sortedProviders = buildOrderedProviderList(providers, providerOrder);
 
   return react.createElement("div", { className: "settings-section lyrics-providers-section" },
     // 통합 컨테이너
@@ -1738,16 +1624,7 @@ const AIProvidersTab = () => {
   };
 
   // 정렬된 provider 목록
-  const sortedProviders = providerOrder
-    .map(id => providers.find(p => p.id === id))
-    .filter(Boolean);
-
-  // 등록되었지만 순서에 없는 provider 추가
-  providers.forEach(p => {
-    if (!providerOrder.includes(p.id)) {
-      sortedProviders.push(p);
-    }
-  });
+  const sortedProviders = buildOrderedProviderList(providers, providerOrder);
 
   return react.createElement("div", { className: "settings-section lyrics-providers-section" },
     // 통합 컨테이너
@@ -4078,7 +3955,46 @@ const SettingsMainPanelShell = ({
     )
   );
 
-const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
+const SETTINGS_RELEASE_LINK_STYLE = "color: rgba(248, 250, 252, 0.92); text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.24); transition: border-color 0.2s;";
+const SETTINGS_RELEASE_CODE_STYLE = "background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; color: #fbbf24;";
+const SETTINGS_RELEASE_PARAGRAPH_STYLE = "margin: 12px 0; line-height: 1.7;";
+
+function escapeSettingsReleaseHtml(value) {
+  return Utils.escapeHtml(value);
+}
+
+function escapeSettingsReleaseAttribute(value) {
+  return Utils.escapeAttribute(value);
+}
+
+function sanitizeSettingsReleaseUrl(url) {
+  return Utils.sanitizeHttpUrl(url);
+}
+
+function renderSettingsReleaseMarkdown(markdown) {
+  return Utils.renderSafeMarkdownToHTML(markdown, {
+    linkStyle: SETTINGS_RELEASE_LINK_STYLE,
+    codeStyle: SETTINGS_RELEASE_CODE_STYLE,
+    paragraphStyle: SETTINGS_RELEASE_PARAGRAPH_STYLE,
+    imageStyle: "max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; display: block;",
+    preStyle: "background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 12px 0;",
+    blockCodeStyle: "font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.9);",
+    blockquoteStyle: "margin: 12px 0; padding-left: 16px; border-left: 3px solid rgba(255, 255, 255, 0.24); color: rgba(255,255,255,0.7); font-style: italic;",
+    hrStyle: "border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;",
+    headingStyles: {
+      1: { tag: "h2", style: "margin: 24px 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;" },
+      2: { tag: "h3", style: "margin: 20px 0 10px; color: #ffffff; font-size: 18px; font-weight: 700;" },
+      3: { tag: "h4", style: "margin: 16px 0 8px; color: #ffffff; font-size: 16px; font-weight: 600;" },
+      4: { tag: "h5", style: "margin: 14px 0 6px; color: #ffffff; font-size: 15px; font-weight: 600;" },
+    },
+  });
+}
+
+const ConfigModal = ({
+  onRequestClose = () => {},
+  initialTab = "general",
+  initialSettingKey = null,
+}) => {
   const [activeTab, setActiveTab] = react.useState(initialTab || "general");
   const [searchQuery, setSearchQuery] = react.useState("");
   const shouldReduceMotion = getEffectiveReducedMotionPreference();
@@ -4397,6 +4313,15 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
     {
       section: I18n.t("tabs.behavior"),
       sectionKey: "lyrics",
+      settingKey: "sync-creator-shortcuts",
+      name: getSettingsText("settings.syncCreatorShortcuts.title", "Sync Creator Shortcuts"),
+      desc: getSettingsText("settings.syncCreatorShortcuts.subtitle", "Configure primary and secondary recording keys for Sync Creator."),
+      i18nKeys: ["tabs.behavior", "settings.syncCreatorShortcuts.title", "settings.syncCreatorShortcuts.subtitle"],
+      keywords: ["sync creator shortcuts hotkeys keybinds karaoke recording syllable word character"]
+    },
+    {
+      section: I18n.t("tabs.behavior"),
+      sectionKey: "lyrics",
       settingKey: "karaoke-mode",
       name: I18n.t("settingsAdvanced.karaokeMode.title"),
       desc: I18n.t("settingsAdvanced.karaokeMode.subtitle"),
@@ -4632,22 +4557,29 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
     },
   ], []);
 
+  const searchableSettingEntries = react.useMemo(() => {
+    return searchableSettings.map((setting) => {
+      const allTranslations = (setting.i18nKeys || []).flatMap((key) =>
+        I18n.getAllTranslations(key)
+      );
+      const keywords = (setting.keywords || []).join(" ");
+
+      return {
+        setting,
+        searchText: `${allTranslations.join(" ")} ${keywords}`.toLowerCase(),
+      };
+    });
+  }, [searchableSettings]);
+
   // 검색 결과 필터링 (모든 언어의 번역을 검색 대상에 포함)
   const searchResults = react.useMemo(() => {
     if (!searchQuery.trim()) return [];
 
     const query = searchQuery.toLowerCase().trim();
-    return searchableSettings.filter(setting => {
-      // i18nKeys의 모든 키에 대해, 모든 언어의 번역을 수집
-      const allTranslations = (setting.i18nKeys || []).flatMap(key =>
-        I18n.getAllTranslations(key)
-      );
-      const keywords = (setting.keywords || []).join(" ");
-      const searchIn = `${allTranslations.join(" ")} ${keywords}`.toLowerCase();
-
-      return searchIn.includes(query);
-    });
-  }, [searchQuery, searchableSettings]);
+    return searchableSettingEntries
+      .filter(({ searchText }) => searchText.includes(query))
+      .map(({ setting }) => setting);
+  }, [searchQuery, searchableSettingEntries]);
 
   // 검색 결과 컴포넌트
   const SearchResults = () => {
@@ -4792,7 +4724,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
   }, []);
 
   // Pending scroll target when switching tabs
-  const pendingTabScrollRef = react.useRef(null);
+  const pendingTabScrollRef = react.useRef(initialSettingKey || null);
   const shouldResetContentScrollRef = react.useRef(false);
 
   react.useEffect(() => {
@@ -4996,83 +4928,24 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
           }
 
           const data = await response.json();
-          const version = data.tag_name || "Unknown";
-          const publishedDate = data.published_at
+          const version = escapeSettingsReleaseHtml(data.tag_name || "Unknown");
+          const publishedDate = escapeSettingsReleaseHtml(data.published_at
             ? new Date(data.published_at).toLocaleDateString("ko-KR", {
               year: "numeric",
               month: "long",
               day: "numeric",
             })
-            : "Unknown";
+            : "Unknown");
 
-          // Markdown을 HTML로 변환
-          let body = data.body || I18n.t("settingsAdvanced.patchNotes.empty");
-
-          // 마크다운 변환 (순서 중요)
-          body = body
-            // 코드 블록 먼저 처리 (```로 감싼 부분)
-            .replace(/```[\s\S]*?```/g, (match) => {
-              return `<pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 12px 0;"><code style="font-family: monospace; font-size: 13px; color: rgba(255,255,255,0.9);">${match.slice(3, -3).trim()}</code></pre>`;
-            })
-            // 헤딩 처리
-            .replace(/^#### (.*?)$/gm, '<h5 style="margin: 14px 0 6px; color: #ffffff; font-size: 15px; font-weight: 600;">$1</h5>')
-            .replace(/^### (.*?)$/gm, '<h4 style="margin: 16px 0 8px; color: #ffffff; font-size: 16px; font-weight: 600;">$1</h4>')
-            .replace(/^## (.*?)$/gm, '<h3 style="margin: 20px 0 10px; color: #ffffff; font-size: 18px; font-weight: 700;">$1</h3>')
-            .replace(/^# (.*?)$/gm, '<h2 style="margin: 24px 0 12px; color: #ffffff; font-size: 20px; font-weight: 700;">$1</h2>')
-            // 인라인 코드
-            .replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; color: #fbbf24;">$1</code>')
-            // 볼드와 이탤릭
-            .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            // 이미지
-            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; display: block;" />')
-            // 링크
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: rgba(248, 250, 252, 0.92); text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.24); transition: border-color 0.2s;" onmouseover="this.style.borderBottomColor=\'rgba(255, 255, 255, 0.52)\'" onmouseout="this.style.borderBottomColor=\'rgba(255, 255, 255, 0.24)\'">$1</a>')
-            // 체크박스 리스트
-            .replace(/^- \[x\] (.*?)$/gm, '<li style="margin: 6px 0; list-style: none;"><span style="color: #4ade80; margin-right: 6px;">✓</span>$1</li>')
-            .replace(/^- \[ \] (.*?)$/gm, '<li style="margin: 6px 0; list-style: none;"><span style="color: rgba(255,255,255,0.3); margin-right: 6px;">○</span>$1</li>')
-            // 일반 리스트 (-, *, +)
-            .replace(/^[\-\*\+] (.*?)$/gm, '<li style="margin: 6px 0; padding-left: 4px;">$1</li>')
-            // 숫자 리스트
-            .replace(/^\d+\. (.*?)$/gm, '<li style="margin: 6px 0; padding-left: 4px;">$1</li>')
-            // 블록쿼트
-            .replace(/^> (.*?)$/gm, '<blockquote style="margin: 12px 0; padding-left: 16px; border-left: 3px solid rgba(255, 255, 255, 0.24); color: rgba(255,255,255,0.7); font-style: italic;">$1</blockquote>')
-            // 구분선
-            .replace(/^---$/gm, '<hr style="border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;" />')
-            .replace(/^\*\*\*$/gm, '<hr style="border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0;" />')
-            // 줄바꿈 처리 (두 번 연속된 줄바꿈은 단락 구분)
-            .replace(/\n\n/g, '</p><p style="margin: 12px 0; line-height: 1.7;">');
-
-          // li 태그들을 ul/ol로 감싸기
-          body = body.replace(/(<li[^>]*>.*?<\/li>(\s|<br\/>)*)+/gs, (match) => {
-            // 체크박스나 일반 리스트인 경우
-            if (match.includes('list-style: none')) {
-              return `<ul style="margin: 8px 0 16px; padding-left: 8px; list-style: none;">${match}</ul>`;
-            }
-            return `<ul style="margin: 8px 0 16px; padding-left: 24px; list-style: disc;">${match}</ul>`;
-          });
-
-          // 시작 p 태그 추가
-          if (!body.startsWith('<h') && !body.startsWith('<ul') && !body.startsWith('<pre')) {
-            body = `<p style="margin: 12px 0; line-height: 1.7;">${body}`;
-          }
-          // 끝 p 태그 추가
-          if (!body.endsWith('</p>') && !body.endsWith('</ul>') && !body.endsWith('</pre>')) {
-            body = `${body}</p>`;
-          }
-
-          container.style.display = "block";
-          container.style.alignItems = "flex-start";
-          container.style.justifyContent = "flex-start";
-          container.innerHTML = `
-            <div style="width: 100%;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div>
-                  <h3 style="margin: 0; font-size: 18px; color: #ffffff; font-weight: 700;">${version}</h3>
-                  <p style="margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,0.5);">${publishedDate}</p>
-                </div>
-                <a href="${data.html_url}" target="_blank" style="
+          // Render release notes through the local sanitizer before assigning innerHTML.
+          const releaseUrl = sanitizeSettingsReleaseUrl(data.html_url);
+          const body = renderSettingsReleaseMarkdown(
+            data.body || I18n.t("settingsAdvanced.patchNotes.empty")
+          );
+          const viewOnGithubLabel = escapeSettingsReleaseHtml(
+            I18n.t("settingsAdvanced.aboutTab.viewOnGithub")
+          );
+          const releaseLinkStyle = `
                   display: inline-flex;
                   align-items: center;
                   gap: 6px;
@@ -5085,13 +4958,29 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                   font-size: 13px;
                   font-weight: 600;
                   transition: all 0.2s;
-                " onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
-                  ${I18n.t("settingsAdvanced.aboutTab.viewOnGithub")}
+                `;
+          const releaseLink = releaseUrl
+            ? `<a href="${escapeSettingsReleaseAttribute(releaseUrl)}" target="_blank" rel="noopener noreferrer" style="${releaseLinkStyle}" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                  ${viewOnGithubLabel}
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.75 2A1.75 1.75 0 002 3.75v8.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0014 12.25v-3.5a.75.75 0 00-1.5 0v3.5a.25.25 0 01-.25.25h-8.5a.25.25 0 01-.25-.25v-8.5a.25.25 0 01.25-.25h3.5a.75.75 0 000-1.5h-3.5z"/>
                     <path d="M10.75 1a.75.75 0 000 1.5h1.69L8.22 6.72a.75.75 0 001.06 1.06l4.22-4.22v1.69a.75.75 0 001.5 0V1h-4.25z"/>
                   </svg>
-                </a>
+                </a>`
+            : `<span style="${releaseLinkStyle}; opacity: 0.55; cursor: default;">
+                  ${viewOnGithubLabel}
+                </span>`;
+          container.style.display = "block";
+          container.style.alignItems = "flex-start";
+          container.style.justifyContent = "flex-start";
+          container.innerHTML = `
+            <div style="width: 100%;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div>
+                  <h3 style="margin: 0; font-size: 18px; color: #ffffff; font-weight: 700;">${version}</h3>
+                  <p style="margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,0.5);">${publishedDate}</p>
+                </div>
+                ${releaseLink}
               </div>
               <div style="line-height: 1.7; color: rgba(255,255,255,0.85); font-size: 14px;">
                 ${body}
@@ -5103,6 +4992,13 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
           container.style.display = "flex";
           container.style.alignItems = "center";
           container.style.justifyContent = "center";
+          const patchNotesLoadFailed = escapeSettingsReleaseHtml(
+            I18n.t("settingsAdvanced.aboutTab.patchNotesLoadFailed")
+          );
+          const checkGithubReleases = escapeSettingsReleaseHtml(
+            I18n.t("settingsAdvanced.aboutTab.checkGithubReleases")
+          );
+
           container.innerHTML = `
             <div style="text-align: center; color: rgba(255,255,255,0.5);">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin-bottom: 12px; opacity: 0.3;">
@@ -5110,8 +5006,8 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                 <line x1="12" y1="8" x2="12" y2="12" stroke-width="2" stroke-linecap="round"/>
                 <line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              <p style="margin: 0; font-size: 14px;">${I18n.t("settingsAdvanced.aboutTab.patchNotesLoadFailed")}</p>
-              <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.7;">${I18n.t("settingsAdvanced.aboutTab.checkGithubReleases")}</p>
+              <p style="margin: 0; font-size: 14px;">${patchNotesLoadFailed}</p>
+              <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.7;">${checkGithubReleases}</p>
             </div>
           `;
         }
@@ -5450,7 +5346,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
   );
   const resolveNavItemId = (tabId, settingKey) => settingKey || tabId;
   const [activeNavItemId, setActiveNavItemId] = react.useState(() =>
-    resolveNavItemId("general", "language")
+    resolveNavItemId(initialTab || "general", initialSettingKey || (initialTab || "general"))
   );
   const activeNavItemIdRef = react.useRef(activeNavItemId);
 
@@ -9891,6 +9787,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                 fa: "فارسی",
                 de: "Deutsch",
                 ru: "Русский",
+                sv: "Svenska",
                 pt: "Português",
                 bn: "বাংলা",
                 it: "Italiano",
@@ -9907,10 +9804,10 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
             if (window.I18n && window.I18n.setLanguage) {
               window.I18n.setLanguage(value);
             }
-            // 설정 페이지로 돌아오기 위해 플래그 저장
-            localStorage.setItem("ivLyrics:return-to-settings", "true");
-            // 자동 새로고침
-            location.reload();
+            queueReloadIntoIvLyrics({
+              reopenSettings: true,
+              initialTab: "general",
+            });
           },
         }),
         react.createElement(OptionList, {
@@ -9934,6 +9831,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                 fa: "فارسی",
                 de: "Deutsch",
                 ru: "Русский",
+                sv: "Svenska",
                 pt: "Português",
                 bn: "বাংলা",
                 it: "Italiano",
@@ -9946,10 +9844,10 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
           onChange: (name, value) => {
             CONFIG.visual[name] = value;
             StorageManager.saveConfig(name, value);
-            // 설정 페이지로 돌아오기 위해 플래그 저장
-            localStorage.setItem("ivLyrics:return-to-settings", "true");
-            // 자동 새로고침
-            location.reload();
+            queueReloadIntoIvLyrics({
+              reopenSettings: true,
+              initialTab: "general",
+            });
           },
         }),
         // 데스크탑 오버레이 섹션
@@ -10910,6 +10808,85 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
           },
         }),
         react.createElement(SectionTitle, {
+          title: getSettingsText("settings.syncCreatorShortcuts.title", "Sync Creator Shortcuts"),
+          subtitle: getSettingsText("settings.syncCreatorShortcuts.subtitle", "Configure primary and secondary recording keys for Sync Creator."),
+          sectionKey: "sync-creator-shortcuts",
+        }),
+        react.createElement(OptionList, {
+          items: [
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.charForward", "Advance one character")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-char-forward-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-char-forward-key"] ?? "right",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.charForward", "Advance one character")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-char-forward-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-char-forward-alt-key"] ?? "",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.charBack", "Revert one character")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-char-back-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-char-back-key"] ?? "left",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.charBack", "Revert one character")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-char-back-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-char-back-alt-key"] ?? "",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.wordForward", "Advance one word")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-word-forward-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-word-forward-key"] ?? ".",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.wordForward", "Advance one word")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-word-forward-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-word-forward-alt-key"] ?? "",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.wordBack", "Revert one word")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-word-back-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-word-back-key"] ?? ",",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.wordBack", "Revert one word")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-word-back-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-word-back-alt-key"] ?? "",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.syllable", "Advance one syllable")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-syllable-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-syllable-key"] ?? ";",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.syllable", "Advance one syllable")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-syllable-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-syllable-alt-key"] ?? "",
+            },
+          ],
+          onChange: (name, value) => {
+            CONFIG.visual[name] = value;
+            StorageManager.saveConfig(name, value);
+            lyricContainerUpdate?.();
+            window.dispatchEvent(
+              new CustomEvent("ivLyrics", {
+                detail: { type: "config", name, value },
+              })
+            );
+          },
+        }),
+        react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.karaokeMode.title"),
           subtitle: I18n.t("settingsAdvanced.karaokeMode.subtitle"),
           sectionKey: "karaoke-mode",
@@ -10927,6 +10904,22 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
               info: I18n.t("settingsAdvanced.karaokeMode.bounce.desc"),
               key: "karaoke-bounce",
               type: ConfigSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.karaokeMode.spotifyFakeKaraoke.label"),
+              info: I18n.t("settingsAdvanced.karaokeMode.spotifyFakeKaraoke.desc"),
+              key: "spotify-fake-karaoke-enabled",
+              type: ConfigSlider,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.karaokeMode.pseudoKaraokeRenderAdvance.label"),
+              info: I18n.t("settingsAdvanced.karaokeMode.pseudoKaraokeRenderAdvance.desc"),
+              key: "pseudo-karaoke-render-advance",
+              type: ConfigSliderRange,
+              min: 0,
+              max: 500,
+              step: 10,
+              unit: "ms",
             },
           ],
           onChange: (name, value) => {
@@ -11125,17 +11118,14 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 
                 try {
                   const cfg = await StorageManager.exportConfig();
-                  window.__ivLyricsDebugLog?.("[Settings] Config before serialize:", cfg);
-                  window.__ivLyricsDebugLog?.("[Settings] Has track-sync-offsets:", "ivLyrics:track-sync-offsets" in cfg);
-                  const u8 = settingsObject.serialize(cfg);
-                  // download as file
-                  const blob = new Blob([u8], {
-                    type: "application/octet-stream",
+                  const serializedConfig = JSON.stringify(cfg, null, 2);
+                  const blob = new Blob([serializedConfig], {
+                    type: "application/json",
                   });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;
-                  a.download = "ivLyrics.lpconfig";
+                  a.download = "ivLyrics-settings.json";
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
@@ -11256,7 +11246,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                 try {
                   const fileInput = document.createElement("input");
                   fileInput.type = "file";
-                  fileInput.accept = ".lpconfig,.json";
+                  fileInput.accept = ".json,application/json";
                   fileInput.onchange = async (e) => {
                     if (!fileInput.files || fileInput.files.length === 0) {
                       button.textContent = originalText;
@@ -11268,27 +11258,15 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                     reader.onload = async (e) => {
                       const contents = e.target.result;
                       try {
-                        // check file type
-                        const fileType = file.type;
-                        const isLpconfig =
-                          !fileType && file.name.includes("lpconfig");
-                        const isJson = fileType && fileType.includes("json");
-                        if (!isLpconfig && !isJson) {
-                          window.__ivLyricsDebugLog?.(fileType);
-                          window.__ivLyricsDebugLog?.(file.name);
-                          throw new Error("Invalid file type " + fileType);
+                        if (typeof contents !== "string") {
+                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
                         }
-                        if (isJson) {
-                          const arraBuffer2Text = (ab) => {
-                            return new TextDecoder("utf-8").decode(ab);
-                          };
-                          const cfg = JSON.parse(arraBuffer2Text(contents));
-                          await StorageManager.importConfig(cfg);
-                        } else {
-                          const u8 = new Uint8Array(contents);
-                          const cfg = settingsObject.deserialize(u8);
-                          await StorageManager.importConfig(cfg);
+
+                        const cfg = JSON.parse(contents);
+                        if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) {
+                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
                         }
+                        await StorageManager.importConfig(cfg);
 
                         const settingRow = button.closest(".setting-row");
                         let resultContainer = settingRow?.nextElementSibling;
@@ -11338,9 +11316,11 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 												</div>`;
 
                         // 1.5초 후 자동 새로고침
-                        setTimeout(() => {
-                          location.reload();
-                        }, 1500);
+                        queueReloadIntoIvLyrics({
+                          reopenSettings: true,
+                          initialTab: "general",
+                          delay: 1500,
+                        });
                       } catch (e) {
                         const settingRow = button.closest(".setting-row");
                         let resultContainer = settingRow?.nextElementSibling;
@@ -11396,7 +11376,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                         button.disabled = false;
                       }
                     };
-                    reader.readAsArrayBuffer(file);
+                    reader.readAsText(file, "utf-8");
                   };
                   document.body.appendChild(fileInput);
                   fileInput.click();
@@ -11433,12 +11413,12 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 
                 try {
                   const data = await DBExportManager.exportAllDBs();
-                  const json = JSON.stringify(data);
+                  const json = JSON.stringify(data, null, 2);
                   const blob = new Blob([json], { type: "application/json" });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;
-                  a.download = "ivLyrics.ivldb";
+                  a.download = "ivLyrics-db.json";
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
@@ -11555,7 +11535,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                 try {
                   const fileInput = document.createElement("input");
                   fileInput.type = "file";
-                  fileInput.accept = ".ivldb";
+                  fileInput.accept = ".json,application/json";
                   fileInput.onchange = async (e) => {
                     if (!fileInput.files || fileInput.files.length === 0) {
                       button.textContent = originalText;
@@ -11577,8 +11557,10 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                     reader.onload = async (e) => {
                       const contents = e.target.result;
                       try {
-                        const text = new TextDecoder("utf-8").decode(contents);
-                        const data = JSON.parse(text);
+                        if (typeof contents !== "string") {
+                          throw new Error(I18n.t("settingsAdvanced.exportImport.import.invalidFormat"));
+                        }
+                        const data = JSON.parse(contents);
                         await DBExportManager.importAllDBs(data);
 
                         const settingRow = button.closest(".setting-row");
@@ -11627,9 +11609,11 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                           </div>
                         </div>`;
 
-                        setTimeout(() => {
-                          location.reload();
-                        }, 1500);
+                        queueReloadIntoIvLyrics({
+                          reopenSettings: true,
+                          initialTab: "general",
+                          delay: 1500,
+                        });
                       } catch (e) {
                         const settingRow = button.closest(".setting-row");
                         let resultContainer = settingRow?.nextElementSibling;
@@ -11680,7 +11664,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                         button.disabled = false;
                       }
                     };
-                    reader.readAsArrayBuffer(file);
+                    reader.readAsText(file, "utf-8");
                   };
                   document.body.appendChild(fileInput);
                   fileInput.click();
@@ -11784,9 +11768,11 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 												</div>`;
 
                   // 1.5초 후 자동 새로고침
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 1500);
+                  queueReloadIntoIvLyrics({
+                    reopenSettings: true,
+                    initialTab: "general",
+                    delay: 1500,
+                  });
                 } catch (e) {
                   resultContainer.innerHTML = `
 											<div style="
@@ -11883,6 +11869,13 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
               key: "fullscreen-browser-fullscreen",
               type: ConfigSlider,
               defaultValue: CONFIG.visual["fullscreen-browser-fullscreen"] ?? false,
+            },
+            {
+              desc: I18n.t("settingsAdvanced.fullscreenMode.hideOverlay.desc"),
+              info: I18n.t("settingsAdvanced.fullscreenMode.hideOverlay.info"),
+              key: "fullscreen-hide-overlay",
+              type: ConfigSlider,
+              defaultValue: CONFIG.visual["fullscreen-hide-overlay"] ?? true,
             },
             {
               desc: I18n.t("settingsAdvanced.fullscreenMode.tvMode.desc"),
@@ -12618,7 +12611,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
           className: `tab-content ${activeTab === "about" ? "active" : ""}`,
           "data-tab-id": "about",
         },
-        // ivLogin 계정 연동 섹션 (최상단)
+        // Discord 계정 연동 섹션 (최상단)
         react.createElement(SectionTitle, {
           title: I18n.t("settingsAdvanced.aboutTab.account.title"),
           subtitle: I18n.t("settingsAdvanced.aboutTab.account.subtitle"),
@@ -12898,6 +12891,32 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                     } else if (updateInfo.hasUpdate) {
                       showUpdateSection = true;
                       showCopyButton = true;
+                      const safeUpdateAvailable = escapeSettingsReleaseHtml(
+                        I18n.t("notifications.updateAvailable")
+                      );
+                      const safeVersionChange = escapeSettingsReleaseHtml(
+                        I18n.t("update.versionChange")
+                      );
+                      const safeCurrentVersion = escapeSettingsReleaseHtml(
+                        updateInfo.currentVersion
+                      );
+                      const safeLatestVersion = escapeSettingsReleaseHtml(
+                        updateInfo.latestVersion
+                      );
+                      const safePlatformName = escapeSettingsReleaseHtml(platformName);
+                      const safeInstallCommand = escapeSettingsReleaseHtml(installCommand);
+                      const releaseNotesUrl = sanitizeSettingsReleaseUrl(
+                        `https://github.com/ivLis-Studio/ivLyrics/releases/tag/v${encodeURIComponent(String(updateInfo.latestVersion ?? ""))}`
+                      );
+                      const releaseNotesHref = releaseNotesUrl
+                        ? escapeSettingsReleaseAttribute(releaseNotesUrl)
+                        : "https://github.com/ivLis-Studio/ivLyrics/releases";
+                      const releaseNotesLabel = escapeSettingsReleaseHtml(
+                        I18n.t("update.releaseNotes")
+                      );
+                      const copyCommandLabel = escapeSettingsReleaseHtml(
+                        I18n.t("update.copyCommand")
+                      );
 
                       resultContainer.innerHTML = `
 												<div style="
@@ -12930,11 +12949,11 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 																	color: rgba(255, 255, 255, 0.95);
 																	margin-bottom: 2px;
 																	letter-spacing: -0.01em;
-																">${I18n.t("notifications.updateAvailable")}</div>
+																">${safeUpdateAvailable}</div>
 																<div style="
 																	font-size: 12px;
 																	color: rgba(255, 255, 255, 0.5);
-																">${I18n.t("update.versionChange")} ${updateInfo.currentVersion} → ${updateInfo.latestVersion}</div>
+																">${safeVersionChange} ${safeCurrentVersion} → ${safeLatestVersion}</div>
 															</div>
 														</div>
 													</div>
@@ -12951,7 +12970,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 															color: rgba(255, 255, 255, 0.6);
 															margin-bottom: 8px;
 															font-weight: 500;
-														">${platformName}</div>
+														">${safePlatformName}</div>
 														<code style="
 															font-family: Consolas, Monaco, 'Courier New', monospace;
 															font-size: 12px;
@@ -12959,7 +12978,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 															word-break: break-all;
 															line-height: 1.6;
 															user-select: all;
-														">${installCommand}</code>
+														">${safeInstallCommand}</code>
 													</div>
 													
 													<div style="display: flex; gap: 8px;">
@@ -12975,9 +12994,10 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 															font-weight: 600;
 															transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 															letter-spacing: -0.01em;
-														">${I18n.t("update.copyCommand")}</button>
-														<a href="https://github.com/ivLis-Studio/ivLyrics/releases/tag/v${updateInfo.latestVersion}" 
+														">${copyCommandLabel}</button>
+														<a href="${releaseNotesHref}"
 														   target="_blank"
+														   rel="noopener noreferrer"
 														   style="
 															flex: 1;
 															background: rgba(255, 255, 255, 0.08);
@@ -12993,7 +13013,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 															align-items: center;
 															justify-content: center;
 															letter-spacing: -0.01em;
-														">${I18n.t("update.releaseNotes")}</a>
+														">${releaseNotesLabel}</a>
 													</div>
 												</div>
 											`;
@@ -13023,6 +13043,16 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
                         });
                       }
                     } else {
+                      const latestVersionLabel = escapeSettingsReleaseHtml(
+                        I18n.t("notifications.latestVersion")
+                      );
+                      const safeVersionChange = escapeSettingsReleaseHtml(
+                        I18n.t("update.versionChange")
+                      );
+                      const safeCurrentVersion = escapeSettingsReleaseHtml(
+                        updateInfo.currentVersion
+                      );
+
                       resultContainer.innerHTML = `
 												<div style="
 													padding: 16px 20px;
@@ -13047,8 +13077,8 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 															<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
 														</svg>
 														<div>
-															<div style="font-weight: 600; margin-bottom: 2px;">${I18n.t("notifications.latestVersion")}</div>
-															<div style="opacity: 0.8; font-size: 12px;">${I18n.t("update.versionChange")} ${updateInfo.currentVersion}</div>
+															<div style="font-weight: 600; margin-bottom: 2px;">${latestVersionLabel}</div>
+															<div style="opacity: 0.8; font-size: 12px;">${safeVersionChange} ${safeCurrentVersion}</div>
 														</div>
 													</div>
 												</div>
@@ -13131,7 +13161,7 @@ const ConfigModal = ({ onRequestClose = () => {}, initialTab = "general" }) => {
 };
 
 function openConfig(options = {}) {
-  const { initialTab = "general" } = options || {};
+  const { initialTab = "general", initialSettingKey = null } = options || {};
   const existingOverlay = document.getElementById("ivLyrics-settings-overlay");
   if (existingOverlay) {
     return;
@@ -13203,27 +13233,84 @@ function openConfig(options = {}) {
     react.createElement(ConfigModal, {
       onRequestClose: closeOverlay,
       initialTab,
+      initialSettingKey,
     }),
     modalContainer
   );
 }
 
+function queueReloadIntoIvLyrics(options = {}) {
+  const {
+    reopenSettings = false,
+    initialTab = "general",
+    initialSettingKey = null,
+    delay = 0,
+  } = options;
+
+  try {
+    if (reopenSettings) {
+      const payload = { initialTab };
+      if (initialSettingKey) {
+        payload.initialSettingKey = initialSettingKey;
+      }
+      localStorage.setItem("ivLyrics:return-to-settings", JSON.stringify(payload));
+    }
+  } catch (error) {
+    console.error("[ivLyrics] Failed to queue settings reopen:", error);
+  }
+
+  try {
+    localStorage.setItem(
+      "ivLyrics:restore-route-after-reload",
+      JSON.stringify({
+        path: "/ivLyrics",
+        expiresAt: Date.now() + 15000,
+      })
+    );
+  } catch (error) {
+    console.error("[ivLyrics] Failed to queue ivLyrics route restore:", error);
+  }
+
+  try {
+    Spicetify?.Platform?.History?.push?.("/ivLyrics");
+  } catch (error) {
+    console.error("[ivLyrics] Failed to navigate to ivLyrics before reload:", error);
+  }
+
+  window.setTimeout(() => {
+    window.location.reload();
+  }, Math.max(0, Number(delay) || 0));
+}
+
+window.ivLyricsOpenConfig = openConfig;
+
 // 언어 변경 후 자동으로 설정 페이지 열기
 (function checkReturnToSettings() {
-  const shouldReturn = localStorage.getItem("ivLyrics:return-to-settings");
-  if (shouldReturn === "true") {
-    localStorage.removeItem("ivLyrics:return-to-settings");
-    // DOM이 준비된 후 설정 열기
-    const tryOpenSettings = () => {
-      if (typeof openConfig === "function" && document.body) {
-        // 약간의 지연을 두고 설정 열기
-        setTimeout(() => {
-          openConfig();
-        }, 500);
-      } else {
-        setTimeout(tryOpenSettings, 100);
-      }
-    };
-    tryOpenSettings();
+  const rawValue = localStorage.getItem("ivLyrics:return-to-settings");
+  if (!rawValue) return;
+
+  let pendingOptions = null;
+  if (rawValue === "true") {
+    pendingOptions = { initialTab: "general" };
+  } else {
+    try {
+      pendingOptions = JSON.parse(rawValue);
+    } catch (error) {
+      pendingOptions = { initialTab: "general" };
+    }
   }
+
+  localStorage.removeItem("ivLyrics:return-to-settings");
+
+  const tryOpenSettings = () => {
+    if (typeof openConfig === "function" && document.body) {
+      setTimeout(() => {
+        openConfig(pendingOptions || {});
+      }, 500);
+    } else {
+      setTimeout(tryOpenSettings, 100);
+    }
+  };
+
+  tryOpenSettings();
 })();

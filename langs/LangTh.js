@@ -376,6 +376,14 @@ window.LANG_TH = {
     },
     "solidBackgroundInUse": "ℹ️ กำลังใช้งานพื้นหลังสีทึบ",
     "fontPlaceholder": "ชื่อฟอนต์ (เช่น Arial, Cordia New)",
+    "shortcuts": {
+      "primary": "หลัก",
+      "secondary": "รอง"
+    },
+    "syncCreatorShortcuts": {
+      "title": "ปุ่มลัด Sync Creator",
+      "subtitle": "กำหนดปุ่มหลักและปุ่มรองสำหรับการบันทึกใน Sync Creator"
+    },
     "aiProviders": {
       "title": "ผู้ให้บริการ AI",
       "description": "เลือกและลำดับความสำคัญของผู้ให้บริการ AI ผู้ให้บริการที่อยู่ด้านบนสุดจะถูกลองก่อน หากล้มเหลว จะใช้ผู้ให้บริการถัดไปโดยอัตโนมัติ",
@@ -695,6 +703,36 @@ window.LANG_TH = {
     "lyricsProvider": "ผู้ให้บริการเนื้อเพลง",
     "syncContributor": "ผู้มีส่วนร่วมในการซิงค์"
   },
+  "creatorProfile": {
+    "title": "ผู้สร้างซิงก์",
+    "anonymous": "ไม่ระบุชื่อ",
+    "openProfile": "เปิดโปรไฟล์ผู้สร้าง",
+    "loading": "กำลังโหลดโปรไฟล์ผู้สร้าง...",
+    "loadFailed": "ไม่สามารถโหลดโปรไฟล์ผู้สร้างได้",
+    "back": "ย้อนกลับ",
+    "contributions": "ซิงก์ที่เพิ่มไว้",
+    "tracks": "เพลงที่ซิงก์แล้ว",
+    "likes": "ถูกใจ",
+    "like": "ถูกใจ",
+    "liked": "ถูกใจแล้ว",
+    "likeActionFailed": "ไม่สามารถอัปเดตการถูกใจผู้สร้างได้",
+    "likeLoginRequired": "ต้องเข้าสู่ระบบ Discord เพื่อกดถูกใจผู้สร้าง",
+    "ownProfile": "นี่คือโปรไฟล์ของคุณ",
+    "loadMore": "โหลดเพิ่ม",
+    "loadingMore": "กำลังโหลดเพิ่ม...",
+    "noContributions": "ยังไม่มีการเพิ่มซิงก์ใดๆ",
+    "unknownTrack": "เพลงที่ไม่รู้จัก",
+    "updated": "อัปเดต",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "ไม่มีบันทึกแพตช์"
@@ -971,6 +1009,14 @@ window.LANG_TH = {
       "bounce": {
         "label": "เอฟเฟกต์ตัวอักษรเด้ง",
         "desc": "ใช้แอนิเมชันเด้งกับตัวอักษรที่กำลังร้องในโหมดคาราโอเกะ"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "คาราโอเกะเสมือน",
+        "desc": "เมื่อเนื้อเพลงมีเพียงจังหวะซิงก์ระดับบรรทัด ระบบจะสร้างจังหวะคาราโอเกะจาก Spotify audio analysis โดยจะแบ่งบรรทัดภาษาเกาหลี ญี่ปุ่น และจีนให้ละเอียดขึ้นเมื่อความเชื่อมั่นสูง"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "การเรนเดอร์คาราโอเกะเสมือนล่วงหน้า",
+        "desc": "ใช้การชดเชยเวลาในขั้นตอนเรนเดอร์กับคาราโอเกะเสมือนเท่านั้น ค่าบวกจะทำให้ไฮไลต์เดินเร็วขึ้น"
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_TH = {
       "browserFullscreen": {
         "desc": "ใช้ Spotify เต็มหน้าจอ",
         "info": "เมื่อเข้าสู่โหมดเต็มหน้าจอ จะปรับ Spotify ให้เต็มจอภาพมอนิเตอร์"
+      },
+      "hideOverlay": {
+        "desc": "ซ่อนโอเวอร์เลย์เมื่อ ivLyrics เต็มหน้าจอ",
+        "info": "ส่งสถานะการเล่นแบบหยุดชั่วคราวไปยังแอปโอเวอร์เลย์ขณะเปิด ivLyrics แบบเต็มหน้าจอ เพื่อให้เนื้อเพลงบนโอเวอร์เลย์เดสก์ท็อปจางหาย"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_TH = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "ต้องเข้าสู่ระบบ Discord",
+        "checking": "กำลังตรวจสอบข้อมูลบัญชี...",
         "title": "เชื่อมต่อบัญชี",
-        "subtitle": "เชื่อมต่อกับบัญชี ivLogin",
-        "description": "บริการบัญชีรวม ivLis STUDIO",
-        "info": "เชื่อมต่อกับ ivLogin เพื่อใช้ฟีเจอร์ต่างๆ เช่น การซิงค์การตั้งค่า กรุณาใส่ User Hash ในหน้าเข้าสู่ระบบเพื่อเชื่อมต่อ",
-        "loginButton": "เชื่อมต่อกับ ivLogin",
+        "subtitle": "เชื่อมต่อกับบัญชี Discord ของคุณ",
+        "description": "บัญชีผู้ร่วมพัฒนา ivLyrics ที่ใช้ Discord",
+        "info": "เมื่อคุณเข้าสู่ระบบด้วย Discord ค่า user hash ปัจจุบันจะถูกแทนที่ด้วย Discord ID ของคุณ และข้อมูลการมีส่วนร่วมเดิมจะถูกย้ายตามไปด้วย",
+        "loginButton": "เข้าสู่ระบบด้วย Discord",
         "loading": "กำลังโหลดข้อมูลบัญชี...",
         "linked": "เชื่อมต่อแล้ว",
-        "linkedAt": "เชื่อมต่อเมื่อ",
-        "lastSync": "ซิงค์ล่าสุด",
-        "manageAccount": "จัดการบัญชี",
+        "linkedAt": "เวลาเชื่อมต่อ",
+        "lastSync": "เข้าสู่ระบบล่าสุด",
+        "manageAccount": "เปลี่ยนบัญชี",
         "refresh": "รีเฟรช",
+        "loggingIn": "กำลังเปิดเบราว์เซอร์...",
+        "startHint": "กรุณาทำขั้นตอนเข้าสู่ระบบ Discord ให้เสร็จในเบราว์เซอร์",
+        "failed": "การเข้าสู่ระบบ Discord ล้มเหลว",
+        "loadFailed": "ไม่สามารถโหลดข้อมูลบัญชีได้",
+        "discordLoginSuccess": "เชื่อมต่อบัญชี Discord สำเร็จแล้ว",
+        "logout": "ออกจากระบบ",
+        "logoutSuccess": "ออกจาก Discord แล้ว และสร้าง user_hash ใหม่แล้ว",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "ชื่อเล่น",
+          "enter": "กรุณาใส่ชื่อเล่น",
+          "changed": "เปลี่ยนชื่อเล่นแล้ว",
+          "failed": "เปลี่ยนไม่สำเร็จ",
+          "error": "เกิดข้อผิดพลาด",
+          "placeholder": "กรอกชื่อเล่น",
+          "none": "ไม่มีชื่อเล่น",
+          "saving": "กำลังบันทึก...",
+          "save": "บันทึก",
+          "change": "เปลี่ยน"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_TH = {
     "unsynced": "เนื้อเพลงทั่วไป"
   },
   "communityVideo": {
+    "loginRequired": "การลงทะเบียนวิดีโอชุมชนต้องเข้าสู่ระบบ Discord",
     "title": "วิดีโอแนะนำจากชุมชน",
     "loading": "กำลังโหลดรายการวิดีโอ...",
     "loadError": "ไม่สามารถโหลดรายการวิดีโอได้",
@@ -1595,7 +1655,7 @@ window.LANG_TH = {
     "copied": "✓ คัดลอกลงคลิปบอร์ดแล้ว",
     "downloaded": "✓ ดาวน์โหลดแล้ว",
     "shared": "✓ แชร์แล้ว",
-    "maxLinesReached": "เลือกได้สูงสุด 3 บรรทัด",
+    "maxLinesReached": "เลือกได้สูงสุด 10 บรรทัด",
     "noSelection": "โปรดเลือกเนื้อเพลง"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_TH = {
       "description": "แสดงเนื้อเพลงปัจจุบันในแผง 'กำลังเล่น' ของ Spotify ดูเนื้อเพลงได้โดยไม่ต้องใช้โหมดเต็มหน้าจอ",
       "enabled": "แสดงเนื้อเพลงในแผง",
       "linesCount": "จำนวนบรรทัดที่แสดง"
+    },
+    "pseudoKaraokeTip": {
+      "title": "คาราโอเกะเสมือน",
+      "subtitle": "เปิดไฮไลต์แบบคาราโอเกะให้ทำงานกับแทบทุกเพลง",
+      "description": "ใช้ Spotify audio analysis เพื่อสร้างจังหวะคาราโอเกะจากเนื้อเพลงที่ซิงก์แบบรายบรรทัด ทำให้โหมดคาราโอเกะทำงานได้กับแทบทุกเพลง แต่จังหวะเป็นค่าโดยประมาณและอาจไม่แม่นยำ",
+      "enabled": "เปิดใช้คาราโอเกะเสมือน"
     },
     "complete": {
       "title": "เตรียมพร้อมเสร็จสิ้น!",
@@ -1736,6 +1802,7 @@ window.LANG_TH = {
     "dismissAll": "ปิดทั้งหมด"
   },
   "syncCreator": {
+    "loginRequired": "การสร้างซิงก์คาราโอเกะต้องเข้าสู่ระบบ Discord",
     "title": "สร้างซิงค์คาราโอเกะ",
     "buttonTooltip": "สร้างซิงค์คาราโอเกะ",
     "clickHereHint": "คลิกที่นี่เพื่อจับจังหวะเนื้อเพลง!",
@@ -1774,6 +1841,21 @@ window.LANG_TH = {
     "loadedExistingSyncData": "โหลดข้อมูลซิงค์ที่มีอยู่แล้ว",
     "providerMismatch": "ข้อมูลซิงค์ที่มีอยู่ใช้ผู้ให้บริการอื่น คุณต้องสร้างข้อมูลใหม่สำหรับผู้ให้บริการของบัญชีคุณ",
     "back": "ปิด",
+    "lrclibSearchResults": "ผลการค้นหา LRCLIB",
+    "showLrclibSearchResults": "แสดงผลการค้นหา",
+    "hideLrclibSearchResults": "ซ่อนผลการค้นหา",
+    "lrclibNoCandidates": "ไม่พบตัวเลือกจาก LRCLIB",
+    "lrclibSelectCandidate": "เลือกตัวเลือก",
+    "lrclibApplyCandidate": "โหลดเนื้อเพลงนี้",
+    "lrclibLoaded": "โหลดแล้ว",
+    "lrclibBadgeExact": "ตรงเป๊ะ",
+    "lrclibBadgeSynced": "ซิงค์",
+    "lrclibBadgePlain": "ข้อความ",
+    "lrclibBadgePrimary": "หลัก",
+    "lrclibBadgeEnglish": "อังกฤษ",
+    "lrclibMetricArtist": "ศิลปิน",
+    "lrclibMetricTitle": "ชื่อเพลง",
+    "lrclibMetricDiff": "ต่าง",
     "lrclib": {
       "registerLyrics": "ลงทะเบียนเนื้อเพลงที่ LRCLIB",
       "title": "ลงทะเบียนเนื้อเพลงที่ LRCLIB",
@@ -1808,6 +1890,7 @@ window.LANG_TH = {
       "syllable": "พยางค์"
     },
     "copyLyrics": "คัดลอกเนื้อเพลง",
+    "virtualKaraoke": "ข้อมูลคาราโอเกะเสมือน",
     "lyricsCopied": "คัดลอกเนื้อเพลงไปยังคลิปบอร์ดแล้ว",
     "copyError": "คัดลอกล้มเหลว",
     "export": "ส่งออก",

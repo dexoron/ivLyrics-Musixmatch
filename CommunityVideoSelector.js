@@ -626,16 +626,21 @@ const CommunityVideoSelector = ({
   trackUri,
   currentVideoId,
   onVideoSelect,
+  defaultStartTime = 0,
   onClose,
 }) => {
   const { useState, useEffect, useCallback, useRef } = react;
+  const getDefaultSubmitStartTime = () => {
+    const parsed = Number(defaultStartTime);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  };
 
   const [videos, setVideos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [submitUrl, setSubmitUrl] = useState("");
-  const [submitStartTime, setSubmitStartTime] = useState(0);
+  const [submitStartTime, setSubmitStartTime] = useState(() => getDefaultSubmitStartTime());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [votingId, setVotingId] = useState(null);
   const [previewVideoId, setPreviewVideoId] = useState(null); // 목록에서 미리보기 중인 영상
@@ -681,12 +686,32 @@ const CommunityVideoSelector = ({
   const resetSubmitForm = useCallback(() => {
     setShowSubmitForm(false);
     setSubmitUrl("");
-    setSubmitStartTime(0);
+    setSubmitStartTime(getDefaultSubmitStartTime());
     setSubmitVideoTitle("");
     setFormPreviewVideoId(null);
     setEditingVideo(null);
     setIsLoadingTitle(false);
-  }, []);
+  }, [defaultStartTime]);
+
+  const openSubmitForm = useCallback(async (video = null) => {
+    try {
+      await Utils.requireDiscordAuth(
+        I18n.t("communityVideo.loginRequired"),
+        { checkingMessage: I18n.t("settingsAdvanced.aboutTab.account.checking") }
+      );
+    } catch (e) {
+      Utils.promptDiscordLoginRequired(e?.message || I18n.t("communityVideo.loginRequired"));
+      return;
+    }
+
+    setEditingVideo(video);
+    setSubmitUrl("");
+    setSubmitStartTime(video?.startTime ?? getDefaultSubmitStartTime());
+    setSubmitVideoTitle(video?.youtubeTitle || "");
+    setFormPreviewVideoId(video?.youtubeVideoId || null);
+    setIsLoadingTitle(false);
+    setShowSubmitForm(true);
+  }, [defaultStartTime]);
 
   // URL 변경 시 YouTube 제목 자동 가져오기
   useEffect(() => {
@@ -765,42 +790,46 @@ const CommunityVideoSelector = ({
   };
 
   // 영상 등록 처리
-  const handleSubmit = async () => {
-    const videoId = editingVideo?.youtubeVideoId || Utils.extractYouTubeVideoId(submitUrl);
-    if (!videoId) {
-      Toast.error(I18n.t("communityVideo.invalidUrl"));
-      return;
-    }
+	  const handleSubmit = async () => {
+	    const videoId = editingVideo?.youtubeVideoId || Utils.extractYouTubeVideoId(submitUrl);
+	    if (!videoId) {
+	      Toast.error(I18n.t("communityVideo.invalidUrl"));
+	      return;
+	    }
 
-    setIsSubmitting(true);
+	    setIsSubmitting(true);
 
     try {
-      // YouTube 영상 유효성 검사 (실제로 존재하고 재생 가능한지 확인)
-      const validation = await Utils.validateYouTubeVideo(videoId);
+      let videoTitle = submitVideoTitle || editingVideo?.youtubeTitle || videoId;
 
-      if (!validation.valid) {
-        // 에러 유형에 따른 메시지
-        let errorMsg;
-        switch (validation.error) {
-          case "notFound":
-            errorMsg = I18n.t("communityVideo.videoNotFound");
-            break;
-          case "private":
-            errorMsg = I18n.t("communityVideo.videoPrivate");
-            break;
-          case "invalidFormat":
-            errorMsg = I18n.t("communityVideo.invalidUrl");
-            break;
-          default:
-            errorMsg = I18n.t("communityVideo.validationError");
+      if (!editingVideo) {
+        // YouTube 영상 유효성 검사 (실제로 존재하고 재생 가능한지 확인)
+        const validation = await Utils.validateYouTubeVideo(videoId);
+
+        if (!validation.valid) {
+          // 에러 유형에 따른 메시지
+          let errorMsg;
+          switch (validation.error) {
+            case "notFound":
+              errorMsg = I18n.t("communityVideo.videoNotFound");
+              break;
+            case "private":
+              errorMsg = I18n.t("communityVideo.videoPrivate");
+              break;
+            case "invalidFormat":
+              errorMsg = I18n.t("communityVideo.invalidUrl");
+              break;
+            default:
+              errorMsg = I18n.t("communityVideo.validationError");
+          }
+          Toast.error(errorMsg);
+          setIsSubmitting(false);
+          return;
         }
-        Toast.error(errorMsg);
-        setIsSubmitting(false);
-        return;
-      }
 
-      // 유효성 검사에서 가져온 제목 사용
-      const videoTitle = validation.title || submitVideoTitle || videoId;
+        // 유효성 검사에서 가져온 제목 사용
+        videoTitle = validation.title || videoTitle;
+      }
 
       const result = await Utils.submitCommunityVideo(
         trackUri,
@@ -818,24 +847,18 @@ const CommunityVideoSelector = ({
         resetSubmitForm();
         // 캐시를 우회하여 새 데이터 가져오기
         loadVideos(true);
-      }
-    } catch (e) {
-      Toast.error(I18n.t("communityVideo.submitError"));
-    }
+	      }
+	    } catch (e) {
+	      Toast.error(e?.message || I18n.t("communityVideo.submitError"));
+	    }
 
-    setIsSubmitting(false);
-  };
+	    setIsSubmitting(false);
+	  };
 
   // 영상 적용 처리 (모달 닫지 않음)
   const handleEdit = (video, e) => {
     e.stopPropagation();
-    setEditingVideo(video);
-    setShowSubmitForm(true);
-    setSubmitUrl("");
-    setSubmitStartTime(video.startTime || 0);
-    setSubmitVideoTitle(video.youtubeTitle || "");
-    setFormPreviewVideoId(video.youtubeVideoId || null);
-    setIsLoadingTitle(false);
+    void openSubmitForm(video);
   };
 
   const handleApply = (video) => {
@@ -875,15 +898,15 @@ const CommunityVideoSelector = ({
     try {
       const result = await Utils.deleteCommunityVideo(videoEntryId, trackUri);
       if (result) {
+        const deletedVideo = previewVideoId
+          ? videos.find((v) => v.id === videoEntryId)
+          : null;
         Toast.success(I18n.t("communityVideo.deleted"));
         // 목록에서 제거
         setVideos((prev) => prev.filter((v) => v.id !== videoEntryId));
         // 미리보기 중이던 영상이면 미리보기 닫기
-        if (previewVideoId) {
-          const deletedVideo = videos.find((v) => v.id === videoEntryId);
-          if (deletedVideo && deletedVideo.youtubeVideoId === previewVideoId) {
-            setPreviewVideoId(null);
-          }
+        if (deletedVideo && deletedVideo.youtubeVideoId === previewVideoId) {
+          setPreviewVideoId(null);
         }
       } else {
         Toast.error(I18n.t("communityVideo.deleteError"));
@@ -1097,10 +1120,9 @@ const CommunityVideoSelector = ({
 	                          },
 	                          I18n.t("communityVideo.applyShort")
 	                        ),
-	                        (video.submitterId === currentUserHash || video.submitterId === "system") &&
-	                        react.createElement(
-	                          "button",
-	                          {
+		                        react.createElement(
+		                          "button",
+		                          {
 	                            className: "action-btn preview",
 	                            onClick: (e) => handleEdit(video, e),
 	                            title: I18n.t("communityVideo.edit"),
@@ -1211,8 +1233,7 @@ const CommunityVideoSelector = ({
                   if (showSubmitForm) {
                     resetSubmitForm();
                   } else {
-                    setEditingVideo(null);
-                    setShowSubmitForm(true);
+                    void openSubmitForm();
                   }
                 },
               },

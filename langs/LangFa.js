@@ -376,6 +376,14 @@ window.LANG_FA = {
     },
     "solidBackgroundInUse": "ℹ️ پس‌زمینه تک‌رنگ فعال است",
     "fontPlaceholder": "نام فونت (مثال: Vazir, Arial)",
+    "shortcuts": {
+      "primary": "اصلی",
+      "secondary": "ثانویه"
+    },
+    "syncCreatorShortcuts": {
+      "title": "میانبرهای Sync Creator",
+      "subtitle": "کلیدهای اصلی و ثانویه ضبط در Sync Creator را تنظیم کنید."
+    },
     "aiProviders": {
       "title": "ارائه‌دهندگان هوش مصنوعی",
       "description": "ارائه‌دهندگان هوش مصنوعی را انتخاب کرده و اولویت‌بندی کنید. ارائه‌دهندگان بالای لیست اول امتحان می‌شوند. در صورت شکست، ارائه‌دهنده بعدی به طور خودکار استفاده می‌شود.",
@@ -695,6 +703,36 @@ window.LANG_FA = {
     "lyricsProvider": "ارائه‌دهنده متن",
     "syncContributor": "مشارکت‌کننده هماهنگ‌سازی"
   },
+  "creatorProfile": {
+    "title": "سازنده همگام‌سازی",
+    "anonymous": "ناشناس",
+    "openProfile": "باز کردن پروفایل سازنده",
+    "loading": "در حال بارگذاری پروفایل سازنده...",
+    "loadFailed": "بارگذاری پروفایل سازنده ناموفق بود.",
+    "back": "بازگشت",
+    "contributions": "همگام‌سازی‌های افزوده‌شده",
+    "tracks": "آهنگ‌های همگام‌شده",
+    "likes": "پسندها",
+    "like": "پسند",
+    "liked": "پسندیده‌شده",
+    "likeActionFailed": "به‌روزرسانی پسند سازنده ناموفق بود.",
+    "likeLoginRequired": "برای پسندیدن سازندگان باید با Discord وارد شوید.",
+    "ownProfile": "این پروفایل شماست.",
+    "loadMore": "بارگذاری بیشتر",
+    "loadingMore": "در حال بارگذاری بیشتر...",
+    "noContributions": "هنوز همگام‌سازی‌ای اضافه نشده است.",
+    "unknownTrack": "آهنگ نامشخص",
+    "updated": "به‌روزرسانی",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "یادداشت پچی وجود ندارد."
@@ -971,6 +1009,14 @@ window.LANG_FA = {
       "bounce": {
         "label": "افکت پرش حروف",
         "desc": "اعمال انیمیشن پرش روی حروفی که در حال خواندن هستند در حالت کارائوکه"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "کارائوکه مجازی",
+        "desc": "وقتی متن آهنگ فقط زمان‌بندی همگام در سطح خط را ارائه می‌کند، زمان‌بندی کارائوکه از تحلیل صوتی Spotify ساخته می‌شود. اگر میزان اطمینان بالا باشد، خطوط کره‌ای، ژاپنی و چینی با جزئیات بیشتری تقسیم می‌شوند."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "پیش‌افت رندر کارائوکه مجازی",
+        "desc": "فقط برای کارائوکه مجازی در زمان رندر یک جابه‌جایی زمانی اعمال می‌کند. مقادیر مثبت باعث می‌شوند هایلایت زودتر نمایش داده شود."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_FA = {
       "browserFullscreen": {
         "desc": "تمام صفحه کردن Spotify",
         "info": "هنگام ورود به حالت تمام صفحه، پنجره Spotify نیز تمام صفحه می‌شود تا کل مانیتور را پر کند"
+      },
+      "hideOverlay": {
+        "desc": "پنهان کردن اوورلی در تمام‌صفحه ivLyrics",
+        "info": "وقتی تمام‌صفحه ivLyrics باز است، وضعیت پخش متوقف‌شده را به برنامه اوورلی می‌فرستد تا متن‌های اوورلی دسکتاپ محو شوند"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_FA = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "ورود به دیسکورد الزامی است.",
+        "checking": "در حال بررسی اطلاعات حساب...",
         "title": "اتصال حساب",
-        "subtitle": "حساب ivLogin خود را متصل کنید",
-        "description": "سرویس حساب یکپارچه ivLis STUDIO",
-        "info": "برای استفاده از ویژگی‌هایی مانند همگام‌سازی تنظیمات، با ivLogin متصل شوید. User Hash خود را در صفحه ورود وارد کنید تا متصل شوید.",
-        "loginButton": "اتصال با ivLogin",
+        "subtitle": "حساب Discord خود را متصل کنید",
+        "description": "حساب مشارکت ivLyrics مبتنی بر Discord",
+        "info": "وقتی با Discord وارد می‌شوید، user hash فعلی شما با شناسه Discord جایگزین می‌شود و داده‌های مشارکت قبلی نیز منتقل می‌شوند.",
+        "loginButton": "ورود با Discord",
         "loading": "در حال بارگذاری اطلاعات حساب...",
-        "linked": "متصل شده",
-        "linkedAt": "تاریخ اتصال",
-        "lastSync": "آخرین همگام‌سازی",
-        "manageAccount": "مدیریت حساب",
+        "linked": "متصل شد",
+        "linkedAt": "زمان اتصال",
+        "lastSync": "آخرین ورود",
+        "manageAccount": "تغییر حساب",
         "refresh": "بازخوانی",
+        "loggingIn": "در حال باز کردن مرورگر...",
+        "startHint": "لطفاً ورود Discord را در مرورگر تکمیل کنید.",
+        "failed": "ورود با Discord ناموفق بود.",
+        "loadFailed": "بارگذاری اطلاعات حساب ناموفق بود.",
+        "discordLoginSuccess": "حساب Discord با موفقیت متصل شد.",
+        "logout": "خروج",
+        "logoutSuccess": "از Discord خارج شدید و user_hash جدید ساخته شد.",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "نام مستعار",
+          "enter": "لطفاً یک نام مستعار وارد کنید.",
+          "changed": "نام مستعار تغییر کرد.",
+          "failed": "تغییر ناموفق بود",
+          "error": "خطایی رخ داد",
+          "placeholder": "نام مستعار را وارد کنید",
+          "none": "بدون نام مستعار",
+          "saving": "در حال ذخیره...",
+          "save": "ذخیره",
+          "change": "تغییر"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_FA = {
     "unsynced": "متن ساده"
   },
   "communityVideo": {
+    "loginRequired": "برای ثبت ویدیوهای انجمن باید وارد دیسکورد شوید.",
     "title": "پیشنهاد ویدیو انجمن",
     "loading": "در حال بارگذاری لیست ویدیو...",
     "loadError": "بارگذاری لیست ویدیو ناموفق بود",
@@ -1594,7 +1654,7 @@ window.LANG_FA = {
     "copied": "✓ در کلیپ‌بورد کپی شد",
     "downloaded": "✓ دانلود شد",
     "shared": "✓ به اشتراک گذاشته شد",
-    "maxLinesReached": "حداکثر می‌توانید 6 خط انتخاب کنید",
+    "maxLinesReached": "حداکثر می‌توانید 10 خط انتخاب کنید",
     "noSelection": "متن را انتخاب کنید"
   },
   "setupWizard": {
@@ -1661,6 +1721,12 @@ window.LANG_FA = {
       "description": "نمایش متن جاری در پنل 'در حال پخش' Spotify. بدون نیاز به تمام صفحه کردن می‌توانید متن را ببینید.",
       "enabled": "نمایش متن پنل",
       "linesCount": "تعداد خطوط نمایشی"
+    },
+    "pseudoKaraokeTip": {
+      "title": "کارائوکه مجازی",
+      "subtitle": "هایلایت سبک کارائوکه را تقریباً برای همه آهنگ‌ها فعال کنید",
+      "description": "برای ساخت زمان‌بندی کارائوکه از تحلیل صوتی Spotify روی متن‌های همگام‌شده در سطح خط استفاده می‌کند. این کار باعث می‌شود حالت کارائوکه تقریباً روی همه آهنگ‌ها کار کند، اما زمان‌بندی تقریبی است و ممکن است دقیق نباشد.",
+      "enabled": "فعال‌سازی کارائوکه مجازی"
     },
     "complete": {
       "title": "آماده شد!",
@@ -1735,6 +1801,7 @@ window.LANG_FA = {
     "dismissAll": "بستن همه"
   },
   "syncCreator": {
+    "loginRequired": "برای ساخت همگام‌سازی کارائوکه باید وارد دیسکورد شوید.",
     "title": "ایجاد سینک کارائوکه",
     "buttonTooltip": "ایجاد سینک کارائوکه",
     "clickHereHint": "برای هماهنگ کردن متن اینجا کلیک کنید!",
@@ -1773,6 +1840,21 @@ window.LANG_FA = {
     "loadedExistingSyncData": "داده‌های سینک موجود بارگذاری شد",
     "providerMismatch": "داده‌های سینک موجود از ارائه‌دهنده دیگری استفاده می‌کند. باید داده‌های جدید برای ارائه‌دهنده حساب خود ایجاد کنید.",
     "back": "بستن",
+    "lrclibSearchResults": "نتایج جستجوی LRCLIB",
+    "showLrclibSearchResults": "نمایش نتایج جستجو",
+    "hideLrclibSearchResults": "پنهان کردن نتایج جستجو",
+    "lrclibNoCandidates": "هیچ نتیجه‌ای از LRCLIB پیدا نشد",
+    "lrclibSelectCandidate": "یک گزینه را انتخاب کنید",
+    "lrclibApplyCandidate": "بارگذاری این متن",
+    "lrclibLoaded": "بارگذاری شد",
+    "lrclibBadgeExact": "دقیق",
+    "lrclibBadgeSynced": "همگام",
+    "lrclibBadgePlain": "متن ساده",
+    "lrclibBadgePrimary": "اصلی",
+    "lrclibBadgeEnglish": "انگلیسی",
+    "lrclibMetricArtist": "هنرمند",
+    "lrclibMetricTitle": "عنوان",
+    "lrclibMetricDiff": "اختلاف",
     "lrclib": {
       "registerLyrics": "ثبت متن در LRCLIB",
       "title": "ثبت متن در LRCLIB",
@@ -1807,6 +1889,7 @@ window.LANG_FA = {
       "syllable": "هجا"
     },
     "copyLyrics": "کپی متن آهنگ",
+    "virtualKaraoke": "داده‌های کارائوکه مجازی",
     "lyricsCopied": "متن آهنگ در کلیپ‌بورد کپی شد",
     "copyError": "خطا در کپی",
     "export": "خروجی",

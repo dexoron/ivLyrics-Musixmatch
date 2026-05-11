@@ -376,6 +376,14 @@ window.LANG_AR = {
     },
     "solidBackgroundInUse": "ℹ️ خلفية اللون الواحد قيد الاستخدام",
     "fontPlaceholder": "أدخل اسم الخط (مثل: Arial, Cairo)",
+    "shortcuts": {
+      "primary": "أساسي",
+      "secondary": "ثانوي"
+    },
+    "syncCreatorShortcuts": {
+      "title": "اختصارات Sync Creator",
+      "subtitle": "قم بتكوين مفاتيح التسجيل الأساسية والثانوية في Sync Creator."
+    },
     "aiProviders": {
       "title": "موفرو الذكاء الاصطناعي",
       "description": "اختر موفري الذكاء الاصطناعي وقم بترتيب أولوياتهم. يتم تجربة الموفرين في الأعلى أولاً. في حالة الفشل، سيتم استخدام الموفر التالي تلقائيًا.",
@@ -695,6 +703,36 @@ window.LANG_AR = {
     "lyricsProvider": "مقدم الكلمات",
     "syncContributor": "مساهم المزامنة"
   },
+  "creatorProfile": {
+    "title": "صانع المزامنة",
+    "anonymous": "مجهول",
+    "openProfile": "فتح ملف الصانع",
+    "loading": "جار تحميل ملف الصانع...",
+    "loadFailed": "تعذر تحميل ملف الصانع.",
+    "back": "رجوع",
+    "contributions": "المزامنات المضافة",
+    "tracks": "المقاطع المتزامنة",
+    "likes": "الإعجابات",
+    "like": "إعجاب",
+    "liked": "مُعجب به",
+    "likeActionFailed": "تعذر تحديث إعجاب الصانع.",
+    "likeLoginRequired": "يلزم تسجيل الدخول عبر Discord للإعجاب بصانعي المزامنة.",
+    "ownProfile": "هذا ملفك الشخصي.",
+    "loadMore": "تحميل المزيد",
+    "loadingMore": "جارٍ تحميل المزيد...",
+    "noContributions": "لا توجد مزامنات مضافة بعد.",
+    "unknownTrack": "مقطع غير معروف",
+    "updated": "تم التحديث",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "لا توجد ملاحظات إصدار."
@@ -971,6 +1009,14 @@ window.LANG_AR = {
       "bounce": {
         "label": "تأثير ارتداد الحروف",
         "desc": "تطبيق حركة ارتداد (Bounce) على الحروف المغناة حاليًا في وضع الكاريوكي"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "كاريوكي افتراضي",
+        "desc": "عندما توفر الكلمات توقيتًا متزامنًا على مستوى السطر فقط، يتم توليد توقيت الكاريوكي من تحليل Spotify الصوتي. تُقسَّم الأسطر الكورية واليابانية والصينية بشكل أكثر كثافة عندما تكون الثقة مرتفعة."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "تقديم الكاريوكي الافتراضي",
+        "desc": "يطبق إزاحة توقيت وقت العرض على الكاريوكي الافتراضي فقط. القيم الموجبة تجعل التمييز يظهر أبكر."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_AR = {
       "browserFullscreen": {
         "desc": "استخدام ملء شاشة المتصفح لـ Spotify",
         "info": "تحويل Spotify لملء الشاشة بالكامل (F11) عند الدخول لوضع ملء شاشة الكلمات"
+      },
+      "hideOverlay": {
+        "desc": "إخفاء التراكب في ملء شاشة ivLyrics",
+        "info": "يرسل إلى تطبيق التراكب حالة تشغيل متوقفة مؤقتًا أثناء فتح ملء شاشة ivLyrics حتى تختفي كلمات تراكب سطح المكتب"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_AR = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "يلزم تسجيل الدخول عبر Discord.",
+        "checking": "جارٍ التحقق من معلومات الحساب...",
         "title": "ربط الحساب",
-        "subtitle": "اربط حسابك بـ ivLogin",
-        "description": "خدمة حساب ivLis STUDIO الموحدة",
-        "info": "اربط حسابك بـ ivLogin لاستخدام ميزات مثل مزامنة الإعدادات. أدخل User Hash في صفحة تسجيل الدخول للربط.",
-        "loginButton": "الربط مع ivLogin",
+        "subtitle": "اربط حسابك على Discord",
+        "description": "حساب مساهمة ivLyrics المعتمد على Discord",
+        "info": "عند تسجيل الدخول باستخدام Discord، سيتم استبدال user hash الحالي بمعرّف Discord الخاص بك ونقل بيانات المساهمة الحالية.",
+        "loginButton": "تسجيل الدخول عبر Discord",
         "loading": "جارٍ تحميل معلومات الحساب...",
         "linked": "مرتبط",
         "linkedAt": "تاريخ الربط",
-        "lastSync": "آخر مزامنة",
-        "manageAccount": "إدارة الحساب",
+        "lastSync": "آخر تسجيل دخول",
+        "manageAccount": "تغيير الحساب",
         "refresh": "تحديث",
+        "loggingIn": "جارٍ فتح المتصفح...",
+        "startHint": "يرجى إكمال تسجيل الدخول إلى Discord في المتصفح.",
+        "failed": "فشل تسجيل الدخول عبر Discord.",
+        "loadFailed": "تعذر تحميل معلومات الحساب.",
+        "discordLoginSuccess": "تم ربط حساب Discord بنجاح.",
+        "logout": "تسجيل الخروج",
+        "logoutSuccess": "تم تسجيل الخروج من Discord وإنشاء user_hash جديد.",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "الاسم المستعار",
+          "enter": "يرجى إدخال اسم مستعار.",
+          "changed": "تم تغيير الاسم المستعار.",
+          "failed": "فشل التغيير",
+          "error": "حدث خطأ",
+          "placeholder": "أدخل اسمًا مستعارًا",
+          "none": "لا يوجد اسم مستعار",
+          "saving": "جارٍ الحفظ...",
+          "save": "حفظ",
+          "change": "تغيير"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_AR = {
     "unsynced": "كلمات عادية"
   },
   "communityVideo": {
+    "loginRequired": "يلزم تسجيل الدخول عبر Discord لتسجيل فيديو مجتمعي.",
     "title": "فيديوهات مقترحة من المجتمع",
     "loading": "جارٍ تحميل قائمة الفيديوهات...",
     "loadError": "فشل تحميل قائمة الفيديوهات",
@@ -1594,7 +1654,7 @@ window.LANG_AR = {
     "copied": "✓ تم النسخ للحافظة",
     "downloaded": "✓ تم التنزيل",
     "shared": "✓ تمت المشاركة",
-    "maxLinesReached": "يمكنك اختيار 3 أسطر كحد أقصى",
+    "maxLinesReached": "يمكنك اختيار 10 أسطر كحد أقصى",
     "noSelection": "اختر كلمات"
   },
   "setupWizard": {
@@ -1661,6 +1721,12 @@ window.LANG_AR = {
       "description": "عرض الكلمات الحالية في لوحة 'يشتغل الآن' بـ Spotify. يمكنك رؤية الكلمات دون الحاجة لوضع ملء الشاشة.",
       "enabled": "عرض كلمات اللوحة",
       "linesCount": "عدد الأسطر للعرض"
+    },
+    "pseudoKaraokeTip": {
+      "title": "كاريوكي افتراضي",
+      "subtitle": "فعّل تمييز الكاريوكي في معظم الأغاني تقريبًا",
+      "description": "يستخدم تحليل Spotify الصوتي لتوليد توقيت كاريوكي للكلمات المتزامنة على مستوى السطر. هذا يجعل وضع الكاريوكي يعمل في معظم الأغاني، لكن التوقيت تقريبي وقد لا يكون دقيقًا.",
+      "enabled": "تفعيل الكاريوكي الافتراضي"
     },
     "complete": {
       "title": "أنت جاهز!",
@@ -1735,6 +1801,7 @@ window.LANG_AR = {
     "dismissAll": "إغلاق الكل"
   },
   "syncCreator": {
+    "loginRequired": "يلزم تسجيل الدخول عبر Discord لإنشاء مزامنة الكاراوكي.",
     "title": "إنشاء مزامنة كاريوكي",
     "buttonTooltip": "إنشاء مزامنة كاريوكي",
     "clickHereHint": "انقر هنا لضبط مزامنة الكلمات!",
@@ -1773,6 +1840,21 @@ window.LANG_AR = {
     "loadedExistingSyncData": "تم تحميل بيانات المزامنة الموجودة",
     "providerMismatch": "بيانات المزامنة الحالية تستخدم مزوداً مختلفاً. يجب إنشاء بيانات جديدة لمزود حسابك.",
     "back": "إغلاق",
+    "lrclibSearchResults": "نتائج بحث LRCLIB",
+    "showLrclibSearchResults": "إظهار نتائج البحث",
+    "hideLrclibSearchResults": "إخفاء نتائج البحث",
+    "lrclibNoCandidates": "لم يتم العثور على نتائج LRCLIB",
+    "lrclibSelectCandidate": "اختر نتيجة",
+    "lrclibApplyCandidate": "تحميل هذه الكلمات",
+    "lrclibLoaded": "تم التحميل",
+    "lrclibBadgeExact": "مطابق",
+    "lrclibBadgeSynced": "متزامن",
+    "lrclibBadgePlain": "نص عادي",
+    "lrclibBadgePrimary": "أساسي",
+    "lrclibBadgeEnglish": "إنجليزي",
+    "lrclibMetricArtist": "الفنان",
+    "lrclibMetricTitle": "العنوان",
+    "lrclibMetricDiff": "الفرق",
     "lrclib": {
       "registerLyrics": "تسجيل الكلمات في LRCLIB",
       "title": "تسجيل الكلمات في LRCLIB",
@@ -1807,6 +1889,7 @@ window.LANG_AR = {
       "syllable": "مقطع"
     },
     "copyLyrics": "نسخ الكلمات",
+    "virtualKaraoke": "بيانات كاريوكي افتراضية",
     "lyricsCopied": "تم نسخ الكلمات إلى الحافظة",
     "copyError": "فشل النسخ",
     "export": "تصدير",

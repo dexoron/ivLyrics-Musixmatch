@@ -376,6 +376,14 @@ window.LANG_KO = {
     },
     "solidBackgroundInUse": "ℹ️ 단색 배경 사용 중",
     "fontPlaceholder": "폰트명 입력 (예: Arial, 맑은 고딕)",
+    "shortcuts": {
+      "primary": "기본",
+      "secondary": "보조"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator 단축키",
+      "subtitle": "Sync Creator 녹음용 기본 및 보조 키를 설정합니다."
+    },
     "aiProviders": {
       "title": "AI 제공자",
       "description": "AI 제공자를 선택하고 우선순위를 설정합니다. 위에 있는 제공자부터 먼저 시도하며, 실패 시 다음 제공자로 자동 전환됩니다.",
@@ -695,6 +703,36 @@ window.LANG_KO = {
     "lyricsProvider": "가사 제공자",
     "syncContributor": "싱크 제작자"
   },
+  "creatorProfile": {
+    "title": "싱크 제작자",
+    "anonymous": "익명",
+    "openProfile": "제작자 프로필 열기",
+    "loading": "제작자 프로필을 불러오는 중...",
+    "loadFailed": "제작자 프로필을 불러오지 못했습니다.",
+    "back": "뒤로",
+    "contributions": "추가한 싱크 가사",
+    "tracks": "싱크 가사 수",
+    "likes": "좋아요",
+    "like": "좋아요",
+    "liked": "좋아요함",
+    "likeActionFailed": "제작자 좋아요를 업데이트하지 못했습니다.",
+    "likeLoginRequired": "제작자에게 좋아요를 누르려면 디스코드 로그인이 필요합니다.",
+    "ownProfile": "내 프로필입니다.",
+    "loadMore": "더 보기",
+    "loadingMore": "더 불러오는 중...",
+    "noContributions": "아직 추가한 싱크 가사가 없습니다.",
+    "unknownTrack": "알 수 없는 곡",
+    "updated": "업데이트",
+    "topArtists": "자주 등록한 아티스트",
+    "artistGroups": "아티스트 수",
+    "noArtistStats": "아직 아티스트 통계가 없습니다.",
+    "sortLabel": "정렬",
+    "sortRecent": "최신순",
+    "sortTitle": "곡명순",
+    "sortArtist": "아티스트순",
+    "clearArtistFilter": "아티스트 필터 해제",
+    "filteredArtist": "필터 중인 아티스트"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "패치 노트가 없습니다."
@@ -971,6 +1009,14 @@ window.LANG_KO = {
       "bounce": {
         "label": "글자 바운스 효과",
         "desc": "노래방 모드에서 현재 부르는 글자에 통통 튀는 애니메이션을 적용합니다"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "가상 노래방",
+        "desc": "가사가 줄단위 싱크만 제공할 때 Spotify audio analysis를 기반으로 노래방 타이밍을 합성합니다. 신뢰도가 높을 때 한글, 일본어, 중국어는 더 촘촘하게 분해합니다."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "가상 노래방 렌더 선행값",
+        "desc": "가상 노래방에만 렌더링 시점 오프셋을 적용합니다. 양수일수록 하이라이트가 더 빨리 진행됩니다."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_KO = {
       "browserFullscreen": {
         "desc": "Spotify 전체화면 사용",
         "info": "전체화면 모드 진입 시 Spotify를 전체화면으로 전환하여 모니터를 꽉 채웁니다"
+      },
+      "hideOverlay": {
+        "desc": "ivLyrics 전체화면에서 오버레이 숨김",
+        "info": "ivLyrics 전체화면이 열려 있는 동안 오버레이 앱에 일시정지 상태를 보내 데스크톱 오버레이 가사를 투명하게 숨깁니다"
       }
     },
     "normalMode": {
@@ -1285,17 +1335,26 @@ window.LANG_KO = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord 로그인이 필요합니다.",
+        "checking": "계정 정보를 확인하고 있습니다...",
         "title": "계정 연동",
-        "subtitle": "ivLogin 계정과 연동하세요",
-        "description": "ivLis STUDIO 통합 계정 서비스",
-        "info": "ivLogin 계정과 연동하면 설정 동기화 등 다양한 기능을 사용할 수 있습니다. 로그인 페이지에서 아래 User Hash를 입력하여 연동하세요.",
-        "loginButton": "ivLogin으로 연동하기",
+        "subtitle": "Discord 계정으로 연동하세요",
+        "description": "Discord 기반 ivLyrics 기여 계정",
+        "info": "Discord로 로그인하면 현재 userhash가 Discord ID로 바뀌고, 기존 기여 데이터도 함께 이동됩니다.",
+        "loginButton": "Discord로 로그인",
         "loading": "계정 정보를 불러오는 중...",
         "linked": "연동됨",
-        "linkedAt": "연동일",
-        "lastSync": "마지막 동기화",
-        "manageAccount": "계정 관리",
+        "linkedAt": "연동 시각",
+        "lastSync": "최근 로그인",
+        "manageAccount": "계정 변경",
         "refresh": "새로고침",
+        "loggingIn": "브라우저 열기...",
+        "startHint": "브라우저에서 Discord 인증을 완료해 주세요.",
+        "failed": "Discord 로그인에 실패했습니다.",
+        "loadFailed": "계정 정보를 불러오지 못했습니다.",
+        "discordLoginSuccess": "Discord 계정이 성공적으로 연동되었습니다.",
+        "logout": "로그아웃",
+        "logoutSuccess": "Discord 계정에서 로그아웃하고 새 user_hash가 생성되었습니다.",
         "nickname": {
           "label": "닉네임",
           "enter": "닉네임을 입력해주세요.",
@@ -1493,6 +1552,7 @@ window.LANG_KO = {
     "unsynced": "일반가사"
   },
   "communityVideo": {
+    "loginRequired": "커뮤니티 영상 등록은 Discord 로그인이 필요합니다.",
     "title": "커뮤니티 영상 추천",
     "loading": "영상 목록 불러오는 중...",
     "loadError": "영상 목록을 불러오지 못했습니다",
@@ -1595,7 +1655,7 @@ window.LANG_KO = {
     "copied": "✓ 클립보드에 복사됨",
     "downloaded": "✓ 다운로드됨",
     "shared": "✓ 공유됨",
-    "maxLinesReached": "최대 3줄까지 선택할 수 있습니다",
+    "maxLinesReached": "최대 10줄까지 선택할 수 있습니다",
     "noSelection": "가사를 선택하세요"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_KO = {
       "description": "Spotify의 '지금 재생 중' 패널에 현재 가사를 표시합니다. 전체화면 모드 없이도 가사를 확인할 수 있습니다.",
       "enabled": "패널 가사 표시",
       "linesCount": "표시할 줄 수"
+    },
+    "pseudoKaraokeTip": {
+      "title": "가상 노래방",
+      "subtitle": "거의 모든 곡에서 노래방 스타일 하이라이트 사용",
+      "description": "줄단위 싱크 가사에 Spotify audio analysis를 사용해 노래방 타이밍을 합성합니다. 거의 모든 곡에서 노래방 모드가 동작하지만, 타이밍은 근사치라서 정확하지 않을 수 있습니다.",
+      "enabled": "가상 노래방 활성화"
     },
     "complete": {
       "title": "준비 완료!",
@@ -1736,6 +1802,7 @@ window.LANG_KO = {
     "dismissAll": "모두 닫기"
   },
   "syncCreator": {
+    "loginRequired": "노래방 싱크 생성은 Discord 로그인이 필요합니다.",
     "title": "노래방 싱크 생성",
     "buttonTooltip": "노래방 싱크 생성",
     "clickHereHint": "여기를 눌러 가사의 싱크를 맞춰주세요!",
@@ -1774,6 +1841,21 @@ window.LANG_KO = {
     "loadedExistingSyncData": "기존 싱크 데이터를 불러왔습니다",
     "providerMismatch": "기존 싱크 데이터의 가사 제공자가 다릅니다. 현재 계정의 가사 제공자로 새로 생성해야 합니다.",
     "back": "닫기",
+    "lrclibSearchResults": "LRCLIB 검색 결과",
+    "showLrclibSearchResults": "검색 결과 보기",
+    "hideLrclibSearchResults": "검색 결과 숨기기",
+    "lrclibNoCandidates": "LRCLIB 후보를 찾지 못했습니다",
+    "lrclibSelectCandidate": "후보를 선택하세요",
+    "lrclibApplyCandidate": "이 가사로 불러오기",
+    "lrclibLoaded": "불러옴",
+    "lrclibBadgeExact": "정확히 일치",
+    "lrclibBadgeSynced": "싱크",
+    "lrclibBadgePlain": "일반",
+    "lrclibBadgePrimary": "기본 검색",
+    "lrclibBadgeEnglish": "영문 검색",
+    "lrclibMetricArtist": "아티스트",
+    "lrclibMetricTitle": "제목",
+    "lrclibMetricDiff": "차이",
     "lrclib": {
       "registerLyrics": "LRCLIB에 가사 등록하기",
       "title": "LRCLIB에 가사 등록",
@@ -1808,6 +1890,7 @@ window.LANG_KO = {
       "syllable": "음절"
     },
     "copyLyrics": "가사 복사",
+    "virtualKaraoke": "가상 노래방 데이터",
     "lyricsCopied": "가사를 클립보드에 복사했습니다",
     "copyError": "복사 실패",
     "export": "내보내기",

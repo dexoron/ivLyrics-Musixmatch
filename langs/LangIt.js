@@ -376,6 +376,14 @@ window.LANG_IT = {
     },
     "solidBackgroundInUse": "ℹ️ Sfondo a tinta unita in uso",
     "fontPlaceholder": "Nome font (es: Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Primario",
+      "secondary": "Secondario"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Scorciatoie Sync Creator",
+      "subtitle": "Configura i tasti primari e secondari per la registrazione in Sync Creator."
+    },
     "aiProviders": {
       "title": "Fornitori IA",
       "description": "Seleziona e dai priorità ai fornitori IA. I fornitori in alto vengono provati per primi. In caso di errore, verrà utilizzato automaticamente il fornitore successivo.",
@@ -695,6 +703,36 @@ window.LANG_IT = {
     "lyricsProvider": "Fornitore testo",
     "syncContributor": "Contributore sincr."
   },
+  "creatorProfile": {
+    "title": "Creatore sync",
+    "anonymous": "Anonimo",
+    "openProfile": "Apri il profilo del creatore",
+    "loading": "Caricamento del profilo del creatore...",
+    "loadFailed": "Impossibile caricare il profilo del creatore.",
+    "back": "Indietro",
+    "contributions": "Sync aggiunte",
+    "tracks": "Brani sincronizzati",
+    "likes": "Mi piace",
+    "like": "Mi piace",
+    "liked": "Piaciuto",
+    "likeActionFailed": "Impossibile aggiornare il Mi piace del creatore.",
+    "likeLoginRequired": "Per mettere Mi piace ai creatori è richiesto l'accesso con Discord.",
+    "ownProfile": "Questo è il tuo profilo.",
+    "loadMore": "Carica altro",
+    "loadingMore": "Caricamento...",
+    "noContributions": "Nessuna sync aggiunta al momento.",
+    "unknownTrack": "Brano sconosciuto",
+    "updated": "Aggiornato",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Nessuna nota di patch."
@@ -971,6 +1009,14 @@ window.LANG_IT = {
       "bounce": {
         "label": "Effetto rimbalzo testo",
         "desc": "Applica un'animazione di rimbalzo al carattere corrente in modalità karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke virtuale",
+        "desc": "Quando i testi forniscono solo la sincronizzazione a livello di riga, il timing karaoke viene sintetizzato dall’analisi audio di Spotify. Le righe in coreano, giapponese e cinese vengono suddivise più finemente quando l’affidabilità è alta."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Anticipo render karaoke virtuale",
+        "desc": "Applica un offset temporale in fase di rendering solo al karaoke virtuale. I valori positivi fanno apparire l’evidenziazione prima."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_IT = {
       "browserFullscreen": {
         "desc": "Usa schermo intero Spotify",
         "info": "Passa Spotify a schermo intero occupando tutto il monitor"
+      },
+      "hideOverlay": {
+        "desc": "Nascondi overlay nello schermo intero ivLyrics",
+        "info": "Invia all'app overlay uno stato di riproduzione in pausa mentre lo schermo intero ivLyrics è aperto, così i testi dell'overlay desktop svaniscono"
       }
     },
     "normalMode": {
@@ -1285,25 +1335,34 @@ window.LANG_IT = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "È richiesto l'accesso con Discord.",
+        "checking": "Verifica delle informazioni dell'account...",
         "title": "Collegamento Account",
-        "subtitle": "Collega il tuo account ivLogin",
-        "description": "Servizio account unificato ivLis STUDIO",
-        "info": "Collega ivLogin per usare funzionalità come la sincronizzazione delle impostazioni. Inserisci il tuo User Hash nella pagina di login per collegare.",
-        "loginButton": "Collega con ivLogin",
+        "subtitle": "Collega il tuo account Discord",
+        "description": "Account contributi ivLyrics basato su Discord",
+        "info": "Quando accedi con Discord, il tuo user hash attuale viene sostituito con il tuo ID Discord e i dati di contributo esistenti vengono migrati.",
+        "loginButton": "Accedi con Discord",
         "loading": "Caricamento info account...",
         "linked": "Collegato",
         "linkedAt": "Collegato il",
-        "lastSync": "Ultima sincronizzazione",
-        "manageAccount": "Gestisci account",
+        "lastSync": "Ultimo accesso",
+        "manageAccount": "Cambia account",
         "refresh": "Aggiorna",
+        "loggingIn": "Apertura del browser...",
+        "startHint": "Completa l'accesso con Discord nel browser.",
+        "failed": "Accesso a Discord non riuscito.",
+        "loadFailed": "Impossibile caricare le informazioni dell'account.",
+        "discordLoginSuccess": "Account Discord collegato con successo.",
+        "logout": "Disconnetti",
+        "logoutSuccess": "Disconnesso da Discord e nuovo user_hash creato.",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Inserisci un nickname.",
-          "changed": "Nickname modificato.",
+          "label": "Soprannome",
+          "enter": "Inserisci un soprannome.",
+          "changed": "Soprannome modificato.",
           "failed": "Modifica fallita",
           "error": "Errore",
-          "placeholder": "Inserisci nickname",
-          "none": "Nessun nickname",
+          "placeholder": "Inserisci soprannome",
+          "none": "Nessun soprannome",
           "saving": "Salvataggio...",
           "save": "Salva",
           "change": "Modifica"
@@ -1493,6 +1552,7 @@ window.LANG_IT = {
     "unsynced": "Testo normale"
   },
   "communityVideo": {
+    "loginRequired": "Per registrare video della community è richiesto l'accesso con Discord.",
     "title": "Video Consigliati Community",
     "loading": "Caricamento elenco video...",
     "loadError": "Impossibile caricare elenco video",
@@ -1595,7 +1655,7 @@ window.LANG_IT = {
     "copied": "✓ Copiato negli appunti",
     "downloaded": "✓ Scaricato",
     "shared": "✓ Condiviso",
-    "maxLinesReached": "Puoi selezionare massimo 3 righe",
+    "maxLinesReached": "Puoi selezionare massimo 10 righe",
     "noSelection": "Seleziona il testo"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_IT = {
       "description": "Mostra il testo corrente nel pannello 'In riproduzione' di Spotify. Puoi vedere i testi senza passare alla modalità schermo intero.",
       "enabled": "Mostra testo nel pannello",
       "linesCount": "Righe da mostrare"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke virtuale",
+      "subtitle": "Attiva l’evidenziazione stile karaoke su quasi tutte le canzoni",
+      "description": "Usa l’analisi audio di Spotify per sintetizzare il timing karaoke a partire da testi sincronizzati per riga. In questo modo la modalità karaoke funziona su quasi tutte le canzoni, ma il timing è approssimativo e potrebbe non essere preciso.",
+      "enabled": "Attiva karaoke virtuale"
     },
     "complete": {
       "title": "Tutto pronto!",
@@ -1736,6 +1802,7 @@ window.LANG_IT = {
     "dismissAll": "Chiudi tutto"
   },
   "syncCreator": {
+    "loginRequired": "Per creare la sincronizzazione karaoke è richiesto l'accesso con Discord.",
     "title": "Crea Sync Karaoke",
     "buttonTooltip": "Crea Sync Karaoke",
     "clickHereHint": "Clicca qui per sincronizzare il testo!",
@@ -1774,6 +1841,21 @@ window.LANG_IT = {
     "loadedExistingSyncData": "Dati sync esistenti caricati",
     "providerMismatch": "I dati sync esistenti usano un provider diverso. Devi creare nuovi dati per il provider del tuo account.",
     "back": "Chiudi",
+    "lrclibSearchResults": "Risultati di ricerca LRCLIB",
+    "showLrclibSearchResults": "Mostra risultati di ricerca",
+    "hideLrclibSearchResults": "Nascondi risultati di ricerca",
+    "lrclibNoCandidates": "Nessun candidato LRCLIB trovato",
+    "lrclibSelectCandidate": "Seleziona un candidato",
+    "lrclibApplyCandidate": "Carica questo testo",
+    "lrclibLoaded": "Caricato",
+    "lrclibBadgeExact": "Esatto",
+    "lrclibBadgeSynced": "Sincronizzato",
+    "lrclibBadgePlain": "Testo semplice",
+    "lrclibBadgePrimary": "Principale",
+    "lrclibBadgeEnglish": "Inglese",
+    "lrclibMetricArtist": "artista",
+    "lrclibMetricTitle": "titolo",
+    "lrclibMetricDiff": "diff.",
     "lrclib": {
       "registerLyrics": "Registra testo su LRCLIB",
       "title": "Registra su LRCLIB",
@@ -1808,6 +1890,7 @@ window.LANG_IT = {
       "syllable": "Sillaba"
     },
     "copyLyrics": "Copia testo",
+    "virtualKaraoke": "Dati karaoke virtuali",
     "lyricsCopied": "Testo copiato negli appunti",
     "copyError": "Copia fallita",
     "export": "Esporta",

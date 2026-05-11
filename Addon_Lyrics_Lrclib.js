@@ -7,16 +7,16 @@
  * 가사를 검색하고 가져오는 Spicetify 애드온입니다.
  * 
  * 【주요 기능】
- * - 3-Tier 하이브리드 검색 시스템 (구조화 → 제목 → 아티스트 순차 폴백)
- * - Jaro-Winkler 알고리즘 기반 문자열 유사도 매칭
- * - 재생 시간(Duration) 기반 정확도 검증
- * - 싱크 가사(LRC 형식) 및 일반 텍스트 가사 지원
+ * - 구조화 검색 중심 LRCLIB 검색 흐름 적용
+ * - 제목 + 가수 + 앨범 구조화 검색 후 필요 시 다단계 자유검색 폴백
+ * - Jaro-Winkler 알고리즘 기반 아티스트 유사도 매칭
+ * - duration 기반 최근접 후보 선택 및 싱크/일반 가사 지원
  * - 네트워크 오류 시 자동 재시도 메커니즘
  * 
  * 【검색 전략】
- * - Tier 1: track_name + artist_name 파라미터 사용 (가장 정확, CJK 문자 최적화)
- * - Tier 2: q=title 파라미터 사용 (번역된 제목, 로마자 표기 대응)
- * - Tier 3: q=artist 파라미터 사용 (최후의 수단)
+ * - /api/search 구조화 검색(track_name + artist_name + album_name)
+ * - 구조화 검색에서 적합한 후보가 없을 때 q=title+artist, q=title 순서로 자유검색 폴백
+ * - 아티스트 유사도 또는 강한 제목 일치 + 정확한 duration 조건으로 후보 채택
  *
  * @addon-type lyrics        - 가사 제공자 타입의 애드온
  * @id lrclib               - 고유 식별자
@@ -36,6 +36,209 @@
 (() => {
     'use strict';  // 엄격 모드 활성화: 잠재적 오류를 사전에 방지
 
+    const ADDON_LOCALIZATION = {
+        en: {
+            description: 'Get lyrics from LRCLIB open-source lyrics database',
+            settings: {
+                fallbackTitleArtistLabel: '1st Fallback (title + artist)',
+                fallbackTitleArtistDesc: 'Use q=title+artist free-text search when structured search fails.',
+                fallbackTitleOnlyLabel: '2nd Fallback (title only)',
+                fallbackTitleOnlyDesc: 'Use q=title free-text search when the first fallback also fails.'
+            }
+        },
+        ko: {
+            description: 'LRCLIB 오픈소스 가사 데이터베이스에서 가사를 가져옵니다',
+            settings: {
+                fallbackTitleArtistLabel: '1차 폴백 (제목 + 아티스트)',
+                fallbackTitleArtistDesc: '구조화 검색이 실패하면 q=title+artist 자유검색을 사용합니다.',
+                fallbackTitleOnlyLabel: '2차 폴백 (제목만)',
+                fallbackTitleOnlyDesc: '1차 폴백도 실패하면 q=title 자유검색을 사용합니다.'
+            }
+        },
+        ja: {
+            description: 'LRCLIBのオープンソース歌詞データベースから歌詞を取得します',
+            settings: {
+                fallbackTitleArtistLabel: '第1フォールバック (タイトル + アーティスト)',
+                fallbackTitleArtistDesc: '構造化検索に失敗した場合、q=title+artist の自由検索を使用します。',
+                fallbackTitleOnlyLabel: '第2フォールバック (タイトルのみ)',
+                fallbackTitleOnlyDesc: '第1フォールバックも失敗した場合、q=title の自由検索を使用します。'
+            }
+        },
+        id: {
+            description: 'Ambil lirik dari basis data lirik open-source LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: 'Fallback ke-1 (judul + artis)',
+                fallbackTitleArtistDesc: 'Gunakan pencarian bebas q=title+artist saat pencarian terstruktur gagal.',
+                fallbackTitleOnlyLabel: 'Fallback ke-2 (judul saja)',
+                fallbackTitleOnlyDesc: 'Gunakan pencarian bebas q=title saat fallback pertama juga gagal.'
+            }
+        },
+        pt: {
+            description: 'Obtenha letras do banco de dados open-source de letras do LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: '1º fallback (título + artista)',
+                fallbackTitleArtistDesc: 'Use a busca livre q=title+artist quando a busca estruturada falhar.',
+                fallbackTitleOnlyLabel: '2º fallback (somente título)',
+                fallbackTitleOnlyDesc: 'Use a busca livre q=title quando o primeiro fallback também falhar.'
+            }
+        },
+        vi: {
+            description: 'Lấy lời bài hát từ cơ sở dữ liệu lời bài hát mã nguồn mở LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: 'Fallback 1 (tên bài + nghệ sĩ)',
+                fallbackTitleArtistDesc: 'Dùng tìm kiếm tự do q=title+artist khi tìm kiếm có cấu trúc thất bại.',
+                fallbackTitleOnlyLabel: 'Fallback 2 (chỉ tên bài)',
+                fallbackTitleOnlyDesc: 'Dùng tìm kiếm tự do q=title khi fallback đầu tiên cũng thất bại.'
+            }
+        },
+        th: {
+            description: 'ดึงเนื้อเพลงจากฐานข้อมูลเนื้อเพลงโอเพนซอร์สของ LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: 'Fallback ขั้นที่ 1 (ชื่อเพลง + ศิลปิน)',
+                fallbackTitleArtistDesc: 'ใช้การค้นหาแบบอิสระ q=title+artist เมื่อการค้นหาแบบมีโครงสร้างล้มเหลว',
+                fallbackTitleOnlyLabel: 'Fallback ขั้นที่ 2 (ชื่อเพลงเท่านั้น)',
+                fallbackTitleOnlyDesc: 'ใช้การค้นหาแบบอิสระ q=title เมื่อ fallback ขั้นแรกยังล้มเหลว'
+            }
+        },
+        ru: {
+            description: 'Получать тексты песен из открытой базы данных LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: '1-й fallback (название + артист)',
+                fallbackTitleArtistDesc: 'Использовать свободный поиск q=title+artist, если структурированный поиск не дал результата.',
+                fallbackTitleOnlyLabel: '2-й fallback (только название)',
+                fallbackTitleOnlyDesc: 'Использовать свободный поиск q=title, если первый fallback тоже не дал результата.'
+            }
+        },
+        'zh-CN': {
+            description: '从 LRCLIB 开源歌词数据库获取歌词',
+            settings: {
+                fallbackTitleArtistLabel: '第 1 级回退（标题 + 艺术家）',
+                fallbackTitleArtistDesc: '结构化搜索失败时，使用 q=title+artist 自由搜索。',
+                fallbackTitleOnlyLabel: '第 2 级回退（仅标题）',
+                fallbackTitleOnlyDesc: '第 1 级回退也失败时，使用 q=title 自由搜索。'
+            }
+        },
+        'zh-TW': {
+            description: '從 LRCLIB 開源歌詞資料庫取得歌詞',
+            settings: {
+                fallbackTitleArtistLabel: '第 1 層回退（標題 + 藝術家）',
+                fallbackTitleArtistDesc: '結構化搜尋失敗時，使用 q=title+artist 自由搜尋。',
+                fallbackTitleOnlyLabel: '第 2 層回退（僅標題）',
+                fallbackTitleOnlyDesc: '第 1 層回退也失敗時，使用 q=title 自由搜尋。'
+            }
+        },
+        fr: {
+            description: 'Récupérer les paroles depuis la base de données open source LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: '1er fallback (titre + artiste)',
+                fallbackTitleArtistDesc: 'Utiliser la recherche libre q=title+artist lorsque la recherche structurée échoue.',
+                fallbackTitleOnlyLabel: '2e fallback (titre seul)',
+                fallbackTitleOnlyDesc: 'Utiliser la recherche libre q=title lorsque le premier fallback échoue aussi.'
+            }
+        },
+        hi: {
+            description: 'LRCLIB ओपन-सोर्स गीत डेटाबेस से गीत के बोल प्राप्त करें',
+            settings: {
+                fallbackTitleArtistLabel: 'पहला fallback (शीर्षक + कलाकार)',
+                fallbackTitleArtistDesc: 'स्ट्रक्चर्ड सर्च विफल होने पर q=title+artist फ्री-टेक्स्ट सर्च का उपयोग करें।',
+                fallbackTitleOnlyLabel: 'दूसरा fallback (केवल शीर्षक)',
+                fallbackTitleOnlyDesc: 'पहला fallback भी विफल होने पर q=title फ्री-टेक्स्ट सर्च का उपयोग करें।'
+            }
+        },
+        ar: {
+            description: 'جلب كلمات الأغاني من قاعدة بيانات LRCLIB المفتوحة المصدر',
+            settings: {
+                fallbackTitleArtistLabel: 'الرجوع الأول (العنوان + الفنان)',
+                fallbackTitleArtistDesc: 'استخدم البحث الحر q=title+artist عندما يفشل البحث المنظم.',
+                fallbackTitleOnlyLabel: 'الرجوع الثاني (العنوان فقط)',
+                fallbackTitleOnlyDesc: 'استخدم البحث الحر q=title عندما يفشل الرجوع الأول أيضًا.'
+            }
+        },
+        bn: {
+            description: 'LRCLIB ওপেন-সোর্স গানের লিরিক্স ডাটাবেস থেকে লিরিক্স আনুন',
+            settings: {
+                fallbackTitleArtistLabel: '১ম fallback (শিরোনাম + শিল্পী)',
+                fallbackTitleArtistDesc: 'স্ট্রাকচার্ড সার্চ ব্যর্থ হলে q=title+artist ফ্রি-টেক্সট সার্চ ব্যবহার করুন।',
+                fallbackTitleOnlyLabel: '২য় fallback (শুধু শিরোনাম)',
+                fallbackTitleOnlyDesc: 'প্রথম fallback-ও ব্যর্থ হলে q=title ফ্রি-টেক্সট সার্চ ব্যবহার করুন।'
+            }
+        },
+        es: {
+            description: 'Obtén letras desde la base de datos de letras de código abierto LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: '1.er fallback (título + artista)',
+                fallbackTitleArtistDesc: 'Usa la búsqueda libre q=title+artist cuando falle la búsqueda estructurada.',
+                fallbackTitleOnlyLabel: '2.º fallback (solo título)',
+                fallbackTitleOnlyDesc: 'Usa la búsqueda libre q=title cuando también falle el primer fallback.'
+            }
+        },
+        it: {
+            description: 'Ottieni i testi dal database open source di LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: '1° fallback (titolo + artista)',
+                fallbackTitleArtistDesc: 'Usa la ricerca libera q=title+artist quando la ricerca strutturata fallisce.',
+                fallbackTitleOnlyLabel: '2° fallback (solo titolo)',
+                fallbackTitleOnlyDesc: 'Usa la ricerca libera q=title quando fallisce anche il primo fallback.'
+            }
+        },
+        fa: {
+            description: 'دریافت متن آهنگ از پایگاه داده متن ترانه متن باز LRCLIB',
+            settings: {
+                fallbackTitleArtistLabel: 'fallback اول (عنوان + هنرمند)',
+                fallbackTitleArtistDesc: 'وقتی جستجوی ساختاریافته ناموفق است، از جستجوی آزاد q=title+artist استفاده شود.',
+                fallbackTitleOnlyLabel: 'fallback دوم (فقط عنوان)',
+                fallbackTitleOnlyDesc: 'وقتی fallback اول هم ناموفق است، از جستجوی آزاد q=title استفاده شود.'
+            }
+        },
+        de: {
+            description: 'Liedtexte aus der Open-Source-Lyrikdatenbank LRCLIB abrufen',
+            settings: {
+                fallbackTitleArtistLabel: '1. Fallback (Titel + Interpret)',
+                fallbackTitleArtistDesc: 'Verwende die Freitextsuche q=title+artist, wenn die strukturierte Suche fehlschlägt.',
+                fallbackTitleOnlyLabel: '2. Fallback (nur Titel)',
+                fallbackTitleOnlyDesc: 'Verwende die Freitextsuche q=title, wenn auch der erste Fallback fehlschlägt.'
+            }
+        }
+    };
+
+    function normalizeAddonLanguageCode(language) {
+        const value = String(language || '').replace(/"/g, '').trim();
+        if (!value) return 'en';
+
+        const lower = value.toLowerCase();
+        if (lower === 'zh' || lower.startsWith('zh-cn') || lower.startsWith('zh-hans')) return 'zh-CN';
+        if (lower.startsWith('zh-tw') || lower.startsWith('zh-hant')) return 'zh-TW';
+
+        const base = lower.split('-')[0];
+        const supportedBase = ['en', 'ko', 'ja', 'id', 'pt', 'vi', 'th', 'ru', 'fr', 'hi', 'ar', 'bn', 'es', 'it', 'fa', 'de'];
+        if (supportedBase.includes(base)) return base;
+
+        return 'en';
+    }
+
+    function getAddonLanguage() {
+        const language = window.I18n?.getCurrentLanguage?.()
+            || window.StorageManager?.getItem?.('ivLyrics:visual:language')
+            || Spicetify.LocalStorage?.get?.('ivLyrics:visual:language')
+            || Spicetify.Locale?.getLocale?.()
+            || 'en';
+
+        return normalizeAddonLanguageCode(language);
+    }
+
+    function getAddonText(path, fallback = '') {
+        const language = getAddonLanguage();
+        const languageTable = ADDON_LOCALIZATION[language] || ADDON_LOCALIZATION.en;
+        const resolved = path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), languageTable);
+        return resolved ?? fallback;
+    }
+
+    function buildAddonDescriptions() {
+        return Object.fromEntries(
+            Object.entries(ADDON_LOCALIZATION).map(([lang, messages]) => [lang, messages.description])
+        );
+    }
+
     // ============================================
     // Addon Metadata (애드온 메타데이터)
     // ============================================
@@ -47,12 +250,10 @@
         name: 'LRCLIB',         // 【표시 이름】 UI에 표시되는 애드온 이름
         author: 'ivLis STUDIO', // 【제작자】 애드온 개발자 정보
         version: '1.0.0',       // 【버전】 시맨틱 버저닝 (Major.Minor.Patch)
+        cacheVersion: '2026-03-19-search-flow-rework-3',
 
         // 【다국어 설명】 사용자 언어 설정에 따라 표시
-        description: {
-            en: 'Get lyrics from LRCLIB open-source lyrics database',
-            ko: 'LRCLIB 오픈소스 가사 데이터베이스에서 가사를 가져옵니다'
-        },
+        description: buildAddonDescriptions(),
 
         // 【지원 가사 유형】 이 애드온이 제공할 수 있는 가사 형식
         supports: {
@@ -80,6 +281,115 @@
     // - GET /api/get?...      : 특정 가사 직접 조회
 
     const LRCLIB_API_BASE = 'https://lrclib.net/api';
+    const LRCLIB_DURATION_TOLERANCE_SEC = 15;
+    const LRCLIB_ARTIST_MATCH_THRESHOLD = 0.9;
+    const LRCLIB_FALLBACK_TITLE_MATCH_THRESHOLD = 0.98;
+    const LRCLIB_ENABLE_INEXACT_SEARCH = true;
+    const LRCLIB_CACHE_VERSION_BASE = '2026-03-28-sync-line-match-priority-1';
+    const LRCLIB_ENGLISH_ACCEPT_LANGUAGE = 'en-US,en;q=0.9';
+    const LRCLIB_ORIGINAL_SCRIPT_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/;
+    const LRCLIB_MEANINGFUL_TEXT_REGEX = /\p{L}|\p{N}/u;
+    const LRCLIB_SETTING_KEYS = {
+        fallbackTitleArtist: 'enable_fallback_title_artist',
+        fallbackTitleOnly: 'enable_fallback_title_only'
+    };
+    const LRCLIB_DEFAULT_SETTINGS = {
+        [LRCLIB_SETTING_KEYS.fallbackTitleArtist]: true,
+        [LRCLIB_SETTING_KEYS.fallbackTitleOnly]: true
+    };
+
+    /**
+     * LRCLIB 설정용 LocalStorage 키를 반환합니다.
+     *
+     * @param {string} key - 설정 키
+     * @returns {string} 저장소 키
+     */
+    function getAddonStorageKey(key) {
+        return `ivLyrics:lyrics:addon:${ADDON_INFO.id}:${key}`;
+    }
+
+    /**
+     * LRCLIB 설정값을 읽습니다.
+     * LyricsAddonManager가 있으면 그 경로를 우선 사용하고,
+     * 없으면 LocalStorage에서 직접 읽습니다.
+     *
+     * @param {string} key - 설정 키
+     * @param {*} defaultValue - 기본값
+     * @returns {*} 저장된 값 또는 기본값
+     */
+    function getProviderSetting(key, defaultValue) {
+        if (window.LyricsAddonManager?.getAddonSetting) {
+            return window.LyricsAddonManager.getAddonSetting(ADDON_INFO.id, key, defaultValue);
+        }
+
+        const value = Spicetify.LocalStorage?.get?.(getAddonStorageKey(key));
+        if (value === null || value === undefined) return defaultValue;
+
+        try {
+            return JSON.parse(value);
+        } catch {
+            return value;
+        }
+    }
+
+    /**
+     * LRCLIB 설정값을 저장합니다.
+     * LyricsAddonManager가 있으면 설정 변경 이벤트와 새로고침을 함께 활용합니다.
+     *
+     * @param {string} key - 설정 키
+     * @param {*} value - 저장할 값
+     */
+    function setProviderSetting(key, value) {
+        if (window.LyricsAddonManager?.setAddonSetting) {
+            window.LyricsAddonManager.setAddonSetting(ADDON_INFO.id, key, value);
+            return;
+        }
+
+        const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+        Spicetify.LocalStorage?.set?.(getAddonStorageKey(key), serialized);
+    }
+
+    /**
+     * 현재 활성화된 LRCLIB 자유검색 설정을 반환합니다.
+     *
+     * @returns {{ enableFallbackTitleArtist: boolean, enableFallbackTitleOnly: boolean }}
+     */
+    function getSearchSettings() {
+        return {
+            enableFallbackTitleArtist: getProviderSetting(
+                LRCLIB_SETTING_KEYS.fallbackTitleArtist,
+                LRCLIB_DEFAULT_SETTINGS[LRCLIB_SETTING_KEYS.fallbackTitleArtist]
+            ) !== false,
+            enableFallbackTitleOnly: getProviderSetting(
+                LRCLIB_SETTING_KEYS.fallbackTitleOnly,
+                LRCLIB_DEFAULT_SETTINGS[LRCLIB_SETTING_KEYS.fallbackTitleOnly]
+            ) !== false
+        };
+    }
+
+    /**
+     * 현재 LRCLIB 설정을 반영한 캐시 버전을 생성합니다.
+     *
+     * @returns {string} 설정 상태가 포함된 캐시 버전 문자열
+     */
+    function buildCacheVersion() {
+        const settings = getSearchSettings();
+        return `${LRCLIB_CACHE_VERSION_BASE}:fta=${settings.enableFallbackTitleArtist ? 1 : 0}:fto=${settings.enableFallbackTitleOnly ? 1 : 0}`;
+    }
+
+    /**
+     * 애드온 객체와 결과에 사용할 캐시 버전을 최신 설정에 맞춰 갱신합니다.
+     *
+     * @returns {string} 최신 캐시 버전
+     */
+    function syncAddonCacheVersion() {
+        const version = buildCacheVersion();
+        ADDON_INFO.cacheVersion = version;
+        if (typeof LrclibLyricsAddon !== 'undefined') {
+            LrclibLyricsAddon.cacheVersion = version;
+        }
+        return version;
+    }
 
     // ============================================
     // Helper Functions (헬퍼 함수)
@@ -220,6 +530,75 @@
     }
 
     /**
+     * 아티스트 문자열을 비교 가능한 단위로 분리합니다.
+     * 예: "Artist A, Artist B & Artist C" -> ["Artist A", "Artist B", "Artist C"]
+     *
+     * @param {string} artistText - 원본 아티스트 문자열
+     * @returns {string[]} 정리된 아티스트 배열
+     */
+    function splitArtists(artistText) {
+        if (!artistText || typeof artistText !== 'string') return [];
+        return artistText
+            .split(/[&,]/g)
+            .map(part => part.trim())
+            .filter(Boolean);
+    }
+
+    /**
+     * 제목 문자열 사이의 비교 점수를 계산합니다.
+     * 완전 일치나 포함 관계가 있으면 높은 점수를 주고,
+     * 그 외에는 Jaro-Winkler 점수를 사용합니다.
+     *
+     * @param {string} expectedTitle - 현재 트랙 제목
+     * @param {string} candidateTitle - LRCLIB 후보 제목
+     * @returns {number} 제목 유사도 점수
+     */
+    function getTitleScore(expectedTitle, candidateTitle) {
+        const normalizedExpected = normalize(expectedTitle);
+        const normalizedCandidate = normalize(candidateTitle);
+
+        if (!normalizedExpected || !normalizedCandidate) return 0;
+        if (normalizedExpected === normalizedCandidate) return 1;
+        if (normalizedCandidate.includes(normalizedExpected) || normalizedExpected.includes(normalizedCandidate)) return 0.99;
+
+        return jaroWinkler(normalizedExpected, normalizedCandidate);
+    }
+
+    /**
+     * 자유검색에서 제목 기반으로 후보를 허용할 수 있을 만큼
+     * 재생 시간이 충분히 정확하게 일치하는지 확인합니다.
+     * LRCLIB와 Spotify의 길이 표기가 초 단위인 경우가 많아 반올림 후 비교합니다.
+     *
+     * @param {number} expectedDurationSec - 현재 트랙 길이(초)
+     * @param {number} candidateDurationSec - LRCLIB 후보 길이(초)
+     * @returns {boolean} 초 단위 반올림 기준 정확히 일치하면 true
+     */
+    function hasExactDurationMatch(expectedDurationSec, candidateDurationSec) {
+        if (!Number.isFinite(expectedDurationSec) || !Number.isFinite(candidateDurationSec)) return false;
+        return Math.round(expectedDurationSec) === Math.round(candidateDurationSec);
+    }
+
+    /**
+     * 기대 아티스트 목록과 후보 아티스트 목록 사이의 최고 Jaro-Winkler 점수를 계산합니다.
+     *
+     * @param {string[]} expectedArtists - 현재 트랙의 아티스트 목록
+     * @param {string[]} candidateArtists - LRCLIB 후보의 아티스트 목록
+     * @returns {number} 최고 유사도 점수
+     */
+    function getBestArtistScore(expectedArtists, candidateArtists) {
+        if (!Array.isArray(expectedArtists) || !Array.isArray(candidateArtists)) return 0;
+        if (expectedArtists.length === 0 || candidateArtists.length === 0) return 0;
+
+        let bestScore = 0;
+        for (const expectedArtist of expectedArtists) {
+            for (const candidateArtist of candidateArtists) {
+                bestScore = Math.max(bestScore, jaroWinkler(expectedArtist, candidateArtist));
+            }
+        }
+        return bestScore;
+    }
+
+    /**
      * ────────────────────────────────────────────────────────────────────────────
      * 타임아웃 및 재시도 지원 Fetch 함수
      * ────────────────────────────────────────────────────────────────────────────
@@ -274,49 +653,290 @@
         return null;
     }
 
-    /**
-     * ────────────────────────────────────────────────────────────────────────────
-     * 가사 커버리지 계산 함수
-     * ────────────────────────────────────────────────────────────────────────────
-     * 
-     * 【목적】
-     * 싱크 가사가 곡의 얼마만큼을 커버하는지 계산합니다.
-     * 이를 통해 "짤린 가사"나 "불완전한 가사"를 감지합니다.
-     * 
-     * 【계산 방법】
-     * 1. 가사의 마지막 타임스탬프를 추출
-     * 2. (마지막 타임스탬프 / 곡 전체 길이)로 커버리지 계산
-     * 3. 결과는 0.0 ~ 1.2 범위로 클램핑
-     * 
-     * 【반환값 해석】
-     * - 0.0: 타임스탬프 없음 또는 계산 불가
-     * - 0.5: 곡의 절반만 커버 (불완전한 가사)
-     * - 1.0: 곡 전체를 커버
-     * - >1.0: 가사가 곡보다 길거나 메타데이터 오류
-     * 
-     * @param {string} syncedLyrics - LRC 형식의 싱크 가사 문자열
-     * @param {number} totalDurationMs - 곡의 전체 길이 (밀리초)
-     * @returns {number} 커버리지 비율 (0.0 ~ 1.2)
-     */
-    function getLyricCoverage(syncedLyrics, totalDurationMs) {
-        // 유효성 검사: 가사나 길이 정보가 없으면 0 반환
-        if (!syncedLyrics || !totalDurationMs || totalDurationMs <= 0) return 0;
+    async function getTrackMetadataForAcceptLanguage(uri, acceptLanguage) {
+        const lookupEntity = Spicetify.GraphQL?.Definitions?.lookupEntity;
+        const graphQLRequest = Spicetify.GraphQL?.Request;
+        const originalFetch = window.fetch;
 
-        // 가사를 줄 단위로 분리
-        const lines = typeof syncedLyrics === 'string' ? syncedLyrics.trim().split('\n') : [];
+        if (!uri || !lookupEntity || typeof graphQLRequest !== 'function' || typeof originalFetch !== 'function') {
+            return null;
+        }
 
-        // 뒤에서부터 탐색하여 마지막 타임스탬프 찾기 (효율성)
-        for (let i = lines.length - 1; i >= 0; i--) {
-            // LRC 타임스탬프 패턴: [MM:SS.xx] 또는 [MM:SS]
-            const match = lines[i].match(/\[(\d+):(\d+(\.\d+)?)\]/);
-            if (match) {
-                // 마지막 타임스탬프를 밀리초로 변환
-                const lastTimeMs = (parseInt(match[1]) * 60 + parseFloat(match[2])) * 1000;
-                // 커버리지 계산 (1.2를 상한으로 클램핑)
-                return Math.min(lastTimeMs / totalDurationMs, 1.2);
+        window.fetch = async (input, init = {}) => {
+            const url = typeof input === 'string' ? input : input?.url || '';
+            const body = typeof init?.body === 'string' ? init.body : '';
+            const isLookupEntityRequest = /graphql|pathfinder/i.test(url) && /lookupEntity/.test(body);
+
+            if (!isLookupEntityRequest) {
+                return originalFetch(input, init);
+            }
+
+            const headers = new Headers(init?.headers || {});
+            headers.set('accept-language', acceptLanguage);
+
+            return originalFetch(input, {
+                ...init,
+                headers
+            });
+        };
+
+        try {
+            const response = await graphQLRequest(lookupEntity, { uri });
+            const track = response?.data?.lookup?.[0]?.data;
+
+            if (track?.__typename !== 'Track') {
+                return null;
+            }
+
+            return {
+                title: track?.name?.trim?.() || '',
+                artist: track?.artists?.items?.map(item => item?.profile?.name).filter(Boolean).join(', ') || ''
+            };
+        } catch (error) {
+            window.__ivLyricsDebugLog?.(`[LR-DEBUG] 영어 메타데이터 조회 실패: ${error?.message || error}`);
+            return null;
+        } finally {
+            window.fetch = originalFetch;
+        }
+    }
+
+    function parsePlainLyrics(plainLyrics) {
+        if (!plainLyrics || typeof plainLyrics !== 'string') return null;
+
+        const lines = plainLyrics
+            .split('\n')
+            .map(line => ({ text: line.trim() }))
+            .filter(line => line.text);
+
+        return lines.length > 0 ? lines : null;
+    }
+
+    function stripLrcTimestamps(text) {
+        if (!text || typeof text !== 'string') return '';
+        return text.replace(/^\[\d+:\d+(?:[.,]\d+)?\]\s*/gm, '').trim();
+    }
+
+    function stripLeadingLrcTimestamp(text) {
+        if (!text || typeof text !== 'string') return '';
+        return text.replace(/^\[\d+:\d+(?:[.,]\d+)?\]\s*/, '').trim();
+    }
+
+    function hasOriginalLyricsScript(text) {
+        if (!text || typeof text !== 'string') return false;
+
+        return LRCLIB_ORIGINAL_SCRIPT_REGEX.test(text);
+    }
+
+    function hasMeaningfulLyricsText(text) {
+        if (!text || typeof text !== 'string') return false;
+        return LRCLIB_MEANINGFUL_TEXT_REGEX.test(text);
+    }
+
+    function getMeaningfulLyricsLines(text) {
+        if (!text || typeof text !== 'string') return [];
+
+        return text
+            .split('\n')
+            .map(line => stripLeadingLrcTimestamp(line))
+            .filter(line => hasMeaningfulLyricsText(line));
+    }
+
+    function analyzeLyricsLanguageMix(text) {
+        const lines = getMeaningfulLyricsLines(text);
+        if (lines.length === 0) {
+            return {
+                meaningfulLineCount: 0,
+                originalScriptLineCount: 0,
+                nonOriginalLineCount: 0,
+                alternatingScriptPairs: 0,
+                comparablePairs: 0,
+                hasInterleavedTranslations: false
+            };
+        }
+
+        let originalScriptLineCount = 0;
+        let nonOriginalLineCount = 0;
+        let alternatingScriptPairs = 0;
+        let comparablePairs = 0;
+
+        const lineKinds = lines.map(line => {
+            if (hasOriginalLyricsScript(line)) {
+                originalScriptLineCount += 1;
+                return 'original';
+            }
+
+            nonOriginalLineCount += 1;
+            return 'other';
+        });
+
+        for (let index = 1; index < lineKinds.length; index += 1) {
+            comparablePairs += 1;
+            if (lineKinds[index] !== lineKinds[index - 1]) {
+                alternatingScriptPairs += 1;
             }
         }
-        return 0;  // 타임스탬프를 찾지 못함
+
+        const hasInterleavedTranslations = lines.length >= 6
+            && originalScriptLineCount >= 2
+            && nonOriginalLineCount >= 2
+            && (originalScriptLineCount / lines.length) >= 0.25
+            && (nonOriginalLineCount / lines.length) >= 0.25
+            && comparablePairs > 0
+            && (alternatingScriptPairs / comparablePairs) >= 0.6;
+
+        return {
+            meaningfulLineCount: lines.length,
+            originalScriptLineCount,
+            nonOriginalLineCount,
+            alternatingScriptPairs,
+            comparablePairs,
+            hasInterleavedTranslations
+        };
+    }
+
+    function getCandidateLyricsText(candidate, preferredSource = null) {
+        if (preferredSource === 'synced' && candidate?.syncedLyrics) {
+            return stripLrcTimestamps(candidate.syncedLyrics);
+        }
+        if (preferredSource === 'plain' && candidate?.plainLyrics) {
+            return candidate.plainLyrics;
+        }
+        if (candidate?.plainLyrics) return candidate.plainLyrics;
+        if (candidate?.syncedLyrics) return stripLrcTimestamps(candidate.syncedLyrics);
+        return '';
+    }
+
+    function getComparableLyricsLines(text, { stripTimestamps = false } = {}) {
+        if (!text || typeof text !== 'string') return [];
+
+        return text
+            .split('\n')
+            .map(line => stripTimestamps ? stripLeadingLrcTimestamp(line) : line.trim())
+            .filter(line => line.length > 0)
+            .map(line => line.normalize('NFC'));
+    }
+
+    function getLineCharCounts(lines) {
+        return lines.map(line => Array.from(line).length);
+    }
+
+    function getSyncDataLineCharCounts(syncData) {
+        if (!Array.isArray(syncData?.syncData?.lines) || syncData.syncData.lines.length === 0) {
+            return null;
+        }
+
+        return syncData.syncData.lines.map(line => Array.isArray(line?.chars) ? line.chars.length : -1);
+    }
+
+    function hasExactLineCharCountMatch(expectedCounts, actualCounts) {
+        if (!Array.isArray(expectedCounts) || !Array.isArray(actualCounts)) return false;
+        if (expectedCounts.length === 0 || expectedCounts.length !== actualCounts.length) return false;
+        return expectedCounts.every((count, index) => count === actualCounts[index]);
+    }
+
+    function getCandidateSyncLineMatch(candidate, expectedCounts) {
+        if (!Array.isArray(expectedCounts) || expectedCounts.length === 0) {
+            return {
+                syncLineExactMatch: false,
+                exactSyncedLineMatch: false,
+                exactPlainLineMatch: false,
+                preferredLyricsSource: null
+            };
+        }
+
+        const syncedLineCounts = candidate?.syncedLyrics
+            ? getLineCharCounts(getComparableLyricsLines(candidate.syncedLyrics, { stripTimestamps: true }))
+            : null;
+        const plainLineCounts = candidate?.plainLyrics
+            ? getLineCharCounts(getComparableLyricsLines(candidate.plainLyrics))
+            : null;
+        const exactSyncedLineMatch = hasExactLineCharCountMatch(expectedCounts, syncedLineCounts);
+        const exactPlainLineMatch = hasExactLineCharCountMatch(expectedCounts, plainLineCounts);
+        const preferredLyricsSource = exactSyncedLineMatch
+            ? 'synced'
+            : (exactPlainLineMatch
+                ? 'plain'
+                : null);
+
+        return {
+            syncLineExactMatch: exactSyncedLineMatch || exactPlainLineMatch,
+            exactSyncedLineMatch,
+            exactPlainLineMatch,
+            preferredLyricsSource
+        };
+    }
+
+    function buildLrclibCandidateSignature(candidate) {
+        const text = getCandidateLyricsText(candidate, candidate?.preferredLyricsSource);
+        return [
+            candidate?.id ?? '',
+            normalize(candidate?.trackName || candidate?.name || ''),
+            normalize(candidate?.artistName || ''),
+            Number(candidate?.duration || 0).toFixed(3),
+            normalize(text.slice(0, 160))
+        ].join('|');
+    }
+
+    function buildLrclibCandidateKey(candidate, sourceLabel, index) {
+        return `${sourceLabel}:${index}:${buildLrclibCandidateSignature(candidate)}`;
+    }
+
+    function buildPreviewCandidateList(primarySearchFlow, englishSearchFlow, selectedCandidate) {
+        const selectedSignature = selectedCandidate ? buildLrclibCandidateSignature(selectedCandidate) : null;
+        const seen = new Set();
+        const output = [];
+        let selectedCandidateKey = null;
+
+        const pushCandidates = (candidates, sourceLabel) => {
+            if (!Array.isArray(candidates)) return;
+
+            candidates.forEach((candidate, index) => {
+                const signature = buildLrclibCandidateSignature(candidate);
+                if (seen.has(signature)) return;
+                seen.add(signature);
+
+                const previewText = getCandidateLyricsText(candidate, candidate?.preferredLyricsSource);
+                const previewLines = getComparableLyricsLines(previewText);
+                const candidateKey = buildLrclibCandidateKey(candidate, sourceLabel, index);
+                const previewCandidate = {
+                    ...candidate,
+                    candidateKey,
+                    searchSource: sourceLabel,
+                    previewText,
+                    previewLineCount: previewLines.length,
+                    hasSyncedLyrics: !!candidate?.syncedLyrics,
+                    hasPlainLyrics: !!candidate?.plainLyrics,
+                    isSelectedByDefault: selectedSignature !== null && signature === selectedSignature
+                };
+
+                if (previewCandidate.isSelectedByDefault && !selectedCandidateKey) {
+                    selectedCandidateKey = candidateKey;
+                }
+
+                output.push(previewCandidate);
+            });
+        };
+
+        if (selectedSignature) {
+            const selectedFirst = (primarySearchFlow?.rankedCandidates || []).concat(englishSearchFlow?.rankedCandidates || []);
+            const selectedMatch = selectedFirst.find(candidate => buildLrclibCandidateSignature(candidate) === selectedSignature);
+            if (selectedMatch) {
+                pushCandidates([selectedMatch], 'selected');
+            }
+        }
+
+        pushCandidates(primarySearchFlow?.rankedCandidates || [], 'primary');
+        pushCandidates(englishSearchFlow?.rankedCandidates || [], 'english');
+
+        if (!selectedCandidateKey && output.length > 0) {
+            output[0].isSelectedByDefault = true;
+            selectedCandidateKey = output[0].candidateKey;
+        }
+
+        return {
+            candidates: output,
+            selectedCandidateKey
+        };
     }
 
     /**
@@ -394,26 +1014,558 @@
         /**
          * 【초기화 메서드】
          * 애드온이 로드될 때 호출됩니다.
-         * 현재는 특별한 초기화 작업이 없어 비어있습니다.
-         * 필요시 캐시 초기화, 설정 로드 등을 추가할 수 있습니다.
+         * 현재 설정 상태를 반영한 캐시 버전을 동기화합니다.
          */
         async init() {
-            // Initialization silent (초기화 시 로그 출력 안 함)
+            syncAddonCacheVersion();
+        },
+
+        async searchCandidates(info) {
+            try {
+                const title = info?.title?.trim?.();
+                const artist = info?.artist?.trim?.();
+                const album = info?.album?.trim?.();
+                const searchSettings = getSearchSettings();
+                const trackDuration = Number(info?.duration || 0);
+                const trackDurationSec = trackDuration > 0 ? trackDuration / 1000 : 0;
+                const expectedArtists = splitArtists(artist);
+
+                if (!title || !artist || !trackDurationSec) {
+                    return {
+                        success: false,
+                        error: 'Missing track metadata',
+                        candidates: [],
+                        selectedCandidateKey: null
+                    };
+                }
+
+                const headers = { 'x-user-agent': `spicetify v${Spicetify.Config?.version || 'unknown'}` };
+                const trackId = info?.uri?.split?.(':')?.[2] || '';
+                let syncDataLineCharCounts = null;
+
+                if (trackId && window.SyncDataService?.getSyncData) {
+                    try {
+                        const existingSyncData = await window.SyncDataService.getSyncData(trackId, ADDON_INFO.id);
+                        syncDataLineCharCounts = getSyncDataLineCharCounts(existingSyncData);
+                    } catch (e) {
+                        window.__ivLyricsDebugLog?.('[LR-DEBUG] Failed to fetch sync-data for exact line matching:', e?.message || e);
+                    }
+                }
+
+                const runSearch = async (params, label) => {
+                    const query = new URLSearchParams();
+                    if (params.track_name) query.set('track_name', params.track_name);
+                    if (params.artist_name) query.set('artist_name', params.artist_name);
+                    if (params.album_name && params.album_name !== 'undefined') query.set('album_name', params.album_name);
+                    if (params.q) query.set('q', params.q);
+
+                    const searchUrl = `${LRCLIB_API_BASE}/search?${query.toString()}`;
+                    const response = await fetchWithTimeout(searchUrl, { headers }, 35000);
+
+                    if (!response) {
+                        return {
+                            fatal: true,
+                            error: 'Network request failed',
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
+                    }
+
+                    if (!response.ok) {
+                        if (response.status === 429) {
+                            return {
+                                fatal: true,
+                                error: 'Rate limit exceeded (429)',
+                                searchLabel: label,
+                                totalResults: 0,
+                                candidates: []
+                            };
+                        }
+                        if (response.status === 404) {
+                            return {
+                                fatal: false,
+                                error: 'No lyrics found',
+                                searchLabel: label,
+                                totalResults: 0,
+                                candidates: []
+                            };
+                        }
+                        return {
+                            fatal: true,
+                            error: `API error: ${response.status}`,
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
+                    }
+
+                    const data = await response.json();
+                    if (!Array.isArray(data)) {
+                        return {
+                            fatal: true,
+                            error: 'Invalid LRCLIB response',
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
+                    }
+
+                    return {
+                        fatal: false,
+                        error: data.length === 0 ? 'No lyrics found' : null,
+                        searchLabel: label,
+                        totalResults: data.length,
+                        candidates: data
+                    };
+                };
+
+                const rankCandidates = (candidates, metadata, { allowTitleDrivenMatch = false } = {}) => {
+                    const metadataTitle = metadata?.title || '';
+                    const metadataArtists = metadata?.expectedArtists || [];
+
+                    return candidates
+                        .map(item => {
+                            const candidateArtists = splitArtists(item?.artistName || '');
+                            const candidateTitle = item?.trackName || item?.name || '';
+                            const syncLineMatch = getCandidateSyncLineMatch(item, syncDataLineCharCounts);
+                            const lyricsText = getCandidateLyricsText(item, syncLineMatch.preferredLyricsSource);
+                            const lyricsMix = analyzeLyricsLanguageMix(lyricsText);
+                            const titleScore = getTitleScore(metadataTitle, candidateTitle);
+                            const artistScore = getBestArtistScore(metadataArtists, candidateArtists);
+                            const durationDiff = Math.abs(Number(item?.duration || 0) - trackDurationSec);
+                            const exactDurationMatch = hasExactDurationMatch(trackDurationSec, Number(item?.duration || 0));
+                            const artistMatched = artistScore > LRCLIB_ARTIST_MATCH_THRESHOLD;
+                            const titleDrivenMatch = allowTitleDrivenMatch
+                                && titleScore >= LRCLIB_FALLBACK_TITLE_MATCH_THRESHOLD
+                                && exactDurationMatch;
+
+                            return {
+                                ...item,
+                                artistScore,
+                                titleScore,
+                                durationDiff,
+                                exactDurationMatch,
+                                artistMatched,
+                                titleDrivenMatch,
+                                syncLineExactMatch: syncLineMatch.syncLineExactMatch,
+                                exactSyncedLineMatch: syncLineMatch.exactSyncedLineMatch,
+                                exactPlainLineMatch: syncLineMatch.exactPlainLineMatch,
+                                preferredLyricsSource: syncLineMatch.preferredLyricsSource,
+                                lyricsMix,
+                                hasInterleavedTranslations: lyricsMix.hasInterleavedTranslations,
+                                matchReason: artistMatched ? 'artist' : (titleDrivenMatch ? 'title' : 'rejected')
+                            };
+                        })
+                        .filter(item => {
+                            if (!item?.syncedLyrics && !item?.plainLyrics && !item?.instrumental) return false;
+                            if (item.artistMatched) return true;
+                            if (allowTitleDrivenMatch && item.titleDrivenMatch) return true;
+                            return false;
+                        })
+                        .sort((a, b) => {
+                            if (a.syncLineExactMatch !== b.syncLineExactMatch) {
+                                return Number(b.syncLineExactMatch) - Number(a.syncLineExactMatch);
+                            }
+                            if (a.exactSyncedLineMatch !== b.exactSyncedLineMatch) {
+                                return Number(b.exactSyncedLineMatch) - Number(a.exactSyncedLineMatch);
+                            }
+                            if (a.artistMatched !== b.artistMatched) {
+                                return Number(b.artistMatched) - Number(a.artistMatched);
+                            }
+                            if (a.hasInterleavedTranslations !== b.hasInterleavedTranslations) {
+                                return Number(a.hasInterleavedTranslations) - Number(b.hasInterleavedTranslations);
+                            }
+                            if (b.titleScore !== a.titleScore) {
+                                return b.titleScore - a.titleScore;
+                            }
+                            if (a.durationDiff !== b.durationDiff) {
+                                return a.durationDiff - b.durationDiff;
+                            }
+                            return b.artistScore - a.artistScore;
+                        });
+                };
+
+                const runSearchFlow = async (metadata, { includeAlbum = true } = {}) => {
+                    const structuredSearch = await runSearch({
+                        track_name: metadata.title,
+                        artist_name: metadata.artist,
+                        album_name: includeAlbum ? metadata.album : ''
+                    }, includeAlbum ? 'structured' : 'structured:no-album');
+
+                    if (structuredSearch.fatal) {
+                        return {
+                            fatal: true,
+                            error: structuredSearch.error,
+                            resolvedSearch: structuredSearch,
+                            rankedCandidates: [],
+                            usedFallbackQuery: false,
+                            bestSyncedCandidate: null,
+                            bestPlainCandidate: null
+                        };
+                    }
+
+                    let resolvedSearch = structuredSearch;
+                    let rankedCandidates = rankCandidates(structuredSearch.candidates, metadata);
+                    let usedFallbackQuery = false;
+
+                    if (rankedCandidates.length === 0 && LRCLIB_ENABLE_INEXACT_SEARCH) {
+                        const fallbackAttempts = [];
+                        if (searchSettings.enableFallbackTitleArtist && metadata.title && metadata.artist) {
+                            fallbackAttempts.push({ params: { q: `${metadata.title} ${metadata.artist}` }, label: 'q:title+artist' });
+                        }
+                        if (searchSettings.enableFallbackTitleOnly && metadata.title) {
+                            fallbackAttempts.push({ params: { q: metadata.title }, label: 'q:title' });
+                        }
+
+                        for (const attempt of fallbackAttempts) {
+                            const fallbackSearch = await runSearch(attempt.params, attempt.label);
+                            usedFallbackQuery = true;
+
+                            if (fallbackSearch.fatal) {
+                                return {
+                                    fatal: true,
+                                    error: fallbackSearch.error,
+                                    resolvedSearch: fallbackSearch,
+                                    rankedCandidates: [],
+                                    usedFallbackQuery,
+                                    bestSyncedCandidate: null,
+                                    bestPlainCandidate: null
+                                };
+                            }
+
+                            resolvedSearch = fallbackSearch;
+                            rankedCandidates = rankCandidates(fallbackSearch.candidates, metadata, { allowTitleDrivenMatch: true });
+
+                            if (rankedCandidates.length > 0) {
+                                break;
+                            }
+                        }
+                    }
+
+                    const withinTolerance = item => item?.durationDiff <= LRCLIB_DURATION_TOLERANCE_SEC;
+                    const exactMatchCandidates = rankedCandidates.filter(item => item.syncLineExactMatch);
+                    const nativeScriptCandidates = rankedCandidates.filter(item => hasOriginalLyricsScript(getCandidateLyricsText(item, item.preferredLyricsSource)));
+                    const fallbackScriptCandidates = rankedCandidates.filter(item => !hasOriginalLyricsScript(getCandidateLyricsText(item, item.preferredLyricsSource)));
+                    const exactNativeScriptCandidates = nativeScriptCandidates.filter(item => item.syncLineExactMatch);
+                    const exactFallbackScriptCandidates = fallbackScriptCandidates.filter(item => item.syncLineExactMatch);
+                    const preferredNativeScriptCandidates = nativeScriptCandidates.filter(item => !item.hasInterleavedTranslations);
+                    const interleavedNativeScriptCandidates = nativeScriptCandidates.filter(item => item.hasInterleavedTranslations);
+                    const orderedNativeScriptCandidates = preferredNativeScriptCandidates.concat(interleavedNativeScriptCandidates);
+
+                    return {
+                        fatal: false,
+                        error: null,
+                        resolvedSearch,
+                        rankedCandidates,
+                        hasExactSyncLineMatch: exactMatchCandidates.length > 0,
+                        usedFallbackQuery,
+                        bestExactNativeSyncedCandidate: exactNativeScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'synced')
+                            || exactNativeScriptCandidates.find(item => item.preferredLyricsSource === 'synced')
+                            || null,
+                        bestExactNativePlainCandidate: exactNativeScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'plain')
+                            || exactNativeScriptCandidates.find(item => item.preferredLyricsSource === 'plain')
+                            || null,
+                        bestExactFallbackSyncedCandidate: exactFallbackScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'synced')
+                            || exactFallbackScriptCandidates.find(item => item.preferredLyricsSource === 'synced')
+                            || null,
+                        bestExactFallbackPlainCandidate: exactFallbackScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'plain')
+                            || exactFallbackScriptCandidates.find(item => item.preferredLyricsSource === 'plain')
+                            || null,
+                        bestNativeSyncedCandidate: orderedNativeScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || orderedNativeScriptCandidates.find(item => item.syncedLyrics)
+                            || null,
+                        bestNativePlainCandidate: orderedNativeScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || orderedNativeScriptCandidates.find(item => item.plainLyrics)
+                            || null,
+                        bestFallbackSyncedCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || fallbackScriptCandidates.find(item => item.syncedLyrics)
+                            || null,
+                        bestFallbackPlainCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || fallbackScriptCandidates.find(item => item.plainLyrics)
+                            || null,
+                        bestInstrumentalCandidate: rankedCandidates.find(item => withinTolerance(item) && item.instrumental)
+                            || rankedCandidates.find(item => item.instrumental)
+                            || null
+                    };
+                };
+
+                const primaryMetadata = {
+                    title,
+                    artist,
+                    album,
+                    expectedArtists
+                };
+
+                const primarySearchFlow = await runSearchFlow(primaryMetadata, { includeAlbum: true });
+                if (primarySearchFlow.fatal) {
+                    return {
+                        success: false,
+                        error: primarySearchFlow.error,
+                        candidates: [],
+                        selectedCandidateKey: null
+                    };
+                }
+
+                let body = null;
+                let selectedFlow = primarySearchFlow;
+                let selectedSource = 'primary-none';
+                let englishSearchFlow = null;
+                let englishMetadata = null;
+                let englishSearchError = null;
+                let englishSearchAttempted = false;
+                const shouldPreferExactSyncLineMatch = Array.isArray(syncDataLineCharCounts) && syncDataLineCharCounts.length > 0;
+
+                const ensureEnglishSearchFlow = async () => {
+                    if (englishSearchAttempted) return englishSearchFlow;
+                    englishSearchAttempted = true;
+                    englishMetadata = await getTrackMetadataForAcceptLanguage(info?.uri, LRCLIB_ENGLISH_ACCEPT_LANGUAGE);
+
+                    if (englishMetadata?.title && englishMetadata?.artist) {
+                        englishMetadata = {
+                            title: englishMetadata.title.trim(),
+                            artist: englishMetadata.artist.trim(),
+                            album: '',
+                            expectedArtists: splitArtists(englishMetadata.artist)
+                        };
+
+                        englishSearchFlow = await runSearchFlow(englishMetadata, { includeAlbum: false });
+
+                        if (englishSearchFlow.fatal) {
+                            englishSearchError = englishSearchFlow.error;
+                            englishSearchFlow = null;
+                        }
+                    }
+
+                    return englishSearchFlow;
+                };
+
+                if (shouldPreferExactSyncLineMatch) {
+                    if (primarySearchFlow.bestExactNativeSyncedCandidate) {
+                        body = primarySearchFlow.bestExactNativeSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-native-synced';
+                    }
+
+                    if (!body) {
+                        await ensureEnglishSearchFlow();
+                        if (englishSearchFlow?.bestExactNativeSyncedCandidate) {
+                            body = englishSearchFlow.bestExactNativeSyncedCandidate;
+                            selectedFlow = englishSearchFlow;
+                            selectedSource = 'english-exact-native-synced';
+                        }
+                    }
+
+                    if (!body && primarySearchFlow.bestExactNativePlainCandidate) {
+                        body = primarySearchFlow.bestExactNativePlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-native-plain';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactNativePlainCandidate) {
+                        body = englishSearchFlow.bestExactNativePlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-native-plain';
+                    }
+
+                    if (!body && primarySearchFlow.bestExactFallbackSyncedCandidate) {
+                        body = primarySearchFlow.bestExactFallbackSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-fallback-synced';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactFallbackSyncedCandidate) {
+                        body = englishSearchFlow.bestExactFallbackSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-fallback-synced';
+                    }
+
+                    if (!body && primarySearchFlow.bestExactFallbackPlainCandidate) {
+                        body = primarySearchFlow.bestExactFallbackPlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-fallback-plain';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactFallbackPlainCandidate) {
+                        body = englishSearchFlow.bestExactFallbackPlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-fallback-plain';
+                    }
+                }
+
+                if (!body) {
+                    body = primarySearchFlow.bestNativeSyncedCandidate;
+                    if (body) {
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-native-synced';
+                    }
+                }
+
+                if (!body) {
+                    await ensureEnglishSearchFlow();
+                    if (englishSearchFlow?.bestNativeSyncedCandidate) {
+                        body = englishSearchFlow.bestNativeSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-native-synced';
+                    }
+                }
+
+                if (!body) {
+                    if (primarySearchFlow.bestNativePlainCandidate) {
+                        body = primarySearchFlow.bestNativePlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-native-plain';
+                    }
+                    else if (englishSearchFlow?.bestNativePlainCandidate) {
+                        body = englishSearchFlow.bestNativePlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-native-plain';
+                    }
+                    else if (primarySearchFlow.bestFallbackSyncedCandidate) {
+                        body = primarySearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-synced';
+                    }
+                    else if (englishSearchFlow?.bestFallbackSyncedCandidate) {
+                        body = englishSearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-synced';
+                    }
+                    else if (primarySearchFlow.bestFallbackPlainCandidate) {
+                        body = primarySearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-plain';
+                    }
+                    else if (englishSearchFlow?.bestFallbackPlainCandidate) {
+                        body = englishSearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-plain';
+                    }
+                    else if (primarySearchFlow.bestInstrumentalCandidate) {
+                        body = primarySearchFlow.bestInstrumentalCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-instrumental';
+                    }
+                    else if (englishSearchFlow?.bestInstrumentalCandidate) {
+                        body = englishSearchFlow.bestInstrumentalCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-instrumental';
+                    }
+                }
+
+                if (!body) {
+                    const finalFlow = englishSearchFlow || primarySearchFlow;
+                    return {
+                        success: false,
+                        error: englishSearchError || (finalFlow.resolvedSearch.totalResults > 0
+                            ? 'Low confidence metadata match'
+                            : (finalFlow.resolvedSearch.error || 'No lyrics found')),
+                        candidates: [],
+                        selectedCandidateKey: null,
+                        searchMode: finalFlow.resolvedSearch?.searchLabel,
+                        totalResults: finalFlow.resolvedSearch?.totalResults || 0,
+                        usedFallbackQuery: finalFlow.usedFallbackQuery || false
+                    };
+                }
+
+                const previewList = buildPreviewCandidateList(primarySearchFlow, englishSearchFlow, body);
+                return {
+                    success: true,
+                    error: null,
+                    candidates: previewList.candidates,
+                    selectedCandidateKey: previewList.selectedCandidateKey,
+                    selectedSource,
+                    searchMode: selectedFlow.resolvedSearch?.searchLabel || 'structured',
+                    totalResults: previewList.candidates.length,
+                    usedFallbackQuery: !!selectedFlow.usedFallbackQuery,
+                    syncDataLineCount: syncDataLineCharCounts?.length || 0,
+                    englishTitle: englishMetadata?.title || null,
+                    englishArtist: englishMetadata?.artist || null
+                };
+            } catch (e) {
+                return {
+                    success: false,
+                    error: e?.message || 'LRCLIB candidate search failed',
+                    candidates: [],
+                    selectedCandidateKey: null
+                };
+            }
         },
 
         /**
          * 【설정 UI 메서드】
          * 사용자 설정 화면에 표시될 React 컴포넌트를 반환합니다.
-         * 현재는 빈 컨테이너만 반환 (설정 항목 없음)
+         * 자유검색 폴백 단계를 개별적으로 켜고 끌 수 있습니다.
          * 
          * @returns {Function} React 함수형 컴포넌트
          */
         getSettingsUI() {
             const React = Spicetify.React;  // Spicetify 내장 React 사용
+            const { useState, useCallback } = React;
 
-            // 빈 설정 컨테이너 반환
             return function LrclibLyricsSettings() {
-                return React.createElement('div', { className: 'lyrics-addon-settings lrclib-settings' });
+                const [enableFallbackTitleArtist, setEnableFallbackTitleArtist] = useState(() =>
+                    getProviderSetting(
+                        LRCLIB_SETTING_KEYS.fallbackTitleArtist,
+                        LRCLIB_DEFAULT_SETTINGS[LRCLIB_SETTING_KEYS.fallbackTitleArtist]
+                    ) !== false
+                );
+                const [enableFallbackTitleOnly, setEnableFallbackTitleOnly] = useState(() =>
+                    getProviderSetting(
+                        LRCLIB_SETTING_KEYS.fallbackTitleOnly,
+                        LRCLIB_DEFAULT_SETTINGS[LRCLIB_SETTING_KEYS.fallbackTitleOnly]
+                    ) !== false
+                );
+
+                const handleToggle = useCallback((key, setter) => (e) => {
+                    const checked = !!e.target.checked;
+                    setter(checked);
+                    setProviderSetting(key, checked);
+                    syncAddonCacheVersion();
+                }, []);
+
+                return React.createElement('div', { className: 'lyrics-addon-settings ai-addon-settings lrclib-settings' },
+                    React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('div', {
+                            style: {
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px'
+                            }
+                        },
+                            React.createElement('div', { style: { flex: '1 1 auto' } },
+                                React.createElement('label', null, getAddonText('settings.fallbackTitleArtistLabel', '1st Fallback (title + artist)')),
+                                React.createElement('small', null, getAddonText('settings.fallbackTitleArtistDesc', 'Use q=title+artist free-text search when structured search fails.'))
+                            ),
+                            React.createElement('input', {
+                                type: 'checkbox',
+                                checked: enableFallbackTitleArtist,
+                                onChange: handleToggle(LRCLIB_SETTING_KEYS.fallbackTitleArtist, setEnableFallbackTitleArtist)
+                            })
+                        )
+                    ),
+                    React.createElement('div', { className: 'ai-addon-setting' },
+                        React.createElement('div', {
+                            style: {
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px'
+                            }
+                        },
+                            React.createElement('div', { style: { flex: '1 1 auto' } },
+                                React.createElement('label', null, getAddonText('settings.fallbackTitleOnlyLabel', '2nd Fallback (title only)')),
+                                React.createElement('small', null, getAddonText('settings.fallbackTitleOnlyDesc', 'Use q=title free-text search when the first fallback also fails.'))
+                            ),
+                            React.createElement('input', {
+                                type: 'checkbox',
+                                checked: enableFallbackTitleOnly,
+                                onChange: handleToggle(LRCLIB_SETTING_KEYS.fallbackTitleOnly, setEnableFallbackTitleOnly)
+                            })
+                        )
+                    )
+                );
             };
         },
 
@@ -430,7 +1582,7 @@
          *   - uri: Spotify URI (예: "spotify:track:abc123")
          *   - title: 곡 제목
          *   - artist: 아티스트 이름
-         *   - album: 앨범 이름 (사용 안 함)
+         *   - album: 앨범 이름 (구조화 검색에 사용)
          *   - duration: 곡 길이 (밀리초)
          * 
          * 【반환값】
@@ -444,503 +1596,584 @@
          *   - error: 에러 메시지 또는 null
          * 
          * 【검색 전략】
-         * 3-Tier 하이브리드 검색 + Best-of-N 선택 알고리즘 적용
+         * 구조화 검색 + 자유검색 폴백 + 아티스트/재생시간 검증
          */
         async getLyrics(info) {
-            // ════════════════════════════════════════════════════════════════
-            // 성능 측정용 변수 초기화
-            // ════════════════════════════════════════════════════════════════
-            const startTotal = performance.now();  // 전체 소요 시간 측정 시작
-            let startServer = 0, endServer = 0;    // 서버 API 호출 시간
-            let startLogic = 0, endLogic = 0;      // 매칭 로직 처리 시간
-            let bestScore = 0, bestSync = 0, bestTitle = 0, bestArtist = 0;  // 최종 선택된 결과의 점수들
+            const startTotal = performance.now();
+            const cacheVersion = syncAddonCacheVersion();
+            const result = {
+                uri: info.uri,
+                provider: 'lrclib',
+                cacheVersion,
+                karaoke: null,
+                synced: null,
+                unsynced: null,
+                copyright: null,
+                error: null
+            };
 
-            /**
-             * 【디버그 로깅 함수】
-             * 검색 결과와 성능 지표를 콘솔에 출력합니다.
-             * 개발 및 디버깅 시 유용한 정보를 제공합니다.
-             * 
-             * @param {string} msg - 상태 메시지 (Success, Failed 등)
-             * @param {string|null} error - 에러 메시지 (있는 경우)
-             */
-            const logDebug = (msg, error = null) => {
+            const logDebug = (status, extra = {}) => {
                 const endTotal = performance.now();
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] ========================================`);
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] Track: ${info.title} - ${info.artist}`);
-                if (msg) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Status: ${msg}`);
-                if (error) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Error: ${error}`);
-                if (bestScore > 0) {
-                    // 매칭 점수 상세 출력 (디버깅용)
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] Match Score: ${bestScore.toFixed(2)} (Sync: ${bestSync.toFixed(2)}, Title: ${bestTitle.toFixed(2)}, Artist: ${bestArtist.toFixed(2)})`);
-                }
-                // 성능 지표 출력
-                if (startServer > 0 && endServer > 0) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Server: ${(endServer - startServer).toFixed(2)}ms`);
-                if (startLogic > 0 && endLogic > 0) window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Logic: ${(endLogic - startLogic).toFixed(2)}ms`);
+                window.__ivLyricsDebugLog?.(`[LR-DEBUG] Status: ${status}`);
+                Object.entries(extra).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null) {
+                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${key}: ${value}`);
+                    }
+                });
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] Time - Total: ${(endTotal - startTotal).toFixed(2)}ms`);
                 window.__ivLyricsDebugLog?.(`[LR-DEBUG] ========================================`);
             };
 
-            // ════════════════════════════════════════════════════════════════
-            // 결과 객체 초기화
-            // ════════════════════════════════════════════════════════════════
-            // 모든 필드를 null로 초기화하고, 성공/실패에 따라 채워나감
-            const result = {
-                uri: info.uri,         // 요청한 트랙의 Spotify URI
-                provider: 'lrclib',    // 가사 제공자 식별자
-                karaoke: null,         // 노래방 가사 (단어별 하이라이트) - 미지원
-                synced: null,          // 싱크 가사 배열 [{startTime, text}, ...]
-                unsynced: null,        // 일반 가사 배열 [{text}, ...]
-                copyright: null,       // 저작권 정보 - LRCLIB은 제공 안 함
-                error: null            // 에러 발생 시 메시지
-            };
-
-            // 트랙 ID 추출 (현재는 사용하지 않지만 향후 캐싱 등에 활용 가능)
-            const trackId = info.uri.split(':')[2];
-
-            // ════════════════════════════════════════════════════════════════
-            // 3-Tier 하이브리드 검색 (Elite Engineering)
-            // ════════════════════════════════════════════════════════════════
-            // 【검색 전략 개요】
-            // LRCLIB API의 특성과 다양한 메타데이터 표기 방식에 대응하기 위해
-            // 3단계 폴백 검색 전략을 사용합니다.
-            //
-            // Tier 1: 구조화 검색 (track_name + artist_name)
-            //   - 가장 정확한 검색 방식
-            //   - 일본어/한국어/중국어(CJK) 문자에 최적화
-            //   - API가 제목과 아티스트를 별도 필드로 인식
-            //
-            // Tier 2: 제목 기반 폴백 (q=title)
-            //   - Tier 1 실패 시 사용
-            //   - 번역된 제목이나 로마자 표기(romaji) 대응
-            //   - Spotify 제목이 LRCLIB과 다른 형식일 때 유용
-            //
-            // Tier 3: 아티스트 기반 폴백 (q=artist)
-            //   - 최후의 수단
-            //   - 아티스트 전체 곡 목록에서 Duration 매칭으로 찾기
-            // ════════════════════════════════════════════════════════════════
             try {
-                let tier = 1;  // 현재 검색 Tier (1, 2, 3)
+                const title = info?.title?.trim?.();
+                const artist = info?.artist?.trim?.();
+                const album = info?.album?.trim?.();
+                const searchSettings = getSearchSettings();
+                const trackDuration = Number(info?.duration || 0);
+                const trackDurationSec = trackDuration > 0 ? trackDuration / 1000 : 0;
+                const expectedArtists = splitArtists(artist);
 
-                // API 요청 헤더: Spicetify 버전 정보 포함 (서버 분석용)
+                if (!title || !artist || !trackDurationSec) {
+                    result.error = 'Missing track metadata';
+                    logDebug('Failed', { error: result.error });
+                    return result;
+                }
+
                 const headers = { 'x-user-agent': `spicetify v${Spicetify.Config?.version || 'unknown'}` };
-                let data = [];  // API 응답 데이터 (검색 결과 배열)
+                const trackId = info?.uri?.split?.(':')?.[2] || '';
+                let syncDataLineCharCounts = null;
 
-                startServer = performance.now();  // 서버 응답 시간 측정 시작
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 1】 구조화 검색 (가장 정확, 일본어/CJK 최적)
-                // ─────────────────────────────────────────────────────────────
-                // track_name과 artist_name을 별도 파라미터로 전달
-                // 서버가 각 필드를 개별적으로 매칭하여 정확도가 높음
-                let searchUrl = `${LRCLIB_API_BASE}/search?track_name=${encodeURIComponent(info.title)}&artist_name=${encodeURIComponent(info.artist)}`;
-                let response = await fetchWithTimeout(searchUrl, { headers }, 35000);
-
-                // 네트워크 재시도 실패 시 (fetchWithTimeout이 null 반환)
-                if (!response) {
-                    data = [];  // 빈 결과로 다음 Tier 진행
-                } else if (!response.ok) {
-                    // HTTP 에러 코드 처리
-                    if (response.status === 429) {
-                        // Rate Limit: 너무 많은 요청 → 즉시 반환
-                        result.error = 'Rate limit exceeded (429)';
-                        logDebug('Failed', result.error);
-                        return result;
+                if (trackId && window.SyncDataService?.getSyncData) {
+                    try {
+                        const existingSyncData = await window.SyncDataService.getSyncData(trackId, ADDON_INFO.id);
+                        syncDataLineCharCounts = getSyncDataLineCharCounts(existingSyncData);
+                    } catch (e) {
+                        window.__ivLyricsDebugLog?.('[LR-DEBUG] Failed to fetch sync-data for exact line matching:', e?.message || e);
                     }
-                    if (response.status === 404) {
-                        // 404는 "결과 없음"으로 간주 → Tier 2로 폴백
-                        data = [];
-                    } else {
-                        // 기타 서버 에러 → 예외 발생
-                        throw new Error(`API error: ${response.status}`);
-                    }
-                } else {
-                    // 성공: JSON 파싱
-                    data = await response.json();
                 }
 
-                window.__ivLyricsDebugLog?.(`[LR-DEBUG] T${tier}: 구조화 검색 → ${Array.isArray(data) ? data.length : 0}개 결과`);
+                const runSearch = async (params, label) => {
+                    const query = new URLSearchParams();
+                    if (params.track_name) query.set('track_name', params.track_name);
+                    if (params.artist_name) query.set('artist_name', params.artist_name);
+                    if (params.album_name && params.album_name !== 'undefined') query.set('album_name', params.album_name);
+                    if (params.q) query.set('q', params.q);
 
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 2】 제목 기반 폴백 (번역 제목, 로마자 표기 대응)
-                // ─────────────────────────────────────────────────────────────
-                // Tier 1에서 결과가 없으면 제목만으로 검색
-                // 예: Spotify "花に亡霊" → LRCLIB "Hana ni Bourei"
-                if (!Array.isArray(data) || data.length === 0) {
-                    tier = 2;
-                    searchUrl = `${LRCLIB_API_BASE}/search?q=${encodeURIComponent(info.title)}`;
-                    response = await fetchWithTimeout(searchUrl, { headers }, 35000);
+                    const searchUrl = `${LRCLIB_API_BASE}/search?${query.toString()}`;
+                    const response = await fetchWithTimeout(searchUrl, { headers }, 35000);
 
-                    if (response && response.ok) {
-                        data = await response.json();
+                    if (!response) {
+                        return {
+                            fatal: true,
+                            error: 'Network request failed',
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
                     }
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] T${tier}: 제목 검색 → ${Array.isArray(data) ? data.length : 0}개 결과`);
-                }
 
-                // ─────────────────────────────────────────────────────────────
-                // 【Tier 3】 아티스트 기반 폴백 (최후의 수단)
-                // ─────────────────────────────────────────────────────────────
-                // T3 검색 + 토큰 필터 공통 함수 (T2 필터 후 폴백에서도 재사용)
-                // q=artist 검색 후 결과의 artistName에 입력 토큰이 포함된 항목만 유지
-                const searchT3WithTokenFilter = async (label) => {
-                    const url = `${LRCLIB_API_BASE}/search?q=${encodeURIComponent(info.artist)}`;
-                    const res = await fetchWithTimeout(url, { headers }, 35000);
-                    let results = [];
-                    if (res && res.ok) results = await res.json();
-                    window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${label}: 아티스트 검색 → ${Array.isArray(results) ? results.length : 0}개 결과`);
-
-                    if (Array.isArray(results) && results.length > 0) {
-                        const tokens = info.artist.split(/[,、&·/\s]+/).map(s => s.trim().toLowerCase()).filter(t => t.length >= 2);
-                        const before = results.length;
-                        results = results.filter(item => {
-                            const ra = (item.artistName || '').toLowerCase();
-                            return tokens.some(t => ra.includes(t));
-                        });
-                        if (results.length !== before) {
-                            window.__ivLyricsDebugLog?.(`[LR-DEBUG] ${label}: 토큰 필터 → ${before}개 → ${results.length}개 (토큰: ${tokens.join(', ')})`);
+                    if (!response.ok) {
+                        if (response.status === 429) {
+                            return {
+                                fatal: true,
+                                error: 'Rate limit exceeded (429)',
+                                searchLabel: label,
+                                totalResults: 0,
+                                candidates: []
+                            };
                         }
+                        if (response.status === 404) {
+                            return {
+                                fatal: false,
+                                error: 'No lyrics found',
+                                searchLabel: label,
+                                totalResults: 0,
+                                candidates: []
+                            };
+                        }
+                        return {
+                            fatal: true,
+                            error: `API error: ${response.status}`,
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
                     }
-                    return Array.isArray(results) ? results : [];
+
+                    const data = await response.json();
+                    if (!Array.isArray(data)) {
+                        return {
+                            fatal: true,
+                            error: 'Invalid LRCLIB response',
+                            searchLabel: label,
+                            totalResults: 0,
+                            candidates: []
+                        };
+                    }
+
+                    return {
+                        fatal: false,
+                        error: data.length === 0 ? 'No lyrics found' : null,
+                        searchLabel: label,
+                        totalResults: data.length,
+                        candidates: data
+                    };
                 };
 
-                if (!Array.isArray(data) || data.length === 0) {
-                    tier = 3;
-                    data = await searchT3WithTokenFilter('T3');
-                }
+                const rankCandidates = (candidates, metadata, { allowTitleDrivenMatch = false } = {}) => {
+                    const metadataTitle = metadata?.title || '';
+                    const metadataArtists = metadata?.expectedArtists || [];
 
-                // ─────────────────────────────────────────────────────────────
-                // 【T2 스크립트 인식 아티스트 필터】 (pear-desktop 참고)
-                // ─────────────────────────────────────────────────────────────
-                // T2는 q=제목으로 검색하므로 동명곡이 다른 아티스트와 함께 반환됨
-                // 해결: 아티스트를 분리 후 파트별로 스크립트 체크 + JW 비교
-                //   - 같은 스크립트 파트 → JW > 0.85 필요
-                //   - 이종 스크립트 파트 → 비교 불가 (무시)
-                //   - 같은 스크립트 파트가 없으면 → 필터 스킵 (CJK↔라틴 보호)
-                if (tier === 2 && Array.isArray(data) && data.length > 1) {
-                    const hasNonLatin = (str) => /[^\u0000-\u024F\u1E00-\u1EFF\u2000-\u206F\u0300-\u036F]/.test(str);
-                    const normFeat = (s) => s.replace(/\s+feat(?:uring)?\.?\s+|\s+ft\.?\s+/gi, ',');
-                    // 악센트 제거: é→e, ñ→n, ö→o 등 (NFD 분해 후 결합 문자 제거)
-                    const stripAccent = (s) => s.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
+                    return candidates
+                        .map(item => {
+                            const candidateArtists = splitArtists(item?.artistName || '');
+                            const candidateTitle = item?.trackName || item?.name || '';
+                            const syncLineMatch = getCandidateSyncLineMatch(item, syncDataLineCharCounts);
+                            const lyricsText = getCandidateLyricsText(item, syncLineMatch.preferredLyricsSource);
+                            const lyricsMix = analyzeLyricsLanguageMix(lyricsText);
+                            const titleScore = getTitleScore(metadataTitle, candidateTitle);
+                            const artistScore = getBestArtistScore(metadataArtists, candidateArtists);
+                            const durationDiff = Math.abs(Number(item?.duration || 0) - trackDurationSec);
+                            const exactDurationMatch = hasExactDurationMatch(trackDurationSec, Number(item?.duration || 0));
+                            const artistMatched = artistScore > LRCLIB_ARTIST_MATCH_THRESHOLD;
+                            const titleDrivenMatch = allowTitleDrivenMatch
+                                && titleScore >= LRCLIB_FALLBACK_TITLE_MATCH_THRESHOLD
+                                && exactDurationMatch;
 
-                    const inputArtists = normFeat(info.artist).split(/[,&、·/]+/g).map(s => s.trim().toLowerCase()).filter(s => s);
-                    const beforeCount = data.length;
-
-                    data = data.filter(item => {
-                        const resultArtist = (item.artistName || '');
-                        const resultArtists = normFeat(resultArtist).split(/[,&、·/]+/g).map(s => s.trim().toLowerCase()).filter(s => s);
-
-                        // 파트별 스크립트 인식 JW 비교
-                        let hasSameScriptPair = false;
-                        let anySameScriptMatch = false;
-
-                        for (const a of inputArtists) {
-                            for (const b of resultArtists) {
-                                if (hasNonLatin(a) === hasNonLatin(b)) {
-                                    // 같은 스크립트 → JW 비교 (악센트 정규화 적용)
-                                    hasSameScriptPair = true;
-                                    if (jaroWinkler(stripAccent(a), stripAccent(b)) > 0.85) {
-                                        anySameScriptMatch = true;
-                                    }
-                                }
-                                // 이종 스크립트 → 비교 불가, 무시
+                            return {
+                                ...item,
+                                artistScore,
+                                titleScore,
+                                durationDiff,
+                                exactDurationMatch,
+                                artistMatched,
+                                titleDrivenMatch,
+                                syncLineExactMatch: syncLineMatch.syncLineExactMatch,
+                                exactSyncedLineMatch: syncLineMatch.exactSyncedLineMatch,
+                                exactPlainLineMatch: syncLineMatch.exactPlainLineMatch,
+                                preferredLyricsSource: syncLineMatch.preferredLyricsSource,
+                                lyricsMix,
+                                hasInterleavedTranslations: lyricsMix.hasInterleavedTranslations,
+                                matchReason: artistMatched ? 'artist' : (titleDrivenMatch ? 'title' : 'rejected')
+                            };
+                        })
+                        .filter(item => {
+                            if (!item?.syncedLyrics && !item?.plainLyrics && !item?.instrumental) return false;
+                            if (item.artistMatched) return true;
+                            if (allowTitleDrivenMatch && item.titleDrivenMatch) return true;
+                            return false;
+                        })
+                        .sort((a, b) => {
+                            if (a.syncLineExactMatch !== b.syncLineExactMatch) {
+                                return Number(b.syncLineExactMatch) - Number(a.syncLineExactMatch);
                             }
+                            if (a.exactSyncedLineMatch !== b.exactSyncedLineMatch) {
+                                return Number(b.exactSyncedLineMatch) - Number(a.exactSyncedLineMatch);
+                            }
+                            if (a.artistMatched !== b.artistMatched) {
+                                return Number(b.artistMatched) - Number(a.artistMatched);
+                            }
+                            if (a.hasInterleavedTranslations !== b.hasInterleavedTranslations) {
+                                return Number(a.hasInterleavedTranslations) - Number(b.hasInterleavedTranslations);
+                            }
+                            if (b.titleScore !== a.titleScore) {
+                                return b.titleScore - a.titleScore;
+                            }
+                            if (a.durationDiff !== b.durationDiff) {
+                                return a.durationDiff - b.durationDiff;
+                            }
+                            return b.artistScore - a.artistScore;
+                        });
+                };
+
+                const runSearchFlow = async (metadata, { includeAlbum = true } = {}) => {
+                    const structuredSearch = await runSearch({
+                        track_name: metadata.title,
+                        artist_name: metadata.artist,
+                        album_name: includeAlbum ? metadata.album : ''
+                    }, includeAlbum ? 'structured' : 'structured:no-album');
+
+                    if (structuredSearch.fatal) {
+                        return {
+                            fatal: true,
+                            error: structuredSearch.error,
+                            resolvedSearch: structuredSearch,
+                            rankedCandidates: [],
+                            usedFallbackQuery: false,
+                            bestSyncedCandidate: null,
+                            bestPlainCandidate: null
+                        };
+                    }
+
+                    let resolvedSearch = structuredSearch;
+                    let rankedCandidates = rankCandidates(structuredSearch.candidates, metadata);
+                    let usedFallbackQuery = false;
+
+                    if (rankedCandidates.length === 0 && LRCLIB_ENABLE_INEXACT_SEARCH) {
+                        const fallbackAttempts = [];
+                        if (searchSettings.enableFallbackTitleArtist && metadata.title && metadata.artist) {
+                            fallbackAttempts.push({ params: { q: `${metadata.title} ${metadata.artist}` }, label: 'q:title+artist' });
+                        }
+                        if (searchSettings.enableFallbackTitleOnly && metadata.title) {
+                            fallbackAttempts.push({ params: { q: metadata.title }, label: 'q:title' });
                         }
 
-                        // 같은 스크립트 파트가 하나도 없으면 → 비교 불가 → 통과 (CJK↔라틴 보호)
-                        // 같은 스크립트 파트가 있으면 → 하나라도 JW > 0.85 필요
-                        return !hasSameScriptPair || anySameScriptMatch;
-                    });
+                        for (const attempt of fallbackAttempts) {
+                            const fallbackSearch = await runSearch(attempt.params, attempt.label);
+                            usedFallbackQuery = true;
 
-                    if (data.length !== beforeCount) {
-                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] T2: 아티스트 필터 적용 → ${beforeCount}개 → ${data.length}개`);
+                            if (fallbackSearch.fatal) {
+                                return {
+                                    fatal: true,
+                                    error: fallbackSearch.error,
+                                    resolvedSearch: fallbackSearch,
+                                    rankedCandidates: [],
+                                    usedFallbackQuery,
+                                    bestSyncedCandidate: null,
+                                    bestPlainCandidate: null
+                                };
+                            }
+
+                            resolvedSearch = fallbackSearch;
+                            rankedCandidates = rankCandidates(fallbackSearch.candidates, metadata, { allowTitleDrivenMatch: true });
+
+                            if (rankedCandidates.length > 0) {
+                                break;
+                            }
+                        }
                     }
 
-                    // 【T2 필터 후 T3 폴백】
-                    // T2 필터가 모든 결과를 제거한 경우 T3로 재시도
-                    if (data.length === 0) {
-                        window.__ivLyricsDebugLog?.(`[LR-DEBUG] T2: 필터 후 결과 없음 → T3 폴백 시도`);
-                        tier = 3;
-                        data = await searchT3WithTokenFilter('T3(폴백)');
-                    }
-                }
+                    const withinTolerance = item => item?.durationDiff <= LRCLIB_DURATION_TOLERANCE_SEC;
+                    const exactMatchCandidates = rankedCandidates.filter(item => item.syncLineExactMatch);
+                    const nativeScriptCandidates = rankedCandidates.filter(item => hasOriginalLyricsScript(getCandidateLyricsText(item, item.preferredLyricsSource)));
+                    const fallbackScriptCandidates = rankedCandidates.filter(item => !hasOriginalLyricsScript(getCandidateLyricsText(item, item.preferredLyricsSource)));
+                    const exactNativeScriptCandidates = nativeScriptCandidates.filter(item => item.syncLineExactMatch);
+                    const exactFallbackScriptCandidates = fallbackScriptCandidates.filter(item => item.syncLineExactMatch);
+                    const preferredNativeScriptCandidates = nativeScriptCandidates.filter(item => !item.hasInterleavedTranslations);
+                    const interleavedNativeScriptCandidates = nativeScriptCandidates.filter(item => item.hasInterleavedTranslations);
+                    const orderedNativeScriptCandidates = preferredNativeScriptCandidates.concat(interleavedNativeScriptCandidates);
 
-
-                // 【TODO: instrumental 트랙 명시적 처리】
-                // 현재는 instrumental 곡이 syncedLyrics/plainLyrics = null이므로
-                // 자연스럽게 "No lyrics found"로 처리됨.
-                // 만약 향후 instrumental인데 가짜 가사가 등록된 케이스가 빈번해지면:
-                //   - pear-desktop 참고: item.instrumental === true → null 반환
-                //   - 주의: LRCLIB의 instrumental 플래그가 항상 정확하지는 않음
-                //   - 현재 densityRatio 필터가 스팸 가사를 어느 정도 잡아줌
-
-                endServer = performance.now();  // 서버 응답 시간 측정 종료
-
-                // 모든 Tier에서 결과 없음 → 가사 없음으로 처리
-                if (!Array.isArray(data) || data.length === 0) {
-                    result.error = 'No lyrics found';
-                    logDebug('Failed', result.error);
-                    return result;
-                }
-
-                // ════════════════════════════════════════════════════════════════
-                // Best-of-N 선택 로직 (매칭 알고리즘)
-                // ════════════════════════════════════════════════════════════════
-                // API에서 여러 결과가 반환되면, 가장 적합한 가사를 선택해야 합니다.
-                // 다음 기준으로 각 결과에 점수를 부여하고 최고점을 선택합니다:
-                // - Duration 일치도 (곡 길이)
-                // - Title 유사도 (Jaro-Winkler)
-                // - Artist 유사도 (Jaro-Winkler)
-                // - 가사 밀도 (시간당 줄 수)
-                // - Sync 가사 여부 (보너스)
-                // ════════════════════════════════════════════════════════════════
-                startLogic = performance.now();  // 매칭 로직 시간 측정 시작
-
-                const songDurationMs = info.duration || 0;       // 곡 길이 (밀리초)
-                const songDurationSec = songDurationMs / 1000;   // 곡 길이 (초) - API 응답과 비교용
-
-                // ─────────────────────────────────────────────────────────────
-                // 【1단계】 데이터 전처리 및 품질 지표 계산
-                // ─────────────────────────────────────────────────────────────
-                // 각 검색 결과에 대해 품질 지표를 계산하여 확장된 객체 생성
-                // 이 단계에서 "점수를 매기기 위한 기초 데이터"를 준비함
-                const processed = data.map(item => {
-                    // 【Duration 차이】 요청 곡 길이와 결과 곡 길이의 차이 (초)
-                    // 절댓값으로 계산하여 길고 짧음 모두 동일하게 처리
-                    const durationDiff = Math.abs(item.duration - songDurationSec);
-
-                    // 【Sync 커버리지】 싱크 가사가 곡의 몇 %를 커버하는지
-                    // 0.0 = 커버 안 함, 1.0 = 100% 커버
-                    const syncCoverage = getLyricCoverage(item.syncedLyrics, songDurationMs);
-
-                    // 【가사 밀도】 시간 대비 줄 수로 가사 완성도 추정
-                    // 일반적인 가사는 1분당 약 10~15줄 정도
-                    const actualLines = item.plainLyrics?.split('\n').filter(l => l.trim()).length || 0;
-                    const expectedLines = (item.duration / 60) * 12; // 1분당 12줄 기준
-                    const densityRatio = expectedLines > 0 ? actualLines / expectedLines : 0;
-
-                    // 【쓰레기 판별】 명백히 불량한 가사 식별
-                    // 1. 싱크 가사인데 커버리지가 50% 미만 → 짤린 가사
-                    const isShortSynced = item.syncedLyrics && syncCoverage < 0.5;
-                    // 2. 일반 가사인데 밀도가 극단적 (0.1 미만 또는 5 초과)
-                    //    - 너무 적음: 가사 일부만 있음
-                    //    - 너무 많음: 스팸이나 메타데이터 오염
-                    const isDensityTrash = !item.syncedLyrics && (densityRatio < 0.1 || densityRatio > 5);
-                    const isTrash = isShortSynced || isDensityTrash;
-
-                    // 【문자열 유사도】 Jaro-Winkler로 제목/아티스트 비교
-                    // 아직 스케일링 전의 "원시 점수" (0.0 ~ 1.0)
-                    const rawTitleScore = jaroWinkler(info.title, item.trackName);
-                    const rawArtistScore = jaroWinkler(info.artist, item.artistName);
-
-                    // 원본 데이터에 계산된 지표를 추가하여 반환
                     return {
-                        ...item,          // 원본 API 응답 데이터 유지
-                        durationDiff,     // Duration 차이 (초)
-                        syncCoverage,     // Sync 커버리지 (0.0~1.2)
-                        densityRatio,     // 밀도 비율
-                        rawTitleScore,    // 제목 유사도 (원시)
-                        rawArtistScore,   // 아티스트 유사도 (원시)
-                        isTrash           // 쓰레기 여부
+                        fatal: false,
+                        error: null,
+                        resolvedSearch,
+                        rankedCandidates,
+                        hasExactSyncLineMatch: exactMatchCandidates.length > 0,
+                        usedFallbackQuery,
+                        bestExactNativeSyncedCandidate: exactNativeScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'synced')
+                            || exactNativeScriptCandidates.find(item => item.preferredLyricsSource === 'synced')
+                            || null,
+                        bestExactNativePlainCandidate: exactNativeScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'plain')
+                            || exactNativeScriptCandidates.find(item => item.preferredLyricsSource === 'plain')
+                            || null,
+                        bestExactFallbackSyncedCandidate: exactFallbackScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'synced')
+                            || exactFallbackScriptCandidates.find(item => item.preferredLyricsSource === 'synced')
+                            || null,
+                        bestExactFallbackPlainCandidate: exactFallbackScriptCandidates.find(item => withinTolerance(item) && item.preferredLyricsSource === 'plain')
+                            || exactFallbackScriptCandidates.find(item => item.preferredLyricsSource === 'plain')
+                            || null,
+                        bestNativeSyncedCandidate: orderedNativeScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || orderedNativeScriptCandidates.find(item => item.syncedLyrics)
+                            || null,
+                        bestNativePlainCandidate: orderedNativeScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || orderedNativeScriptCandidates.find(item => item.plainLyrics)
+                            || null,
+                        bestFallbackSyncedCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.syncedLyrics)
+                            || fallbackScriptCandidates.find(item => item.syncedLyrics)
+                            || null,
+                        bestFallbackPlainCandidate: fallbackScriptCandidates.find(item => withinTolerance(item) && item.plainLyrics)
+                            || fallbackScriptCandidates.find(item => item.plainLyrics)
+                            || null,
+                        bestInstrumentalCandidate: rankedCandidates.find(item => withinTolerance(item) && item.instrumental)
+                            || rankedCandidates.find(item => item.instrumental)
+                            || null
                     };
-                });
+                };
 
-                // ─────────────────────────────────────────────────────────────
-                // 【2단계】 쓰레기 제거 (극단적인 경우만 필터링)
-                // ─────────────────────────────────────────────────────────────
-                // isTrash가 true인 항목은 점수 평가 대상에서 제외
-                // 이는 명백히 불량한 가사만 제거하므로 과도한 필터링 방지
-                const qualityPassed = processed.filter(item => !item.isTrash);
+                const primaryMetadata = {
+                    title,
+                    artist,
+                    album,
+                    expectedArtists
+                };
 
-                // 모든 결과가 쓰레기로 판정되면 실패 처리
-                if (qualityPassed.length === 0) {
-                    result.error = 'No quality lyrics found';
-                    logDebug('Failed', result.error);
+                const primarySearchFlow = await runSearchFlow(primaryMetadata, { includeAlbum: true });
+
+                if (primarySearchFlow.fatal) {
+                    result.error = primarySearchFlow.error;
+                    logDebug('Failed', {
+                        error: result.error,
+                        searchMode: primarySearchFlow.resolvedSearch?.searchLabel
+                    });
                     return result;
                 }
 
-                // ─────────────────────────────────────────────────────────────
-                // 【3단계】 관대한 점수 평가 (Scoring)
-                // ─────────────────────────────────────────────────────────────
-                // 각 품질 지표를 스케일링하고 가중치를 적용하여 총점 계산
-                // Tier에 따라 다른 가중치 전략 적용 (Tier-aware scoring)
-                const scored = qualityPassed.map(item => {
-                    // 【Duration 점수】 ±45초 기준으로 선형 감소
-                    // 0초 차이 = 1.0점, 45초 차이 = 0.0점
-                    // 관대한 기준으로 약간의 길이 차이 허용
-                    const durationScore = Math.max(0, 1 - (item.durationDiff / 45));
+                let body = null;
+                let selectedFlow = primarySearchFlow;
+                let selectedSource = 'primary-none';
+                let englishSearchFlow = null;
+                let englishMetadata = null;
+                let englishSearchError = null;
+                let englishSearchAttempted = false;
+                const shouldPreferExactSyncLineMatch = Array.isArray(syncDataLineCharCounts) && syncDataLineCharCounts.length > 0;
 
-                    // 【Title 점수】 관대한 스케일링 적용
-                    // - 0.5 이상: 최소 0.7점 보장 (낮은 유사도도 구제)
-                    // - 0.5 미만: 1.4배 스케일업 (완전 불일치가 아니면 기회 부여)
-                    // 이유: 번역/로마자 표기로 인해 낮은 원시 점수가 나올 수 있음
-                    const titleScore = item.rawTitleScore >= 0.5
-                        ? 0.7 + (item.rawTitleScore - 0.5) * 0.6   // 0.5→0.7, 1.0→1.0
-                        : item.rawTitleScore * 1.4;                // 0.3→0.42, 0.0→0.0
+                const ensureEnglishSearchFlow = async () => {
+                    if (englishSearchAttempted) return englishSearchFlow;
+                    englishSearchAttempted = true;
+                    englishMetadata = await getTrackMetadataForAcceptLanguage(info?.uri, LRCLIB_ENGLISH_ACCEPT_LANGUAGE);
 
-                    // 【Artist 점수】 더 관대한 스케일링 적용
-                    // - 0.3 이상: 최소 0.5점 보장
-                    // - 0.3 미만: 1.67배 스케일업
-                    // 이유: 아티스트 표기가 매우 다양함 (feat., & 등)
-                    const artistScore = item.rawArtistScore >= 0.3
-                        ? 0.5 + (item.rawArtistScore - 0.3) * 0.71  // 0.3→0.5, 1.0→1.0
-                        : item.rawArtistScore * 1.67;              // 0.0→0.0, 0.3→0.5
+                    if (englishMetadata?.title && englishMetadata?.artist) {
+                        englishMetadata = {
+                            title: englishMetadata.title.trim(),
+                            artist: englishMetadata.artist.trim(),
+                            album: '',
+                            expectedArtists: splitArtists(englishMetadata.artist)
+                        };
 
-                    // 【Density 점수】 가사 밀도 (최대 1.0)
-                    // 밀도가 너무 높은 경우도 1.0으로 캡핑
-                    const densityScore = Math.min(item.densityRatio, 1);
+                        englishSearchFlow = await runSearchFlow(englishMetadata, { includeAlbum: false });
 
-                    // 【Sync 보너스】 싱크 가사가 있으면 15점 추가
-                    // 사용자 경험상 싱크 가사가 더 가치 있음
-                    const syncBonus = item.syncedLyrics ? 15 : 0;
-
-                    // 【토큰 검증】 아티스트 이름의 부분 일치 확인
-                    // "Artist A & Artist B" 같은 복합 아티스트 대응
-                    // 구분자: 쉼표(,), 일본어 쉼표(、), &, 중점(·), 슬래시(/)
-                    const queryTokens = info.artist.split(/[,、&·/]/).map(s => s.trim().toLowerCase()).filter(t => t.length >= 2);
-                    const resultArtist = item.artistName.toLowerCase();
-                    // 아티스트 이름 토큰 중 하나라도 결과에 포함되면 매치
-                    const hasTokenMatch = queryTokens.some(t => resultArtist.includes(t));
-
-                    // 토큰 매치 보너스/페널티
-                    const tokenBonus = hasTokenMatch ? 10 : 0;       // 토큰 매치 시 +10
-                    // 토큰 매치 없고 유사도도 낮으면 -15 (커버곡/잘못된 결과 차단)
-                    const artistPenalty = (!hasTokenMatch && item.rawArtistScore < 0.3) ? -15 : 0;
-
-                    // 【Tier-aware 최종 점수 합산】
-                    // Tier에 따라 가중치를 다르게 적용
-                    let totalScore;
-                    if (tier >= 2) {
-                        // ═══════════════════════════════════════════════════════
-                        // Tier 2/3: 폴백 검색 → Duration + Artist 중시
-                        // ═══════════════════════════════════════════════════════
-                        // 이유: 제목 검색(Tier 2)이나 아티스트 검색(Tier 3)은
-                        // Title 유사도가 불안정하므로 Duration을 더 신뢰
-                        const durationMatch = item.durationDiff <= 2;  // 2초 이내면 거의 확실
-                        totalScore = durationMatch
-                            // Duration 정확 매치: 높은 신뢰도 보너스 (+20)
-                            ? (durationScore * 50) + (artistScore * 20) + syncBonus + 20
-                            // Duration 불일치: Title도 약간 고려하되 비중 낮음
-                            : (durationScore * 50) + (titleScore * 7) + (artistScore * 30) + syncBonus;
-                    } else {
-                        // ═══════════════════════════════════════════════════════
-                        // Tier 1: 구조화 검색 → 균형 잡힌 로직
-                        // ═══════════════════════════════════════════════════════
-                        // 가중치: Duration 30 + Title 40 + Artist 10 + Density 10 + 보너스
-                        // Title에 가장 높은 가중치 (제목이 가장 중요한 매칭 기준)
-                        totalScore = (durationScore * 30) + (titleScore * 40) + (artistScore * 10) +
-                            (densityScore * 10) + tokenBonus + artistPenalty + syncBonus;
+                        if (englishSearchFlow.fatal) {
+                            englishSearchError = englishSearchFlow.error;
+                            englishSearchFlow = null;
+                        }
                     }
 
-                    // 계산된 점수들과 함께 반환
-                    return { ...item, durationScore, titleScore, artistScore, densityScore, sync: item.syncCoverage, totalScore, tier };
-                });
+                    return englishSearchFlow;
+                };
 
-                // ─────────────────────────────────────────────────────────────
-                // 【4단계】 최종 선택 및 임계값 검증
-                // ─────────────────────────────────────────────────────────────
-                // 총점 기준 내림차순 정렬 후 최고점 선택
-                scored.sort((a, b) => b.totalScore - a.totalScore);
-                const body = scored[0];  // 최고 점수 후보
-
-                // 【Tier-aware 임계값 검증】
-                // 너무 낮은 점수의 결과는 잘못된 매칭일 가능성이 높으므로 거부
-                if (tier === 1) {
-                    // Tier 1: 엄격한 임계값 적용
-                    // Duration 20% 이상 + Title 40% 이상이어야 통과
-                    if (body.durationScore < 0.2 || body.titleScore < 0.4) {
-                        result.error = 'No matching lyrics';
-                        logDebug(`Failed (T${tier})`, result.error);
-                        return result;
+                if (shouldPreferExactSyncLineMatch) {
+                    if (primarySearchFlow.bestExactNativeSyncedCandidate) {
+                        body = primarySearchFlow.bestExactNativeSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-native-synced';
                     }
-                } else {
-                    // Tier 2/3: Duration 기반 페널티 + 총점 검증
-                    // 15초 이상 차이나면 다른 곡일 가능성 높음 → 50점 감점
-                    const durationPenalty = body.durationDiff > 15 ? 50 : 0;
-                    const adjustedScore = body.totalScore - durationPenalty;
 
-                    // 조정된 점수가 40점 미만이면 거부
-                    if (adjustedScore < 40) {
-                        result.error = body.durationDiff > 15
-                            ? `Duration mismatch (${Math.round(body.durationDiff)}s diff)`  // Duration 차이 명시
-                            : 'Low confidence match';  // 전반적으로 낮은 신뢰도
-                        logDebug(`Failed (T${tier})`, result.error);
-                        return result;
+                    if (!body) {
+                        await ensureEnglishSearchFlow();
+                        if (englishSearchFlow?.bestExactNativeSyncedCandidate) {
+                            body = englishSearchFlow.bestExactNativeSyncedCandidate;
+                            selectedFlow = englishSearchFlow;
+                            selectedSource = 'english-exact-native-synced';
+                        }
+                    }
+
+                    if (!body && primarySearchFlow.bestExactNativePlainCandidate) {
+                        body = primarySearchFlow.bestExactNativePlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-native-plain';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactNativePlainCandidate) {
+                        body = englishSearchFlow.bestExactNativePlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-native-plain';
+                    }
+
+                    if (!body && primarySearchFlow.bestExactFallbackSyncedCandidate) {
+                        body = primarySearchFlow.bestExactFallbackSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-fallback-synced';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactFallbackSyncedCandidate) {
+                        body = englishSearchFlow.bestExactFallbackSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-fallback-synced';
+                    }
+
+                    if (!body && primarySearchFlow.bestExactFallbackPlainCandidate) {
+                        body = primarySearchFlow.bestExactFallbackPlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-exact-fallback-plain';
+                    }
+
+                    if (!body && englishSearchFlow?.bestExactFallbackPlainCandidate) {
+                        body = englishSearchFlow.bestExactFallbackPlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-exact-fallback-plain';
                     }
                 }
 
-                endLogic = performance.now();  // 매칭 로직 시간 측정 종료
+                if (!body) {
+                    body = primarySearchFlow.bestNativeSyncedCandidate;
+                    if (body) {
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-native-synced';
+                    }
+                }
 
-                // ════════════════════════════════════════════════════════════════
-                // 결과 처리 및 반환
-                // ════════════════════════════════════════════════════════════════
+                if (!body) {
+                    await ensureEnglishSearchFlow();
+                    if (englishSearchFlow?.bestNativeSyncedCandidate) {
+                        body = englishSearchFlow.bestNativeSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-native-synced';
+                    }
+                }
 
-                // 【디버깅용 점수 캡처】
-                // logDebug 함수에서 출력하기 위해 최종 선택된 결과의 점수 저장
-                bestScore = body.totalScore;      // 총점
-                bestSync = body.sync;             // Sync 커버리지
-                bestTitle = body.titleScore;      // Title 점수
-                bestArtist = body.artistScore;    // Artist 점수
+                if (!body) {
+                    if (primarySearchFlow.bestNativePlainCandidate) {
+                        body = primarySearchFlow.bestNativePlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-native-plain';
+                    }
+                    else if (englishSearchFlow?.bestNativePlainCandidate) {
+                        body = englishSearchFlow.bestNativePlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-native-plain';
+                    }
+                    else if (primarySearchFlow.bestFallbackSyncedCandidate) {
+                        body = primarySearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-synced';
+                    }
+                    else if (englishSearchFlow?.bestFallbackSyncedCandidate) {
+                        body = englishSearchFlow.bestFallbackSyncedCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-synced';
+                    }
+                    else if (primarySearchFlow.bestFallbackPlainCandidate) {
+                        body = primarySearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-fallback-plain';
+                    }
+                    else if (englishSearchFlow?.bestFallbackPlainCandidate) {
+                        body = englishSearchFlow.bestFallbackPlainCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-fallback-plain';
+                    }
+                    else if (primarySearchFlow.bestInstrumentalCandidate) {
+                        body = primarySearchFlow.bestInstrumentalCandidate;
+                        selectedFlow = primarySearchFlow;
+                        selectedSource = 'primary-instrumental';
+                    }
+                    else if (englishSearchFlow?.bestInstrumentalCandidate) {
+                        body = englishSearchFlow.bestInstrumentalCandidate;
+                        selectedFlow = englishSearchFlow;
+                        selectedSource = 'english-instrumental';
+                    }
+                }
 
+                if (!body) {
+                    if (englishSearchError) {
+                        result.error = englishSearchError;
+                    }
+                    else {
+                        const finalFlow = englishSearchFlow || primarySearchFlow;
+                        result.error = finalFlow.resolvedSearch.totalResults > 0
+                            ? 'Low confidence metadata match'
+                            : (finalFlow.resolvedSearch.error || 'No lyrics found');
+                    }
+                    logDebug('Failed', {
+                        error: result.error,
+                        searchMode: (englishSearchFlow || primarySearchFlow).resolvedSearch?.searchLabel,
+                        totalResults: (englishSearchFlow || primarySearchFlow).resolvedSearch?.totalResults,
+                        usedFallbackQuery: (englishSearchFlow || primarySearchFlow).usedFallbackQuery,
+                        selectedSource,
+                        englishTitle: englishMetadata?.title,
+                        englishArtist: englishMetadata?.artist
+                    });
+                    return result;
+                }
 
-                // (프로덕션에서는 품질 알림 비활성화)
-                // Quality notification removed for production PR
+                if (body.durationDiff > LRCLIB_DURATION_TOLERANCE_SEC) {
+                    result.error = `No LRCLIB results within ±${LRCLIB_DURATION_TOLERANCE_SEC}s`;
+                    logDebug('Failed', {
+                        error: result.error,
+                        durationDiff: body.durationDiff.toFixed(2),
+                        searchMode: selectedFlow.resolvedSearch.searchLabel,
+                        usedFallbackQuery: selectedFlow.usedFallbackQuery,
+                        selectedSource
+                    });
+                    return result;
+                }
 
-
-                // ─────────────────────────────────────────────────────────────
-                // 【Instrumental 체크】
-                // ─────────────────────────────────────────────────────────────
-                // LRCLIB API가 instrumental=true로 표시한 경우
-                // 가사 없는 연주곡임을 표시
                 if (body.instrumental) {
                     result.synced = [{ startTime: 0, text: '♪ Instrumental ♪' }];
                     result.unsynced = [{ text: '♪ Instrumental ♪' }];
-                    logDebug('Success (Instrumental)');
+                    logDebug('Success', {
+                        instrumental: true,
+                        matchedCandidates: selectedFlow.rankedCandidates.length,
+                        durationDiff: body.durationDiff.toFixed(2),
+                        exactDurationMatch: body.exactDurationMatch,
+                        artistScore: body.artistScore.toFixed(3),
+                        titleScore: body.titleScore.toFixed(3),
+                        matchReason: body.matchReason,
+                        syncLineExactMatch: !!body.syncLineExactMatch,
+                        preferredLyricsSource: body.preferredLyricsSource,
+                        searchMode: selectedFlow.resolvedSearch.searchLabel,
+                        usedFallbackQuery: selectedFlow.usedFallbackQuery,
+                        selectedSource,
+                        englishTitle: englishMetadata?.title,
+                        englishArtist: englishMetadata?.artist
+                    });
                     return result;
                 }
 
-                // ─────────────────────────────────────────────────────────────
-                // 【가사 파싱 및 결과 설정】
-                // ─────────────────────────────────────────────────────────────
-
-                // 싱크 가사 파싱 (Sync가 있고 커버리지가 0 초과인 경우)
-                if (body.syncedLyrics && body.sync > 0) {
+                if (body.preferredLyricsSource === 'plain' && body.plainLyrics) {
+                    result.unsynced = parsePlainLyrics(body.plainLyrics);
+                }
+                else if (body.syncedLyrics) {
                     const parsed = parseLRC(body.syncedLyrics);
-                    result.synced = parsed.synced;       // 싱크 가사 배열
+                    result.synced = parsed.synced;
                     if (!result.unsynced) {
-                        result.unsynced = parsed.unsynced;  // 일반 가사도 함께 설정
+                        result.unsynced = parsed.unsynced;
                     }
                 }
-                // 싱크 가사 없으면 Plain 가사로 폴백
                 else if (body.plainLyrics) {
-                    // 줄 단위로 분리하여 객체 배열로 변환
-                    // 빈 줄은 필터링
-                    result.unsynced = body.plainLyrics.split('\n').map(line => ({ text: line.trim() })).filter(l => l.text);
+                    result.unsynced = parsePlainLyrics(body.plainLyrics);
                 }
 
-                // 추가 안전장치: 싱크가 없지만 plain이 있는 경우
                 if (!result.synced && body.plainLyrics && !result.unsynced) {
-                    result.unsynced = body.plainLyrics.split('\n').map(line => ({ text: line.trim() })).filter(l => l.text);
+                    result.unsynced = parsePlainLyrics(body.plainLyrics);
                 }
 
-                // 최종 검증: 아무 가사도 없으면 에러 설정
                 if (!result.synced && !result.unsynced) {
                     result.error = 'No lyrics';
+                    logDebug('Failed', {
+                        error: result.error,
+                        matchedCandidates: selectedFlow.rankedCandidates.length,
+                        searchMode: selectedFlow.resolvedSearch.searchLabel,
+                        usedFallbackQuery: selectedFlow.usedFallbackQuery,
+                        selectedSource
+                    });
+                    return result;
                 }
 
-                // 디버그 로그 출력 후 결과 반환
-                logDebug(result.error ? 'Failure' : `Success (T${tier})`);
+                logDebug('Success', {
+                    totalResults: selectedFlow.resolvedSearch.totalResults,
+                    matchedCandidates: selectedFlow.rankedCandidates.length,
+                    artistScore: body.artistScore.toFixed(3),
+                    titleScore: body.titleScore.toFixed(3),
+                    durationDiff: body.durationDiff.toFixed(2),
+                    exactDurationMatch: body.exactDurationMatch,
+                    hasSynced: !!result.synced,
+                    hasUnsynced: !!result.unsynced,
+                    hasInterleavedTranslations: !!body.hasInterleavedTranslations,
+                    matchReason: body.matchReason,
+                    syncDataLineCount: syncDataLineCharCounts?.length || 0,
+                    syncLineExactMatch: !!body.syncLineExactMatch,
+                    preferredLyricsSource: body.preferredLyricsSource,
+                    searchMode: selectedFlow.resolvedSearch.searchLabel,
+                    usedFallbackQuery: selectedFlow.usedFallbackQuery,
+                    selectedSource,
+                    englishTitle: englishMetadata?.title,
+                    englishArtist: englishMetadata?.artist
+                });
                 return result;
 
             } catch (e) {
-                // ═══════════════════════════════════════════════════════════
-                // 예외 처리: 예상치 못한 에러 발생 시
-                // ═══════════════════════════════════════════════════════════
                 result.error = e.message;
-                logDebug('Fatal Error', e.message);
+                logDebug('Fatal Error', { error: e.message });
                 return result;
             }
 
         }
     };
+
+    syncAddonCacheVersion();
 
     // ============================================
     // Registration (애드온 등록)

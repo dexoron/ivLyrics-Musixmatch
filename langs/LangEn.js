@@ -376,6 +376,14 @@ window.LANG_EN = {
     },
     "solidBackgroundInUse": "ℹ️ Solid Background in use",
     "fontPlaceholder": "Enter font name (e.g., Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Primary",
+      "secondary": "Secondary"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator Shortcuts",
+      "subtitle": "Configure primary and secondary recording keys for Sync Creator."
+    },
     "aiProviders": {
       "title": "AI Providers",
       "description": "Select and prioritize AI providers. Providers at the top are tried first. On failure, the next provider is automatically used.",
@@ -696,6 +704,36 @@ window.LANG_EN = {
     "lyricsProvider": "Lyrics Provider",
     "syncContributor": "Sync Contributor"
   },
+  "creatorProfile": {
+    "title": "Sync Creator",
+    "anonymous": "Anonymous",
+    "openProfile": "Open creator profile",
+    "loading": "Loading creator profile...",
+    "loadFailed": "Failed to load creator profile.",
+    "back": "Back",
+    "contributions": "Sync Contributions",
+    "tracks": "Synced tracks",
+    "likes": "Likes",
+    "like": "Like",
+    "liked": "Liked",
+    "likeActionFailed": "Failed to update creator like.",
+    "likeLoginRequired": "Discord login is required to like creators.",
+    "ownProfile": "This is your profile.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading more...",
+    "noContributions": "No sync contributions yet.",
+    "unknownTrack": "Unknown Track",
+    "updated": "Updated",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "No patch notes available."
@@ -972,6 +1010,14 @@ window.LANG_EN = {
       "bounce": {
         "label": "Character Bounce Effect",
         "desc": "Apply a bounce animation to the current singing characters in Karaoke mode"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Pseudo Karaoke",
+        "desc": "When lyrics only provide line-synced timing, synthesize karaoke timing from Spotify audio analysis. Korean, Japanese, and Chinese lines are split more densely when confidence is high."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pseudo Karaoke Render Advance",
+        "desc": "Apply a render-time timing offset to pseudo karaoke only. Positive values make the highlight appear earlier."
       }
     },
     "prefetch": {
@@ -1149,6 +1195,10 @@ window.LANG_EN = {
       "browserFullscreen": {
         "desc": "Use Browser Fullscreen",
         "info": "Switch browser to fullscreen mode to fill the entire monitor when entering lyrics fullscreen"
+      },
+      "hideOverlay": {
+        "desc": "Hide Overlay in ivLyrics Fullscreen",
+        "info": "Send the overlay app a paused playback state while ivLyrics fullscreen is open so desktop overlay lyrics fade out"
       }
     },
     "normalMode": {
@@ -1286,17 +1336,26 @@ window.LANG_EN = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord login is required.",
+        "checking": "Checking account information...",
         "title": "Account Linking",
-        "subtitle": "Link with your ivLogin account",
-        "description": "ivLis STUDIO unified account service",
-        "info": "Link with ivLogin to access features like settings sync. Enter your User Hash on the login page to link your account.",
-        "loginButton": "Link with ivLogin",
+        "subtitle": "Link with your Discord account",
+        "description": "Discord-based ivLyrics contribution account",
+        "info": "When you sign in with Discord, your current user hash is replaced with your Discord ID and existing contribution data is migrated.",
+        "loginButton": "Sign In With Discord",
         "loading": "Loading account info...",
         "linked": "Linked",
         "linkedAt": "Linked on",
-        "lastSync": "Last sync",
-        "manageAccount": "Manage Account",
+        "lastSync": "Last login",
+        "manageAccount": "Change Account",
         "refresh": "Refresh",
+        "loggingIn": "Opening browser...",
+        "startHint": "Complete the Discord sign-in flow in your browser.",
+        "failed": "Discord login failed.",
+        "loadFailed": "Failed to load account information.",
+        "discordLoginSuccess": "Discord account linked successfully.",
+        "logout": "Log Out",
+        "logoutSuccess": "Signed out from Discord and created a new user hash.",
         "nickname": {
           "label": "Nickname",
           "enter": "Please enter a nickname.",
@@ -1494,6 +1553,7 @@ window.LANG_EN = {
     "unsynced": "Plain Text"
   },
   "communityVideo": {
+    "loginRequired": "Discord login is required to register community videos.",
     "title": "Community Video Recommendations",
     "loading": "Loading video list...",
     "loadError": "Failed to load video list",
@@ -1596,7 +1656,7 @@ window.LANG_EN = {
     "copied": "✓ Copied to clipboard",
     "downloaded": "✓ Downloaded",
     "shared": "✓ Shared",
-    "maxLinesReached": "You can select up to 3 lines",
+    "maxLinesReached": "You can select up to 10 lines",
     "noSelection": "Please select lyrics"
   },
   "setupWizard": {
@@ -1663,6 +1723,12 @@ window.LANG_EN = {
       "description": "Displays current lyrics in Spotify's 'Now Playing' panel. You can see lyrics without using fullscreen mode.",
       "enabled": "Show Panel Lyrics",
       "linesCount": "Lines to Show"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Virtual Karaoke",
+      "subtitle": "Enable karaoke-style highlighting on almost every song",
+      "description": "Uses Spotify audio analysis to synthesize karaoke timing for line-synced lyrics. This makes karaoke mode work on almost every song, but the timing is approximate and may be inaccurate.",
+      "enabled": "Enable Virtual Karaoke"
     },
     "complete": {
       "title": "Ready!",
@@ -1737,6 +1803,7 @@ window.LANG_EN = {
     "dismissAll": "Close All"
   },
   "syncCreator": {
+    "loginRequired": "Discord login is required to create karaoke sync.",
     "title": "Create Karaoke Sync",
     "buttonTooltip": "Create Karaoke Sync",
     "clickHereHint": "Click here to sync the lyrics!",
@@ -1775,6 +1842,21 @@ window.LANG_EN = {
     "loadedExistingSyncData": "Loaded existing sync data",
     "providerMismatch": "Existing sync data uses a different lyrics provider. You need to create new sync data for your account's provider.",
     "back": "Close",
+    "lrclibSearchResults": "LRCLIB Search Results",
+    "showLrclibSearchResults": "Show Search Results",
+    "hideLrclibSearchResults": "Hide Search Results",
+    "lrclibNoCandidates": "No LRCLIB candidates found",
+    "lrclibSelectCandidate": "Select a candidate",
+    "lrclibApplyCandidate": "Load This Lyrics",
+    "lrclibLoaded": "Loaded",
+    "lrclibBadgeExact": "Exact",
+    "lrclibBadgeSynced": "Synced",
+    "lrclibBadgePlain": "Plain",
+    "lrclibBadgePrimary": "Primary",
+    "lrclibBadgeEnglish": "English",
+    "lrclibMetricArtist": "artist",
+    "lrclibMetricTitle": "title",
+    "lrclibMetricDiff": "diff",
     "lrclib": {
       "registerLyrics": "Register Lyrics to LRCLIB",
       "title": "Register to LRCLIB",
@@ -1809,6 +1891,7 @@ window.LANG_EN = {
       "syllable": "Syllable"
     },
     "copyLyrics": "Copy Lyrics",
+    "virtualKaraoke": "Virtual karaoke data",
     "lyricsCopied": "Lyrics copied to clipboard",
     "copyError": "Copy failed",
     "export": "Export",

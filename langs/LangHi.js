@@ -376,6 +376,14 @@ window.LANG_HI = {
     },
     "solidBackgroundInUse": "ℹ️ ठोस बैकग्राउंड उपयोग में है",
     "fontPlaceholder": "फ़ॉन्ट का नाम दर्ज करें (उदा: Arial, Mangal)",
+    "shortcuts": {
+      "primary": "प्राथमिक",
+      "secondary": "द्वितीयक"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator शॉर्टकट",
+      "subtitle": "Sync Creator रिकॉर्डिंग के लिए प्राथमिक और द्वितीयक कुंजियाँ कॉन्फ़िगर करें।"
+    },
     "aiProviders": {
       "title": "AI प्रदाता",
       "description": "AI प्रदाता चुनें और प्राथमिकता दें। शीर्ष पर स्थित प्रदाताओं को पहले आज़माया जाता है। विफलता पर, अगला प्रदाता स्वचालित रूप से उपयोग किया जाता है।",
@@ -695,6 +703,36 @@ window.LANG_HI = {
     "lyricsProvider": "गीत बोल प्रदाता",
     "syncContributor": "सिंक योगदानकर्ता"
   },
+  "creatorProfile": {
+    "title": "सिंक निर्माता",
+    "anonymous": "अनाम",
+    "openProfile": "निर्माता प्रोफ़ाइल खोलें",
+    "loading": "निर्माता प्रोफ़ाइल लोड हो रही है...",
+    "loadFailed": "निर्माता प्रोफ़ाइल लोड नहीं हो सकी।",
+    "back": "वापस",
+    "contributions": "जोड़ी गई सिंक लिरिक्स",
+    "tracks": "सिंक किए गए ट्रैक",
+    "likes": "पसंद",
+    "like": "पसंद",
+    "liked": "पसंद किया गया",
+    "likeActionFailed": "निर्माता की पसंद अपडेट नहीं की जा सकी।",
+    "likeLoginRequired": "निर्माताओं को पसंद करने के लिए Discord लॉगिन आवश्यक है।",
+    "ownProfile": "यह आपकी प्रोफ़ाइल है।",
+    "loadMore": "और लोड करें",
+    "loadingMore": "और लोड हो रहा है...",
+    "noContributions": "अभी तक कोई सिंक लिरिक्स नहीं जोड़ी गई हैं।",
+    "unknownTrack": "अज्ञात ट्रैक",
+    "updated": "अपडेट",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "कोई पैच नोट्स नहीं।"
@@ -971,6 +1009,14 @@ window.LANG_HI = {
       "bounce": {
         "label": "बाउंस प्रभाव",
         "desc": "कराओके मोड में वर्तमान अक्षर पर बाउंस एनीमेशन लागू करें"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "वर्चुअल कराओके",
+        "desc": "जब गीत के बोल केवल पंक्ति-स्तरीय सिंक टाइमिंग देते हैं, तब Spotify audio analysis के आधार पर कराओके टाइमिंग बनाई जाती है। भरोसा अधिक होने पर कोरियाई, जापानी और चीनी पंक्तियों को अधिक बारीकी से विभाजित किया जाता है।"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "वर्चुअल कराओके रेंडर अग्रिम",
+        "desc": "केवल वर्चुअल कराओके पर रेंडर-समय टाइमिंग ऑफसेट लागू करता है। सकारात्मक मान हाइलाइट को पहले दिखाते हैं।"
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_HI = {
       "browserFullscreen": {
         "desc": "Spotify फुलस्क्रीन का उपयोग करें",
         "info": "फुलस्क्रीन मोड में Spotify को भी फुलस्क्रीन करें"
+      },
+      "hideOverlay": {
+        "desc": "ivLyrics फुलस्क्रीन में ओवरले छिपाएँ",
+        "info": "ivLyrics फुलस्क्रीन खुली होने पर ओवरले ऐप को paused playback स्थिति भेजता है, ताकि डेस्कटॉप ओवरले के बोल पारदर्शी हो जाएँ"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_HI = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord में लॉग इन करना आवश्यक है।",
+        "checking": "खाते की जानकारी जाँची जा रही है...",
         "title": "खाता लिंकिंग",
-        "subtitle": "अपने ivLogin खाते से लिंक करें",
-        "description": "ivLis STUDIO एकीकृत खाता सेवा",
-        "info": "सेटिंग्स सिंक जैसी सुविधाओं का उपयोग करने के लिए ivLogin से लिंक करें। लिंक करने के लिए लॉगिन पेज पर अपना User Hash दर्ज करें।",
-        "loginButton": "ivLogin से लिंक करें",
+        "subtitle": "अपने Discord खाते से लिंक करें",
+        "description": "Discord-आधारित ivLyrics योगदान खाता",
+        "info": "जब आप Discord से लॉग इन करते हैं, तो आपका मौजूदा user hash आपके Discord ID से बदल दिया जाता है और मौजूदा योगदान डेटा भी माइग्रेट हो जाता है।",
+        "loginButton": "Discord से लॉग इन करें",
         "loading": "खाता जानकारी लोड हो रही है...",
         "linked": "लिंक किया गया",
         "linkedAt": "लिंक की तारीख",
-        "lastSync": "अंतिम सिंक",
-        "manageAccount": "खाता प्रबंधन",
+        "lastSync": "आखिरी लॉगिन",
+        "manageAccount": "खाता बदलें",
         "refresh": "रीफ़्रेश",
+        "loggingIn": "ब्राउज़र खोला जा रहा है...",
+        "startHint": "कृपया ब्राउज़र में Discord लॉगिन पूरा करें।",
+        "failed": "Discord लॉगिन विफल रहा।",
+        "loadFailed": "खाते की जानकारी लोड नहीं की जा सकी।",
+        "discordLoginSuccess": "Discord खाता सफलतापूर्वक लिंक हो गया।",
+        "logout": "लॉग आउट",
+        "logoutSuccess": "Discord से लॉग आउट किया गया और नया user_hash बनाया गया।",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "उपनाम",
+          "enter": "कृपया एक उपनाम दर्ज करें।",
+          "changed": "उपनाम बदल दिया गया।",
+          "failed": "बदलाव विफल",
+          "error": "कोई त्रुटि हुई",
+          "placeholder": "उपनाम दर्ज करें",
+          "none": "कोई उपनाम नहीं",
+          "saving": "सहेजा जा रहा है...",
+          "save": "सहेजें",
+          "change": "बदलें"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_HI = {
     "unsynced": "सामान्य लिरिक्स"
   },
   "communityVideo": {
+    "loginRequired": "कम्युनिटी वीडियो दर्ज करने के लिए Discord में लॉग इन करना आवश्यक है।",
     "title": "कम्युनिटी वीडियो अनुशंसा",
     "loading": "वीडियो सूची लोड हो रही है...",
     "loadError": "वीडियो सूची लोड करने में विफल",
@@ -1594,7 +1654,7 @@ window.LANG_HI = {
     "copied": "✓ क्लिपबोर्ड पर कॉपी किया गया",
     "downloaded": "✓ डाउनलोड किया गया",
     "shared": "✓ साझा किया गया",
-    "maxLinesReached": "आप अधिकतम 3 लाइनें चुन सकते हैं",
+    "maxLinesReached": "आप अधिकतम 10 लाइनें चुन सकते हैं",
     "noSelection": "लिरिक्स चुनें"
   },
   "setupWizard": {
@@ -1661,6 +1721,12 @@ window.LANG_HI = {
       "description": "Spotify के 'Now Playing' पैनल में वर्तमान लिरिक्स प्रदर्शित करता है।",
       "enabled": "पैनल लिरिक्स दिखाएं",
       "linesCount": "पंक्तियों की संख्या"
+    },
+    "pseudoKaraokeTip": {
+      "title": "वर्चुअल कराओके",
+      "subtitle": "लगभग हर गाने पर कराओके-शैली हाइलाइटिंग चालू करें",
+      "description": "लाइन-सिंक्ड लिरिक्स के लिए कराओके टाइमिंग बनाने में Spotify audio analysis का उपयोग करता है। इससे कराओके मोड लगभग हर गाने पर काम करेगा, लेकिन टाइमिंग अनुमानित है और पूरी तरह सटीक नहीं भी हो सकती।",
+      "enabled": "वर्चुअल कराओके सक्षम करें"
     },
     "complete": {
       "title": "तैयार!",
@@ -1735,6 +1801,7 @@ window.LANG_HI = {
     "dismissAll": "सभी बंद करें"
   },
   "syncCreator": {
+    "loginRequired": "कराओके सिंक बनाने के लिए Discord में लॉग इन करना आवश्यक है।",
     "title": "कराओके सिंक क्रिएटर",
     "buttonTooltip": "कराओके सिंक बनाएं",
     "clickHereHint": "लिरिक्स सिंक करने के लिए यहाँ क्लिक करें!",
@@ -1773,6 +1840,21 @@ window.LANG_HI = {
     "loadedExistingSyncData": "मौजूदा सिंक डेटा लोड किया गया",
     "providerMismatch": "मौजूदा सिंक डेटा अलग प्रदाता का उपयोग करता है। आपको अपने खाते के प्रदाता के लिए नया डेटा बनाना होगा।",
     "back": "बंद करें",
+    "lrclibSearchResults": "LRCLIB खोज परिणाम",
+    "showLrclibSearchResults": "खोज परिणाम दिखाएँ",
+    "hideLrclibSearchResults": "खोज परिणाम छिपाएँ",
+    "lrclibNoCandidates": "कोई LRCLIB परिणाम नहीं मिला",
+    "lrclibSelectCandidate": "एक परिणाम चुनें",
+    "lrclibApplyCandidate": "ये लिरिक्स लोड करें",
+    "lrclibLoaded": "लोड किया गया",
+    "lrclibBadgeExact": "सटीक",
+    "lrclibBadgeSynced": "सिंक",
+    "lrclibBadgePlain": "सादा",
+    "lrclibBadgePrimary": "मुख्य",
+    "lrclibBadgeEnglish": "अंग्रेज़ी",
+    "lrclibMetricArtist": "कलाकार",
+    "lrclibMetricTitle": "शीर्षक",
+    "lrclibMetricDiff": "अंतर",
     "lrclib": {
       "registerLyrics": "LRCLIB पर लिरिक्स पंजीकृत करें",
       "title": "LRCLIB पर पंजीकरण",
@@ -1807,6 +1889,7 @@ window.LANG_HI = {
       "syllable": "Syllable"
     },
     "copyLyrics": "गीत कॉपी करें",
+    "virtualKaraoke": "वर्चुअल कराओके डेटा",
     "lyricsCopied": "गीत क्लिपबोर्ड पर कॉपी किए गए",
     "copyError": "कॉपी विफल",
     "export": "निर्यात",

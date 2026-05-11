@@ -1,47 +1,967 @@
-// CreditFooter implementing provider and contributor display
-const CreditFooter = react.memo(({ provider, contributors }) => {
-	if (!provider) return null;
+function getCreatorProfileCopy() {
+	return {
+		title: I18n.t("creatorProfile.title") || "Sync Creator",
+		anonymous: I18n.t("creatorProfile.anonymous") || "Anonymous",
+		openProfile: I18n.t("creatorProfile.openProfile") || "Open creator profile",
+		loading: I18n.t("creatorProfile.loading") || "Loading creator profile...",
+		loadFailed: I18n.t("creatorProfile.loadFailed") || "Failed to load creator profile.",
+		back: I18n.t("creatorProfile.back") || "Back",
+		contributions: I18n.t("creatorProfile.contributions") || "Sync Contributions",
+		tracks: I18n.t("creatorProfile.tracks") || "Synced tracks",
+		likes: I18n.t("creatorProfile.likes") || "Likes",
+		like: I18n.t("creatorProfile.like") || "Like",
+		liked: I18n.t("creatorProfile.liked") || "Liked",
+		likeActionFailed: I18n.t("creatorProfile.likeActionFailed") || "Failed to update creator like.",
+		likeLoginRequired: I18n.t("creatorProfile.likeLoginRequired") || "Discord login is required to like creators.",
+		ownProfile: I18n.t("creatorProfile.ownProfile") || "This is your profile.",
+		loadMore: I18n.t("creatorProfile.loadMore") || "Load more",
+		loadingMore: I18n.t("creatorProfile.loadingMore") || "Loading more...",
+		noContributions: I18n.t("creatorProfile.noContributions") || "No sync contributions yet.",
+		unknownTrack: I18n.t("creatorProfile.unknownTrack") || "Unknown Track",
+		updated: I18n.t("creatorProfile.updated") || "Updated",
+		topArtists: I18n.t("creatorProfile.topArtists") || "Top Artists",
+		artistGroups: I18n.t("creatorProfile.artistGroups") || "Artist Groups",
+		noArtistStats: I18n.t("creatorProfile.noArtistStats") || "No artist stats yet.",
+		sortLabel: I18n.t("creatorProfile.sortLabel") || "Sort",
+		sortRecent: I18n.t("creatorProfile.sortRecent") || "Recent",
+		sortTitle: I18n.t("creatorProfile.sortTitle") || "Title",
+		sortArtist: I18n.t("creatorProfile.sortArtist") || "Artist",
+		clearArtistFilter: I18n.t("creatorProfile.clearArtistFilter") || "Clear artist filter",
+		filteredArtist: I18n.t("creatorProfile.filteredArtist") || "Filtered artist"
+	};
+}
 
-	let text = `${I18n.t("misc.lyricsProvider") || "Lyrics Provider"} : ${provider}`;
-	if (contributors && contributors.length > 0) {
-		let uniqueContributors = contributors;
+function mergeCreatorProfileContributions(currentItems, nextItems) {
+	const merged = [];
+	const seen = new Set();
 
-		// Merge multiple 'Anonymous' (case-insensitive)
-		const isAnonymous = c => c && c.toLowerCase() === 'anonymous';
-		if (contributors.some(isAnonymous)) {
-			const others = contributors.filter(c => !isAnonymous(c));
-			// Deduplicate others as well
-			uniqueContributors = [...new Set(others), "Anonymous"];
-		} else {
-			uniqueContributors = [...new Set(contributors)];
+	const appendUniqueItems = (items) => {
+		if (!Array.isArray(items)) {
+			return;
 		}
 
-		// Limit to max 3
-		if (uniqueContributors.length > 3) {
-			uniqueContributors = uniqueContributors.slice(0, 3);
-		}
+		for (const item of items) {
+			if (!item || typeof item !== "object") {
+				continue;
+			}
 
-		text += ` | ${I18n.t("misc.syncContributor") || "Sync Contributor"} : ${uniqueContributors.join(", ")}`;
+			const key = `${item.trackId || "unknown"}:${item.provider || "unknown"}`;
+			if (seen.has(key)) {
+				continue;
+			}
+
+			seen.add(key);
+			merged.push(item);
+		}
+	};
+
+	appendUniqueItems(currentItems);
+	appendUniqueItems(nextItems);
+
+	return merged;
+}
+
+function normalizeContributorEntry(contributor) {
+	if (!contributor) {
+		return null;
 	}
 
+	if (typeof contributor === "string") {
+		const name = contributor.trim() || "Anonymous";
+		return {
+			key: `name:${name.toLowerCase()}`,
+			userHash: null,
+			name,
+			avatarUrl: null,
+			linked: false,
+			profileAvailable: false
+		};
+	}
+
+	if (typeof contributor !== "object") {
+		return null;
+	}
+
+	const name = String(contributor.name || contributor.nickname || contributor.displayName || "Anonymous").trim() || "Anonymous";
+	const userHash = typeof contributor.userHash === "string" && contributor.userHash.trim()
+		? contributor.userHash.trim()
+		: null;
+
+	return {
+		key: userHash || `name:${name.toLowerCase()}`,
+		userHash,
+		name,
+		avatarUrl: typeof contributor.avatarUrl === "string" ? contributor.avatarUrl : null,
+		linked: !!contributor.linked,
+		profileAvailable: contributor.profileAvailable ?? !!userHash
+	};
+}
+
+function getDisplayContributors(contributors, limit = 3) {
+	if (!Array.isArray(contributors) || contributors.length === 0) {
+		return [];
+	}
+
+	const result = [];
+	const seen = new Set();
+	let anonymousAdded = false;
+
+	for (const rawContributor of contributors) {
+		const contributor = normalizeContributorEntry(rawContributor);
+		if (!contributor) {
+			continue;
+		}
+
+		const isAnonymous = contributor.name.toLowerCase() === "anonymous" && !contributor.profileAvailable;
+		if (isAnonymous) {
+			if (anonymousAdded) {
+				continue;
+			}
+			anonymousAdded = true;
+			result.push(contributor);
+		} else {
+			const key = contributor.userHash || contributor.key;
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			result.push(contributor);
+		}
+
+		if (limit > 0 && result.length >= limit) {
+			break;
+		}
+	}
+
+	return result;
+}
+
+function formatContributorTimestamp(epochSeconds) {
+	if (!epochSeconds) {
+		return null;
+	}
+
+	try {
+		return new Date(epochSeconds * 1000).toLocaleDateString();
+	} catch (error) {
+		return null;
+	}
+}
+
+function getCreatorProfileUiTheme() {
+	try {
+		return localStorage.getItem("ivLyrics:settings-ui-theme") === "light"
+			? "light"
+			: "dark";
+	} catch (error) {
+		return "dark";
+	}
+}
+
+const CREATOR_PROFILE_PAGE_SIZE = 12;
+
+function createCreatorProfileShell(contributor, options = {}) {
+	const sort = typeof options.sort === "string" && options.sort.trim() ? options.sort.trim() : "recent";
+	const artist = typeof options.artist === "string" && options.artist.trim() ? options.artist.trim() : null;
+	const displayName = contributor?.name || "Anonymous";
+
+	return {
+		userHash: contributor?.userHash || null,
+		displayName,
+		account: contributor?.avatarUrl
+			? {
+				profileImage: contributor.avatarUrl,
+				displayName
+			}
+			: null,
+		stats: null,
+		viewer: {
+			authenticated: false,
+			isOwnProfile: false,
+			canLike: false,
+			liked: false
+		},
+		artistStats: {
+			items: []
+		},
+		filters: {
+			sort,
+			artist
+		},
+		contributions: [],
+		pagination: {
+			offset: 0,
+			limit: CREATOR_PROFILE_PAGE_SIZE,
+			returnedCount: 0,
+			totalCount: 0,
+			hasMore: false,
+			nextOffset: null
+		}
+	};
+}
+
+const SyncCreatorProfileModal = react.memo(({
+	contributor,
+	profile,
+	loading,
+	error,
+	likePending,
+	loadMorePending,
+	listRefreshing,
+	onClose,
+	onToggleLike,
+	onLoadMore,
+	onTrackClick,
+	activeSortMode,
+	activeArtistFilter,
+	onSortChange,
+	onArtistFilterChange
+}) => {
+	const copy = getCreatorProfileCopy();
+	const uiTheme = getCreatorProfileUiTheme();
+	const profileData = profile || {};
+	const contributions = Array.isArray(profileData.contributions) ? profileData.contributions : [];
+	const displayName = profileData.displayName || contributor?.name || copy.anonymous;
+	const account = profileData.account || null;
+	const handle = account?.username ? `@${account.username}` : null;
+	const avatarUrl = account?.profileImage || contributor?.avatarUrl || null;
+	const initial = (displayName || copy.anonymous).charAt(0).toUpperCase();
+	const trackCount = Number(profileData.stats?.trackCount || 0);
+	const likeCount = Number(profileData.stats?.likeCount || 0);
+	const artistGroupCount = Number(profileData.stats?.artistGroupCount || 0);
+	const totalContributionCount = Number(profileData.pagination?.totalCount || trackCount || 0);
+	const loadedContributionCount = contributions.length;
+	const hasMoreContributions = !!profileData.pagination?.hasMore;
+	const bodyRef = react.useRef(null);
+	const loadMoreLockRef = react.useRef(false);
+	const canLike = !!profileData.viewer?.canLike;
+	const liked = !!profileData.viewer?.liked;
+	const isOwnProfile = !!profileData.viewer?.isOwnProfile;
+	const subtitle = handle || (account?.displayName && account.displayName !== displayName ? account.displayName : null);
+	const likeButtonLabel = likePending ? "..." : liked ? copy.liked : copy.like;
+	const likeButtonTitle = !profileData.viewer?.authenticated && !isOwnProfile
+		? copy.likeLoginRequired
+		: copy.like;
+	const artistStats = Array.isArray(profileData.artistStats?.items) ? profileData.artistStats.items : [];
+	const sortMode = activeSortMode || profileData.filters?.sort || "recent";
+	const artistFilter = activeArtistFilter ?? profileData.filters?.artist ?? null;
+	const hasLoadedProfileData = !!profileData.stats;
+	const showSectionLoading = loading && !error && !hasLoadedProfileData;
+	const sortOptions = [
+		{ key: "recent", label: copy.sortRecent },
+		{ key: "title", label: copy.sortTitle },
+		{ key: "artist", label: copy.sortArtist }
+	];
+	const closeIcon = react.createElement(
+		"svg",
+		{
+			width: 16,
+			height: 16,
+			viewBox: "0 0 16 16",
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: 1.8,
+			strokeLinecap: "round"
+		},
+		react.createElement("path", { d: "M3 3l10 10" }),
+		react.createElement("path", { d: "M13 3L3 13" })
+	);
+	const likeIcon = react.createElement(
+		"svg",
+		{
+			width: 14,
+			height: 14,
+			viewBox: "0 0 16 16",
+			fill: liked ? "currentColor" : "none",
+			stroke: "currentColor",
+			strokeWidth: 1.5,
+			strokeLinecap: "round",
+			strokeLinejoin: "round",
+			"aria-hidden": "true"
+		},
+		react.createElement("path", { d: "M8 13.4 2.9 8.6a3.2 3.2 0 0 1 4.5-4.5L8 4.7l.6-.6a3.2 3.2 0 1 1 4.5 4.5L8 13.4Z" })
+	);
+
+	const maybeLoadMore = react.useCallback(() => {
+		const body = bodyRef.current;
+		if (!body || !hasMoreContributions || loadMorePending || loading || error || typeof onLoadMore !== "function") {
+			return;
+		}
+
+		const remaining = body.scrollHeight - body.scrollTop - body.clientHeight;
+		if (remaining > 160 || loadMoreLockRef.current) {
+			return;
+		}
+
+		loadMoreLockRef.current = true;
+		onLoadMore();
+	}, [error, hasMoreContributions, loadMorePending, loading, onLoadMore]);
+
+	react.useEffect(() => {
+		if (!loadMorePending) {
+			loadMoreLockRef.current = false;
+		}
+	}, [loadMorePending, loadedContributionCount]);
+
+	react.useEffect(() => {
+		maybeLoadMore();
+	}, [maybeLoadMore, loadedContributionCount]);
+
+	const content = react.createElement(
+		react.Fragment,
+		null,
+		react.createElement(
+			"div",
+			{ className: "lyrics-creator-profile-hero" },
+			avatarUrl
+				? react.createElement("img", {
+					className: "lyrics-creator-profile-avatar",
+					src: avatarUrl,
+					alt: displayName,
+					onError: (event) => {
+						event.currentTarget.style.display = "none";
+					}
+				})
+				: react.createElement(
+					"div",
+					{ className: "lyrics-creator-profile-avatar lyrics-creator-profile-avatar-fallback" },
+					initial
+				),
+			react.createElement(
+				"div",
+				{ className: "lyrics-creator-profile-info" },
+				react.createElement(
+					"div",
+					{ className: "lyrics-creator-profile-name-row" },
+					react.createElement("h2", { className: "lyrics-creator-profile-name" }, displayName),
+					react.createElement(
+						"button",
+						{
+							type: "button",
+							className: `lyrics-creator-profile-like-inline ${liked ? "is-liked" : ""} ${likePending ? "is-loading" : ""}`.trim(),
+							onClick: onToggleLike,
+							disabled: likePending || !canLike,
+							title: likeButtonTitle,
+							"aria-label": likeButtonLabel
+						},
+						likeIcon,
+						react.createElement("span", null, likeButtonLabel)
+					)
+				),
+				subtitle && react.createElement("div", { className: "lyrics-creator-profile-handle" }, subtitle),
+				hasLoadedProfileData
+					? react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-stats" },
+						react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-stat" },
+							react.createElement("strong", null, trackCount),
+							react.createElement("span", null, copy.tracks)
+						),
+						react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-stat" },
+							react.createElement("strong", null, likeCount),
+							react.createElement("span", null, copy.likes)
+						),
+						react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-stat" },
+							react.createElement("strong", null, artistGroupCount),
+							react.createElement("span", null, copy.artistGroups)
+						)
+					)
+					: react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-inline-state" },
+						copy.loading
+					)
+			)
+		),
+		error
+			? react.createElement(
+				"div",
+				{ className: "lyrics-creator-profile-state lyrics-creator-profile-error" },
+				error
+			)
+			: showSectionLoading
+				? react.createElement(
+					"div",
+					{ className: "lyrics-creator-profile-state lyrics-creator-profile-state-compact" },
+					copy.loading
+				)
+				: react.createElement(
+					react.Fragment,
+					null,
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-section-header lyrics-creator-profile-section-header-tight" },
+						react.createElement("h3", { className: "lyrics-creator-profile-section-title" }, copy.topArtists),
+						profileData.stats?.artistGroupCount > 0 && react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-section-meta" },
+							String(profileData.stats.artistGroupCount)
+						)
+					),
+					artistStats.length
+						? react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-artist-stats" },
+							...artistStats.map((item) => react.createElement(
+								"button",
+								{
+									type: "button",
+									key: item.name,
+									className: `lyrics-creator-profile-artist-chip ${artistFilter === item.name ? "is-active" : ""}`.trim(),
+									onClick: () => onArtistFilterChange?.(artistFilter === item.name ? null : item.name)
+								},
+								react.createElement("span", { className: "lyrics-creator-profile-artist-chip-name" }, item.name),
+								react.createElement("span", { className: "lyrics-creator-profile-artist-chip-count" }, item.count)
+							))
+						)
+						: react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-empty lyrics-creator-profile-empty-compact" },
+							copy.noArtistStats
+						),
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-toolbar" },
+						react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-toolbar-group" },
+							react.createElement("span", { className: "lyrics-creator-profile-toolbar-label" }, copy.sortLabel),
+							react.createElement(
+								"div",
+								{ className: "lyrics-creator-profile-sort-controls" },
+								...sortOptions.map((option) => react.createElement(
+									"button",
+									{
+										type: "button",
+										key: option.key,
+										className: `lyrics-creator-profile-sort-btn ${sortMode === option.key ? "is-active" : ""}`.trim(),
+										onClick: () => onSortChange?.(option.key),
+										disabled: loadMorePending || listRefreshing
+									},
+									option.label
+								))
+							)
+						),
+						artistFilter && react.createElement(
+							"button",
+							{
+								type: "button",
+								className: "lyrics-creator-profile-filter-badge",
+								onClick: () => onArtistFilterChange?.(null),
+								disabled: loadMorePending || listRefreshing
+							},
+							`${copy.filteredArtist}: ${artistFilter} ×`
+						)
+					),
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-section-header" },
+						react.createElement("h3", { className: "lyrics-creator-profile-section-title" }, copy.contributions),
+						totalContributionCount > 0 && react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-section-meta" },
+							`${loadedContributionCount}/${totalContributionCount}`
+						)
+					),
+					listRefreshing && react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-list-status" },
+						copy.loadingMore
+					),
+					contributions.length
+						? react.createElement(
+							react.Fragment,
+							null,
+							react.createElement(
+								"div",
+								{ className: `lyrics-creator-profile-grid ${listRefreshing ? "is-refreshing" : ""}`.trim() },
+								...contributions.map((item) => {
+									const updatedLabel = formatContributorTimestamp(item.updatedAt || item.createdAt);
+									return react.createElement(
+										"button",
+										{
+											type: "button",
+											key: `${item.trackId}:${item.provider}`,
+											className: "lyrics-creator-profile-track",
+											onClick: () => onTrackClick(item.trackId)
+										},
+										react.createElement(
+											"div",
+											{ className: "lyrics-creator-profile-track-main" },
+											react.createElement("div", { className: "lyrics-creator-profile-track-title" }, item.trackName || copy.unknownTrack),
+											react.createElement("div", { className: "lyrics-creator-profile-track-artist" }, item.artists || item.trackId)
+										),
+										react.createElement(
+											"div",
+											{ className: "lyrics-creator-profile-track-side" },
+											react.createElement("span", { className: "lyrics-creator-profile-track-provider" }, item.provider),
+											updatedLabel && react.createElement("span", { className: "lyrics-creator-profile-track-updated" }, `${copy.updated} ${updatedLabel}`)
+										)
+									);
+								})
+							),
+							hasMoreContributions && react.createElement(
+								"div",
+								{ className: "lyrics-creator-profile-grid-footer" },
+								loadMorePending
+									? react.createElement(
+										"div",
+										{ className: "lyrics-creator-profile-load-more is-loading" },
+										copy.loadingMore
+									)
+									: null
+							)
+						)
+						: react.createElement(
+							"div",
+							{ className: "lyrics-creator-profile-empty" },
+							copy.noContributions
+						)
+				)
+	);
+
 	return react.createElement(
+		"div",
+		{
+			className: "lyrics-creator-profile-overlay",
+			"data-ui-theme": uiTheme,
+			onClick: onClose
+		},
+		react.createElement(
+			"div",
+			{
+				className: "lyrics-creator-profile-modal",
+				"data-ui-theme": uiTheme,
+				onClick: (event) => event.stopPropagation()
+			},
+			react.createElement(
+				"div",
+				{ className: "lyrics-creator-profile-header" },
+				react.createElement(
+					"div",
+					{ className: "lyrics-creator-profile-title-wrap" },
+					react.createElement("h2", { className: "lyrics-creator-profile-header-title" }, copy.title)
+				),
+				react.createElement(
+					"button",
+					{
+						type: "button",
+						className: "lyrics-creator-profile-close",
+						onClick: onClose,
+						title: copy.back
+					},
+					closeIcon
+				)
+			),
+			react.createElement(
+				"div",
+				{
+					className: "lyrics-creator-profile-body",
+					ref: bodyRef,
+					onScroll: maybeLoadMore
+				},
+				content
+			),
+			react.createElement(
+				"div",
+				{ className: "lyrics-creator-profile-footer" },
+				react.createElement(
+					"button",
+					{
+						type: "button",
+						className: "lyrics-creator-profile-footer-btn",
+						onClick: onClose
+					},
+					copy.back
+				)
+			)
+		)
+	);
+});
+
+// CreditFooter implementing provider and contributor display
+const CreditFooter = react.memo(({ provider, contributors }) => {
+	const copy = getCreatorProfileCopy();
+	const reactDom = window.Spicetify?.ReactDOM ?? window.ReactDOM ?? null;
+	const visibleContributors = useMemo(() => getDisplayContributors(contributors, 3), [contributors]);
+	const [activeContributor, setActiveContributor] = useState(null);
+	const [creatorProfile, setCreatorProfile] = useState(null);
+	const [profileLoading, setProfileLoading] = useState(false);
+	const [profileError, setProfileError] = useState(null);
+	const [likePending, setLikePending] = useState(false);
+	const [profileLoadingMore, setProfileLoadingMore] = useState(false);
+	const [profileListRefreshing, setProfileListRefreshing] = useState(false);
+	const [profileSort, setProfileSort] = useState("recent");
+	const [profileArtistFilter, setProfileArtistFilter] = useState(null);
+	const requestIdRef = useRef(0);
+
+	const closeProfile = useCallback(() => {
+		requestIdRef.current += 1;
+		setActiveContributor(null);
+		setCreatorProfile(null);
+		setProfileLoading(false);
+		setProfileError(null);
+		setLikePending(false);
+		setProfileLoadingMore(false);
+		setProfileListRefreshing(false);
+		setProfileSort("recent");
+		setProfileArtistFilter(null);
+	}, []);
+
+	useEffect(() => {
+		if (!activeContributor) {
+			return undefined;
+		}
+
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") {
+				closeProfile();
+			}
+		};
+
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [activeContributor, closeProfile]);
+
+	const loadCreatorProfile = useCallback(async (contributor, options = {}) => {
+		if (!contributor?.profileAvailable || !contributor.userHash) {
+			return;
+		}
+
+		const {
+			offset = 0,
+			sort = "recent",
+			artist = null,
+			append = false,
+			preserveProfile = false
+		} = options;
+		const requestId = requestIdRef.current + 1;
+		requestIdRef.current = requestId;
+		if (append) {
+			setProfileLoadingMore(true);
+		} else if (preserveProfile) {
+			setProfileListRefreshing(true);
+		} else {
+			setProfileLoading(true);
+			setProfileError(null);
+			setProfileLoadingMore(false);
+		}
+
+		try {
+			const data = await Utils.fetchSyncCreatorProfile(contributor.userHash, {
+				limit: CREATOR_PROFILE_PAGE_SIZE,
+				offset,
+				sort,
+				artist
+			});
+			if (requestIdRef.current !== requestId) {
+				return;
+			}
+
+			setCreatorProfile((currentProfile) => {
+				if (!append || !currentProfile || currentProfile.userHash !== data.userHash) {
+					if (preserveProfile && currentProfile && currentProfile.userHash === data.userHash) {
+						return {
+							...currentProfile,
+							...data,
+							account: data.account || currentProfile.account,
+							displayName: data.displayName || currentProfile.displayName
+						};
+					}
+
+					return data;
+				}
+
+				return {
+					...data,
+					contributions: mergeCreatorProfileContributions(
+						currentProfile.contributions,
+						data.contributions
+					),
+					stats: {
+						...currentProfile.stats,
+						...data.stats
+					},
+					viewer: {
+						...currentProfile.viewer,
+						...data.viewer
+					},
+					artistStats: data.artistStats || currentProfile.artistStats,
+					filters: data.filters || currentProfile.filters
+				};
+			});
+		} catch (error) {
+			if (requestIdRef.current !== requestId) {
+				return;
+			}
+			if (append) {
+				Toast.error(error.message || copy.loadFailed);
+			} else if (preserveProfile) {
+				Toast.error(error.message || copy.loadFailed);
+			} else {
+				setProfileError(error.message || copy.loadFailed);
+			}
+		} finally {
+			if (requestIdRef.current === requestId) {
+				if (append) {
+					setProfileLoadingMore(false);
+				} else if (preserveProfile) {
+					setProfileListRefreshing(false);
+				} else {
+					setProfileLoading(false);
+				}
+			}
+		}
+	}, [copy.loadFailed]);
+
+	const openCreatorProfile = useCallback(async (contributor) => {
+		if (!contributor?.profileAvailable || !contributor.userHash) {
+			return;
+		}
+
+		setActiveContributor(contributor);
+		setProfileError(null);
+		setLikePending(false);
+		setProfileSort("recent");
+		setProfileArtistFilter(null);
+		setProfileListRefreshing(false);
+		setCreatorProfile(createCreatorProfileShell(contributor, {
+			sort: "recent",
+			artist: null
+		}));
+		void loadCreatorProfile(contributor, {
+			offset: 0,
+			sort: "recent",
+			artist: null,
+			append: false
+		});
+	}, [loadCreatorProfile]);
+
+	const handleLoadMore = useCallback(async () => {
+		if (!activeContributor?.userHash || !creatorProfile?.pagination?.hasMore || profileLoadingMore) {
+			return;
+		}
+
+		await loadCreatorProfile(activeContributor, {
+			offset: Number(creatorProfile.pagination?.nextOffset || creatorProfile.contributions?.length || 0),
+			sort: profileSort,
+			artist: profileArtistFilter,
+			append: true
+		});
+	}, [activeContributor, creatorProfile, loadCreatorProfile, profileArtistFilter, profileLoadingMore, profileSort]);
+
+	const handleSortChange = useCallback(async (nextSort) => {
+		if (!activeContributor?.userHash || !nextSort || nextSort === profileSort) {
+			return;
+		}
+
+		setProfileSort(nextSort);
+		void loadCreatorProfile(activeContributor, {
+			offset: 0,
+			sort: nextSort,
+			artist: profileArtistFilter,
+			append: false,
+			preserveProfile: true
+		});
+	}, [activeContributor, loadCreatorProfile, profileArtistFilter, profileSort]);
+
+	const handleArtistFilterChange = useCallback(async (nextArtist) => {
+		if (!activeContributor?.userHash) {
+			return;
+		}
+
+		const normalizedArtist = typeof nextArtist === "string" && nextArtist.trim()
+			? nextArtist.trim()
+			: null;
+
+		if (normalizedArtist === profileArtistFilter) {
+			return;
+		}
+
+		setProfileArtistFilter(normalizedArtist);
+		void loadCreatorProfile(activeContributor, {
+			offset: 0,
+			sort: profileSort,
+			artist: normalizedArtist,
+			append: false,
+			preserveProfile: true
+		});
+	}, [activeContributor, loadCreatorProfile, profileArtistFilter, profileSort]);
+
+	const handleToggleLike = useCallback(async () => {
+		if (!creatorProfile?.userHash) {
+			return;
+		}
+
+		if (!creatorProfile.viewer?.authenticated) {
+			Toast.error(copy.likeLoginRequired);
+			return;
+		}
+
+		setLikePending(true);
+		try {
+			const result = await Utils.setSyncCreatorLike(creatorProfile.userHash, !creatorProfile.viewer?.liked);
+			setCreatorProfile((currentProfile) => currentProfile
+				? {
+					...currentProfile,
+					stats: {
+						...currentProfile.stats,
+						likeCount: result.likeCount
+					},
+					viewer: {
+						...currentProfile.viewer,
+						liked: result.liked
+					}
+				}
+				: currentProfile
+			);
+		} catch (error) {
+			Toast.error(error.message || copy.likeActionFailed);
+		} finally {
+			setLikePending(false);
+		}
+	}, [copy.likeActionFailed, copy.likeLoginRequired, creatorProfile]);
+
+	const handleTrackClick = useCallback((trackId) => {
+		if (!trackId) {
+			return;
+		}
+
+		closeProfile();
+		Spicetify?.Platform?.History?.push?.(`/track/${trackId}`);
+	}, [closeProfile]);
+
+	if (!provider) {
+		return null;
+	}
+
+	const footer = react.createElement(
 		"div",
 		{
 			className: "lyrics-credit-footer",
 			style: {
 				position: "absolute",
 				bottom: "40px",
-				width: "100%",
+				left: "50%",
+				transform: "translateX(-50%)",
+				width: "max-content",
+				maxWidth: "min(92%, 980px)",
 				fontSize: "12px",
 				color: "var(--lyrics-color-inactive)",
 				opacity: 0.7,
 				textAlign: "center",
 				zIndex: 200,
-				pointerEvents: "none",
-				textShadow: "0 0 10px rgba(0,0,0,0.5)"
+				textShadow: "0 0 10px rgba(0,0,0,0.5)",
+				pointerEvents: "auto"
 			}
 		},
-		text
+		react.createElement(
+			"div",
+			{
+				className: "lyrics-credit-footer-content",
+				onPointerDown: (event) => event.stopPropagation(),
+				onClick: (event) => event.stopPropagation(),
+				onMouseDown: (event) => event.stopPropagation()
+			},
+			react.createElement(
+				"span",
+				{ className: "lyrics-credit-footer-group" },
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-label" },
+					I18n.t("misc.lyricsProvider") || "Lyrics Provider"
+				),
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-value" },
+					provider
+				)
+			),
+			visibleContributors.length > 0 && react.createElement(
+				react.Fragment,
+				null,
+				react.createElement("span", { className: "lyrics-credit-footer-divider", "aria-hidden": "true" }, "•"),
+				react.createElement(
+					"span",
+					{ className: "lyrics-credit-footer-group" },
+					react.createElement(
+						"span",
+						{ className: "lyrics-credit-footer-label" },
+						I18n.t("misc.syncContributor") || "Sync Contributor"
+					),
+					react.createElement(
+						"span",
+						{ className: "lyrics-credit-footer-value lyrics-credit-footer-contributors" },
+						...visibleContributors.flatMap((contributor, index) => {
+							const node = contributor.profileAvailable
+								? react.createElement(
+									"button",
+									{
+										type: "button",
+										key: contributor.key,
+										className: "lyrics-credit-footer-link",
+										onPointerDown: (event) => event.stopPropagation(),
+										onMouseDown: (event) => event.stopPropagation(),
+										onClick: (event) => {
+											event.stopPropagation();
+											openCreatorProfile(contributor);
+										},
+										title: copy.openProfile
+									},
+									contributor.name
+								)
+								: react.createElement(
+									"span",
+									{
+										key: contributor.key,
+										className: "lyrics-credit-footer-name"
+									},
+									contributor.name
+								);
+
+							return index < visibleContributors.length - 1
+								? [node, react.createElement("span", { key: `${contributor.key}:comma`, className: "lyrics-credit-footer-separator" }, ", ")]
+								: [node];
+						})
+					)
+				)
+			)
+		)
+	);
+
+	const modal = activeContributor
+		? react.createElement(SyncCreatorProfileModal, {
+			contributor: activeContributor,
+			profile: creatorProfile,
+			loading: profileLoading,
+			error: profileError,
+			likePending,
+			loadMorePending: profileLoadingMore,
+			listRefreshing: profileListRefreshing,
+			onClose: closeProfile,
+			onToggleLike: handleToggleLike,
+			onLoadMore: handleLoadMore,
+			onTrackClick: handleTrackClick,
+			activeSortMode: profileSort,
+			activeArtistFilter: profileArtistFilter,
+			onSortChange: handleSortChange,
+			onArtistFilterChange: handleArtistFilterChange
+		})
+		: null;
+
+	return react.createElement(
+		react.Fragment,
+		null,
+		footer,
+		modal && reactDom?.createPortal && document.body
+			? reactDom.createPortal(modal, document.body)
+			: modal
 	);
 });
 window.CreditFooter = CreditFooter;
@@ -213,7 +1133,8 @@ const useLyricsPlaybackPosition = () => {
 	const trackOffset = useTrackOffsetState();
 
 	useTrackPosition(() => {
-		const newPos = Spicetify.Player.getProgress();
+		const newPos = window.Utils?.getSafePlayerProgress?.()
+			?? (Spicetify.Player.getProgress?.() || 0);
 		const delay = CONFIG.visual.delay + trackOffset;
 		setPosition(newPos + delay);
 	});
@@ -342,6 +1263,24 @@ const getUnsyncedLineRenderData = (lyrics, text, originalText, text2) => {
 		showMode2Translation,
 		belowMode,
 		showMode2,
+	};
+};
+
+const buildLyricDisplayState = (isKara, line, text, originalText, text2) => {
+	const { mainText, subText, subText2 } = getLyricsDisplayMode(
+		isKara,
+		line,
+		text,
+		originalText,
+		text2
+	);
+
+	return {
+		mainText,
+		subText,
+		subText2,
+		hasSubLine: !!subText || !!subText2,
+		originalText,
 	};
 };
 
@@ -492,6 +1431,237 @@ const buildGlobalCharState = (lyrics, position) => {
 	};
 };
 
+const EMPTY_GLOBAL_CHAR_STATE = {
+	globalCharOffsets: [],
+	activeGlobalCharIndex: -1,
+};
+
+const KARAOKE_PRE_SPACE_MIN_DURATION_MS = 45;
+const KARAOKE_PRE_SPACE_NEXT_CHAR_RATIO = 0.7;
+const KARAOKE_PRE_SPACE_MAX_DURATION_MS = 120;
+const PSEUDO_KARAOKE_SOURCES = new Set(["audio-analysis-pseudo", "spotify-audio-analysis"]);
+const KARAOKE_NO_WORD_WRAP_LANGUAGE_PREFIXES = ["ja", "zh", "th", "lo", "km", "my"];
+const KARAOKE_RTL_STRONG_CHAR_REGEX = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/u;
+const KARAOKE_LTR_STRONG_CHAR_REGEX = /[A-Za-z\u00C0-\u02AF\u0370-\u052F\u1E00-\u1EFF]/u;
+const KARAOKE_JOINING_SCRIPT_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFC]/u;
+
+const getKaraokeTextDirection = (text) => {
+	const normalizedText = typeof text === "string" ? text : "";
+	let rtlCount = 0;
+	let ltrCount = 0;
+
+	for (const char of Array.from(normalizedText)) {
+		if (KARAOKE_RTL_STRONG_CHAR_REGEX.test(char)) {
+			rtlCount++;
+			continue;
+		}
+		if (KARAOKE_LTR_STRONG_CHAR_REGEX.test(char)) {
+			ltrCount++;
+		}
+	}
+
+	return rtlCount > ltrCount ? "rtl" : "ltr";
+};
+
+const shouldUseKaraokeTextRun = (text) => {
+	const normalizedText = typeof text === "string" ? text : "";
+	return KARAOKE_RTL_STRONG_CHAR_REGEX.test(normalizedText) ||
+		KARAOKE_JOINING_SCRIPT_REGEX.test(normalizedText);
+};
+
+const shouldWrapKaraokeByWord = (text, language) => {
+	const normalizedText = typeof text === "string" ? text : "";
+	if (!/\S\s+\S/u.test(normalizedText)) {
+		return false;
+	}
+
+	const normalizedLanguage = String(language || "").toLowerCase();
+	if (!normalizedLanguage) {
+		return true;
+	}
+
+	return !KARAOKE_NO_WORD_WRAP_LANGUAGE_PREFIXES.some((prefix) =>
+		normalizedLanguage === prefix || normalizedLanguage.startsWith(`${prefix}-`)
+	);
+};
+
+const buildKaraokeWordElements = (timedChars, charElements) => {
+	if (!Array.isArray(timedChars) || !Array.isArray(charElements) || timedChars.length !== charElements.length) {
+		return charElements;
+	}
+
+	const wordElements = [];
+	let currentWord = [];
+	let currentWordStart = 0;
+
+	const flushWord = () => {
+		if (currentWord.length === 0) {
+			return;
+		}
+
+		wordElements.push(react.createElement(
+			"span",
+			{
+				className: "lyrics-karaoke-word",
+				key: `karaoke-word-${currentWordStart}`,
+			},
+			currentWord
+		));
+		currentWord = [];
+	};
+
+	timedChars.forEach((charInfo, index) => {
+		const char = charInfo?.char || "";
+		const element = charElements[index];
+		const isWhitespace = /\s/u.test(char);
+
+		if (!isWhitespace && currentWord.length === 0) {
+			currentWordStart = index;
+		}
+
+		if (isWhitespace) {
+			if (currentWord.length > 0) {
+				currentWord.push(element);
+				flushWord();
+			} else {
+				wordElements.push(element);
+			}
+			return;
+		}
+
+		currentWord.push(element);
+	});
+
+	flushWord();
+	return wordElements;
+};
+
+const getKaraokeSegmentFill = (segment, position, isActive, isComplete) => {
+	if (isComplete) {
+		return 100;
+	}
+	if (!isActive || !segment) {
+		return 0;
+	}
+
+	const startTime = Number.isFinite(segment.startTime) ? segment.startTime : 0;
+	const endTime = Number.isFinite(segment.endTime) ? segment.endTime : startTime;
+	if (position <= startTime) {
+		return 0;
+	}
+	if (position >= endTime) {
+		return 100;
+	}
+
+	return Math.max(0, Math.min(100, ((position - startTime) / Math.max(1, endTime - startTime)) * 100));
+};
+
+const buildKaraokeTextRunSegments = (timedChars) => {
+	if (!Array.isArray(timedChars) || timedChars.length === 0) {
+		return [];
+	}
+
+	const segments = [];
+	let currentSegment = null;
+
+	const flushSegment = () => {
+		if (!currentSegment || currentSegment.text.length === 0) {
+			currentSegment = null;
+			return;
+		}
+		segments.push(currentSegment);
+		currentSegment = null;
+	};
+
+	timedChars.forEach((charInfo, index) => {
+		const char = charInfo?.char || "";
+		const type = /\s/u.test(char) ? "space" : "text";
+		if (!currentSegment || currentSegment.type !== type) {
+			flushSegment();
+			currentSegment = {
+				type,
+				startIndex: index,
+				text: "",
+				startTime: Number.isFinite(charInfo?.startTime) ? charInfo.startTime : 0,
+				endTime: Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0,
+			};
+		}
+
+		currentSegment.text += char;
+		if (Number.isFinite(charInfo?.endTime)) {
+			currentSegment.endTime = Math.max(currentSegment.endTime, charInfo.endTime);
+		}
+	});
+
+	flushSegment();
+	return segments;
+};
+
+const buildKaraokeTextRunElements = (timedChars, position, isActive, isComplete, textDirection) => {
+	const segments = buildKaraokeTextRunSegments(timedChars);
+	const renderSegments = textDirection === "rtl" ? [...segments].reverse() : segments;
+
+	return renderSegments.map((segment) => {
+		if (segment.type === "space") {
+			return react.createElement(
+				"span",
+				{
+					className: "lyrics-karaoke-text-run-space",
+					key: `karaoke-text-run-space-${segment.startIndex}`,
+				},
+				segment.text
+			);
+		}
+
+		const fillValue = getKaraokeSegmentFill(segment, position, isActive, isComplete);
+		const softEdge = 10;
+		const shouldFeather = fillValue > 0 && fillValue < 100;
+		const bounce = getKaraokeBounceValues(position, isActive, segment.startTime, segment.endTime);
+		const segmentDirection = getKaraokeTextDirection(segment.text) || textDirection;
+		const gradientDirection = segmentDirection === "rtl" ? "to left" : "to right";
+		const segmentStyle = {
+			"--karaoke-gradient-direction": gradientDirection,
+			"--karaoke-char-fill": `${fillValue}%`,
+			"--karaoke-char-fill-soft-start": `${shouldFeather ? Math.max(0, fillValue - softEdge) : fillValue}%`,
+			"--karaoke-char-fill-soft-end": `${shouldFeather ? Math.min(100, fillValue + softEdge) : fillValue}%`,
+			"--karaoke-bounce-y": `${bounce.offsetY}px`,
+			"--karaoke-bounce-scale": bounce.scale,
+		};
+
+		return react.createElement(
+			"span",
+			{
+				className: `lyrics-karaoke-text-run-segment${isComplete ? " is-complete" : ""}`,
+				dir: segmentDirection,
+				style: segmentStyle,
+				key: `karaoke-text-run-segment-${segment.startIndex}`,
+			},
+			segment.text
+		);
+	});
+};
+
+const getPseudoKaraokeRenderAdvance = (karaokeSource) => {
+	if (!PSEUDO_KARAOKE_SOURCES.has(karaokeSource)) {
+		return 0;
+	}
+
+	const configuredAdvance = Number(CONFIG.visual["pseudo-karaoke-render-advance"] ?? 0);
+	return Number.isFinite(configuredAdvance) ? configuredAdvance : 0;
+};
+
+const buildPreparedSyncedLyrics = (lyrics, isKara) =>
+	lyrics.map((line) => ({
+		...line,
+		...buildLyricDisplayState(
+			isKara,
+			line,
+			line?.text,
+			line?.originalText,
+			line?.text2
+		),
+	}));
+
 const buildPaddedSyncedLyrics = (lyrics, leadingEmptyLines) =>
 	Array.from({ length: leadingEmptyLines }, () => emptyLine)
 		.concat(lyrics)
@@ -541,7 +1711,7 @@ const LyricsLineBlock = react.memo(({
 	style,
 	lineRef = null,
 	dir = "auto",
-	onClick = null,
+	seekTime = null,
 	mainText,
 	subText = null,
 	subText2 = null,
@@ -580,6 +1750,13 @@ const LyricsLineBlock = react.memo(({
 		mainProps.dangerouslySetInnerHTML = { __html: Utils.rubyTextToHTML(mainText) };
 	}
 
+	const handleClick = useCallback(() => {
+		if (Number.isFinite(seekTime)) {
+			window.Utils?.clearSafePlayerProgressCorrection?.();
+			Spicetify.Player.seek(seekTime);
+		}
+	}, [seekTime]);
+
 	return react.createElement(
 		"div",
 		{
@@ -587,7 +1764,7 @@ const LyricsLineBlock = react.memo(({
 			style,
 			dir,
 			ref: lineRef,
-			onClick,
+			onClick: Number.isFinite(seekTime) ? handleClick : null,
 		},
 		react.createElement(
 			"p",
@@ -596,7 +1773,7 @@ const LyricsLineBlock = react.memo(({
 				isKara,
 				mainText,
 				line: mainLine,
-				position,
+				position: isKara ? position : 0,
 				isActive,
 				globalCharOffset,
 				activeGlobalCharIndex,
@@ -619,6 +1796,39 @@ const LyricsLineBlock = react.memo(({
 	);
 });
 
+const renderLyricsItems = ({ items, isKara, position = 0, activeLineRef = null }) => {
+	const karaokePosition = isKara ? position : 0;
+
+	return items.map((item) => {
+		if (item.type === "indicator") {
+			return react.createElement(IdlingIndicator, {
+				key: item.key,
+				isActive: item.isActive,
+				progress: item.progress,
+				delay: item.delay,
+			});
+		}
+
+		return react.createElement(LyricsLineBlock, {
+			key: item.key,
+			className: item.className,
+			style: item.style,
+			lineRef: item.trackLineRef ? activeLineRef : null,
+			seekTime: item.canSeek ? item.startTime : null,
+			mainText: item.mainText,
+			subText: item.subText,
+			subText2: item.subText2,
+			originalText: item.originalText,
+			isKara,
+			line: item.line,
+			position: karaokePosition,
+			isActive: item.karaokeActive,
+			globalCharOffset: item.globalCharOffset,
+			activeGlobalCharIndex: item.activeGlobalCharIndex,
+		});
+	});
+};
+
 const SyncedLyricsScrollView = react.memo(({
 	lyrics = [],
 	position = 0,
@@ -639,7 +1849,7 @@ const SyncedLyricsScrollView = react.memo(({
 		},
 		...lyrics.map((line, index) => {
 			const { text, startTime, originalText, text2 } = line;
-			const { mainText, subText, subText2 } = getLyricsDisplayMode(
+			const { mainText, subText, subText2, hasSubLine } = buildLyricDisplayState(
 				isKara,
 				line,
 				text,
@@ -647,7 +1857,6 @@ const SyncedLyricsScrollView = react.memo(({
 				text2
 			);
 			const isActiveLine = index === activeLyricIndex;
-			const hasSubLine = !!subText || !!subText2;
 
 			return react.createElement(LyricsLineBlock, {
 				key: `scroll-line-${startTime ?? index}-${index}`,
@@ -656,7 +1865,7 @@ const SyncedLyricsScrollView = react.memo(({
 					cursor: Number.isFinite(startTime) ? "pointer" : "default",
 				},
 				lineRef: isActiveLine ? activeLineRef : null,
-				onClick: Number.isFinite(startTime) ? () => Spicetify.Player.seek(startTime) : null,
+				seekTime: Number.isFinite(startTime) ? startTime : null,
 				mainText,
 				subText,
 				subText2,
@@ -688,9 +1897,14 @@ const useSyncedLyricsEngine = ({
 		compact ? [lyricsId, containerReady] : [lyricsId]
 	);
 
+	const preparedLyrics = useMemo(
+		() => buildPreparedSyncedLyrics(lyrics, isKara),
+		[lyrics, isKara]
+	);
+
 	const paddedLyrics = useMemo(
-		() => buildPaddedSyncedLyrics(lyrics, leadingEmptyLines),
-		[lyrics, leadingEmptyLines]
+		() => buildPaddedSyncedLyrics(preparedLyrics, leadingEmptyLines),
+		[preparedLyrics, leadingEmptyLines]
 	);
 
 	const activeLineIndex = useMemo(
@@ -706,7 +1920,19 @@ const useSyncedLyricsEngine = ({
 		return Math.max(activeLineIndex - CONFIG.visual["lines-before"], 0);
 	}, [compact, activeLineIndex]);
 
-	const linesToRender = paddedLyrics;
+	const linesToRender = useMemo(() => {
+		if (!compact || isScrolling) {
+			return paddedLyrics;
+		}
+
+		const startIndex = Math.max(compactWindowStartIndex - 2, 0);
+		const endIndex = Math.min(
+			activeLineIndex + CONFIG.visual["lines-after"] + 3,
+			paddedLyrics.length
+		);
+
+		return paddedLyrics.slice(startIndex, endIndex);
+	}, [compact, isScrolling, paddedLyrics, compactWindowStartIndex, activeLineIndex]);
 	const compactAnchorIndex = compact
 		? Math.min(CONFIG.visual["lines-before"], leadingEmptyLines)
 		: activeLineIndex;
@@ -719,10 +1945,13 @@ const useSyncedLyricsEngine = ({
 		? leadingEmptyLines
 		: activeLineIndex;
 
-	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(
-		() => buildGlobalCharState(lyrics, position),
-		[lyrics, position]
-	);
+	const { globalCharOffsets, activeGlobalCharIndex } = useMemo(() => {
+		if (!isKara) {
+			return EMPTY_GLOBAL_CHAR_STATE;
+		}
+
+		return buildGlobalCharState(lyrics, position);
+	}, [lyrics, position, isKara]);
 
 	const compactOffset = compact
 		? getCompactSyncedOffset(containerRef.current, activeLineRef.current, isScrolling)
@@ -773,17 +2002,9 @@ const useSyncedLyricsEngine = ({
 
 	const renderItems = useMemo(() => {
 		if (compact && isScrolling) {
-			return lyrics.map((line, index) => {
-				const { text, startTime, originalText, text2 } = line;
-				const { mainText, subText, subText2 } = getLyricsDisplayMode(
-					isKara,
-					line,
-					text,
-					originalText,
-					text2
-				);
+			return preparedLyrics.map((line, index) => {
+				const { startTime, originalText, mainText, subText, subText2, hasSubLine } = line;
 				const isActiveLine = index === Math.max(0, activeLineIndex - leadingEmptyLines);
-				const hasSubLine = !!subText || !!subText2;
 
 				return {
 					type: "line",
@@ -809,7 +2030,14 @@ const useSyncedLyricsEngine = ({
 		}
 
 		return linesToRender.map((line, visibleIndex) => {
-			const { lineNumber = visibleIndex, text, startTime, originalText, text2 } = line;
+			const {
+				lineNumber = visibleIndex,
+				startTime,
+				originalText,
+				mainText,
+				subText,
+				subText2,
+			} = line;
 			const compactVisibleIndex = compact
 				? lineNumber - compactWindowStartIndex
 				: visibleIndex;
@@ -846,8 +2074,6 @@ const useSyncedLyricsEngine = ({
 				lineNumber,
 				visibleIndex: compactVisibleIndex,
 			});
-			const { mainText, subText, subText2 } = getLyricsDisplayMode(isKara, line, text, originalText, text2);
-
 			let className = "lyrics-lyricsContainer-LyricsLine";
 			if (isActiveLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-active";
@@ -897,6 +2123,7 @@ const useSyncedLyricsEngine = ({
 		activeLineIndex,
 		leadingEmptyLines,
 		lyrics,
+		preparedLyrics,
 		position,
 		paddedLyrics,
 		isScrolling,
@@ -1174,6 +2401,46 @@ const buildKaraokeTimedChars = (line) => {
 	}));
 };
 
+const applyKaraokeWhitespaceCompensation = (timedChars) => {
+	if (!Array.isArray(timedChars) || timedChars.length < 2) {
+		return timedChars;
+	}
+
+	let didChange = false;
+	const compensatedChars = timedChars.map((charInfo, index) => {
+		const nextCharInfo = timedChars[index + 1];
+		if (!nextCharInfo) {
+			return charInfo;
+		}
+
+		const currentChar = charInfo?.char || "";
+		const nextChar = nextCharInfo?.char || "";
+		const duration = Math.max(0, (charInfo?.endTime || 0) - (charInfo?.startTime || 0));
+		const nextCharDuration = Math.max(0, (nextCharInfo?.endTime || 0) - (nextCharInfo?.startTime || 0));
+		const isPreWhitespaceChar = currentChar && !/\s/u.test(currentChar) && /\s/u.test(nextChar);
+
+		if (!isPreWhitespaceChar || duration >= KARAOKE_PRE_SPACE_MIN_DURATION_MS) {
+			return charInfo;
+		}
+
+		const compensatedDuration = Math.max(
+			KARAOKE_PRE_SPACE_MIN_DURATION_MS,
+			Math.min(
+				KARAOKE_PRE_SPACE_MAX_DURATION_MS,
+				nextCharDuration * KARAOKE_PRE_SPACE_NEXT_CHAR_RATIO
+			)
+		);
+
+		didChange = true;
+		return {
+			...charInfo,
+			endTime: charInfo.startTime + compensatedDuration,
+		};
+	});
+
+	return didChange ? compensatedChars : timedChars;
+};
+
 const getKaraokeCharFill = (position, isActive, startTime, endTime) => {
 	if (!isActive) {
 		return 0;
@@ -1229,16 +2496,33 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 		return "";
 	}
 
-	const rawLineText = line.syllables?.map((syllable) => syllable?.text || "").join("")
-		|| getCopyableText(line.text)
-		|| "";
-	const processedText = Utils.applyFuriganaIfEnabled(rawLineText);
-	const furiganaMap = buildKaraokeFuriganaMap(processedText);
-	const timedChars = buildKaraokeTimedChars(line);
-	const { endTime } = getKaraokeLineBounds(line);
+	const furiganaEnabled = CONFIG?.visual?.["furigana-enabled"] === true;
+	const furiganaReady = window.FuriganaConverter?.isAvailable?.() === true;
+	const detectedLanguage = Utils.getDetectedLanguage?.() || null;
+
+	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun } = useMemo(() => {
+		const rawLineText = line.syllables?.map((syllable) => syllable?.text || "").join("")
+			|| getCopyableText(line.text)
+			|| "";
+		const processedText = Utils.applyFuriganaIfEnabled(rawLineText);
+		const compensatedTimedChars = applyKaraokeWhitespaceCompensation(buildKaraokeTimedChars(line));
+		const detectedTextDirection = getKaraokeTextDirection(rawLineText);
+
+		return {
+			furiganaMap: buildKaraokeFuriganaMap(processedText),
+			timedChars: compensatedTimedChars,
+			endTime: compensatedTimedChars.reduce(
+				(maxEndTime, charInfo) => Math.max(maxEndTime, Number.isFinite(charInfo?.endTime) ? charInfo.endTime : 0),
+				getKaraokeLineBounds(line).endTime
+			),
+			wrapByWord: shouldWrapKaraokeByWord(rawLineText, detectedLanguage),
+			textDirection: detectedTextDirection,
+			useTextRun: shouldUseKaraokeTextRun(rawLineText),
+		};
+	}, [line, furiganaEnabled, furiganaReady, detectedLanguage]);
 	const isComplete = isActive && position >= endTime;
 
-	const charElements = timedChars.map((charInfo, index) => {
+	const charElements = useTextRun ? [] : timedChars.map((charInfo, index) => {
 		const fillValue = Math.max(0, Math.min(100, getKaraokeCharFill(
 			position,
 			isActive,
@@ -1290,18 +2574,25 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 			react.createElement("rt", null, reading)
 		);
 	});
+	const lineChildren = useTextRun
+		? buildKaraokeTextRunElements(timedChars, position, isActive, isComplete, textDirection)
+		: wrapByWord
+		? buildKaraokeWordElements(timedChars, charElements)
+		: charElements;
 
 	return react.createElement(
 		"span",
 		{
-			className: `lyrics-karaoke-line${isActive ? " is-active" : ""}${isComplete ? " is-complete" : ""}`,
+			className: `lyrics-karaoke-line${wrapByWord || useTextRun ? " has-word-wrap" : ""}${useTextRun ? " is-text-run" : ""}${textDirection === "rtl" ? " is-rtl" : ""}${isActive ? " is-active" : ""}${isComplete ? " is-complete" : ""}`,
+			dir: useTextRun ? (textDirection === "rtl" ? "ltr" : textDirection) : undefined,
 		},
-		charElements
+		lineChildren
 	);
 });
 
-const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara }) => {
+const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null }) => {
 	const position = useLyricsPlaybackPosition();
+	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const [containerReady, setContainerReady] = useState(false);
 	const compactActiveLineEle = useRef();
 	const lyricContainerEle = useRef();
@@ -1323,7 +2614,7 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 		activeGlobalCharIndex,
 	} = useSyncedLyricsEngine({
 		lyrics,
-		position,
+		position: karaokePosition,
 		compact: true,
 		isKara,
 		containerRef: lyricContainerEle,
@@ -1392,33 +2683,11 @@ const SyncedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copy
 				},
 				key: lyricsId,
 			},
-			...renderItems.map((item) => {
-				if (item.type === "indicator") {
-					return react.createElement(IdlingIndicator, {
-						key: item.key,
-						progress: item.progress,
-						delay: item.delay,
-						isActive: item.isActive,
-					});
-				}
-
-				return react.createElement(LyricsLineBlock, {
-					key: item.key,
-					className: item.className,
-					style: item.style,
-					lineRef: item.trackLineRef ? compactActiveLineEle : null,
-					onClick: item.canSeek ? () => Spicetify.Player.seek(item.startTime) : null,
-					mainText: item.mainText,
-					subText: item.subText,
-					subText2: item.subText2,
-					originalText: item.originalText,
-					isKara,
-					line: item.line,
-					position,
-					isActive: item.karaokeActive,
-					globalCharOffset: item.globalCharOffset,
-					activeGlobalCharIndex: item.activeGlobalCharIndex,
-				});
+			...renderLyricsItems({
+				items: renderItems,
+				isKara,
+				position: karaokePosition,
+				activeLineRef: compactActiveLineEle,
 			})
 		)
 	);
@@ -1493,6 +2762,10 @@ class SearchBar extends react.Component {
 		};
 		this.container = null;
 		this.instanceId = `searchbar-${Date.now()}-${Math.random()}`;
+		this.getNodeFromInput = this.getNodeFromInput.bind(this);
+		this.handleInputRef = (node) => {
+			this.container = node;
+		};
 	}
 
 	componentDidMount() {
@@ -1606,12 +2879,10 @@ class SearchBar extends react.Component {
 			{
 				className: `lyrics-Searchbar${this.state.hidden ? " hidden" : ""}`,
 			},
-			react.createElement("input", {
-				ref: (c) => {
-					this.container = c;
-				},
-				onChange: this.getNodeFromInput.bind(this),
-			}),
+						react.createElement("input", {
+								ref: this.handleInputRef,
+								onChange: this.getNodeFromInput,
+						}),
 			react.createElement("svg", {
 				width: 16,
 				height: 16,
@@ -1649,8 +2920,9 @@ function isInViewport(element) {
 	);
 }
 
-const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara }) => {
+const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributors, copyright, isKara, karaokeSource = null }) => {
 	const position = useLyricsPlaybackPosition();
+	const karaokePosition = isKara ? position + getPseudoKaraokeRenderAdvance(karaokeSource) : position;
 	const activeLineRef = useRef(null);
 	const pageRef = useRef(null);
 	const lyricsId = useMemo(() => lyrics[0]?.text || "no-lyrics", [lyrics]);
@@ -1659,7 +2931,7 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 		renderItems,
 	} = useSyncedLyricsEngine({
 		lyrics,
-		position,
+		position: karaokePosition,
 		compact: false,
 		isKara,
 		containerRef: pageRef,
@@ -1682,31 +2954,11 @@ const SyncedExpandedLyricsPage = react.memo(({ lyrics = [], provider, contributo
 		react.createElement("p", {
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
 		}),
-		...renderItems.map((item) => {
-			if (item.type === "indicator") {
-				return react.createElement(IdlingIndicator, {
-					key: item.key,
-					isActive: item.isActive,
-					progress: item.progress,
-					delay: item.delay,
-				});
-			}
-
-			return react.createElement(LyricsLineBlock, {
-				key: item.key,
-				className: item.className,
-				style: item.style,
-				lineRef: item.trackLineRef ? activeLineRef : null,
-				onClick: item.canSeek ? () => Spicetify.Player.seek(item.startTime) : null,
-				mainText: item.mainText,
-				subText: item.subText,
-				subText2: item.subText2,
-				originalText: item.originalText,
-				isKara,
-				line: item.line,
-				position,
-				isActive: item.karaokeActive,
-			});
+		...renderLyricsItems({
+			items: renderItems,
+			isKara,
+			position: karaokePosition,
+			activeLineRef,
 		}),
 		react.createElement("p", {
 			className: "lyrics-lyricsContainer-LyricsUnsyncedPadding",
@@ -1900,6 +3152,7 @@ const LyricsPageRenderer = react.memo(({
 	trackUri = "",
 	currentLyrics = [],
 	karaoke = null,
+	karaokeSource = null,
 	synced = null,
 	unsynced = null,
 	provider = null,
@@ -1935,6 +3188,7 @@ const LyricsPageRenderer = react.memo(({
 					contributors,
 					copyright,
 					isKara: true,
+					karaokeSource,
 					reRenderLyricsPage,
 				},
 			};
@@ -1979,6 +3233,7 @@ const LyricsPageRenderer = react.memo(({
 		syncedMode,
 		unsyncedMode,
 		karaoke,
+		karaokeSource,
 		synced,
 		unsynced,
 		karaokeLyrics,

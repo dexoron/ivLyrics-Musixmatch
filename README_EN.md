@@ -1,4 +1,4 @@
-<img width="2208" height="512" alt="en" src="https://github.com/user-attachments/assets/8441680c-68a3-435c-b22a-d674948807a3" />
+<img width="2208" height="512" alt="en" src="https://github.com/ivLis-Studio/ivLyrics/blob/main/preview_readme_en.png?raw=true" />
 
 ---
 
@@ -11,7 +11,7 @@
 
 ### ivLyrics - Enjoy music in your language.
 
-A lyrics extension for Spicetify. It supports pronunciation guides and translations for multiple languages using the Google Gemini API.
+A lyrics extension for Spicetify. It supports pronunciation guides and translations for multiple languages using the AI API.
 
 For bug reports and feature suggestions, please contact us through GitHub Issues or [Discord](https://discord.gg/2fu36fUzdE).
 
@@ -54,7 +54,7 @@ For bug reports and feature suggestions, please contact us through GitHub Issues
 - Extensive font, color, and layout customization
 
 ### Supported Languages
-Korean, English, Japanese, Chinese (Simplified/Traditional), Spanish, French, German, Italian, Portuguese, Russian, Arabic, Persian, Hindi, Bengali, Thai, Vietnamese, Indonesian
+Korean, English, Japanese, Chinese (Simplified/Traditional), Spanish, French, German, Italian, Russian, Swedish, Portuguese, Arabic, Persian, Hindi, Bengali, Thai, Vietnamese, Indonesian
 
 ---
 

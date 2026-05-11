@@ -10,7 +10,8 @@
     var fallbackData = {};
     var STORAGE_KEY = "ivLyrics:visual:language";
     var DEFAULT_LANGUAGE = "ko";
-    var AVAILABLE_LANGUAGES = ["ko", "en", "zh-CN", "zh-TW", "ja", "es", "fr", "de", "it", "ru", "pt", "hi", "ar", "fa", "bn", "ur", "th", "vi", "id"];
+    var LANGUAGE_CODES = ["ko", "en", "zh-CN", "zh-TW", "ja", "es", "fr", "de", "it", "ru", "sv", "pt", "hi", "ar", "fa", "bn", "ur", "th", "vi", "id"];
+    var AVAILABLE_LANGUAGES = [];
 
     // Language display names
     var LANGUAGE_NAMES = {
@@ -24,6 +25,7 @@
         de: "Deutsch",
         it: "Italiano",
         ru: "Русский",
+        sv: "Svenska",
         pt: "Português",
         hi: "हिन्दी",
         ar: "العربية",
@@ -69,6 +71,9 @@
         if (langCode === 'ru' && typeof window.LANG_RU !== 'undefined' && window.LANG_RU) {
             return window.LANG_RU;
         }
+        if (langCode === 'sv' && typeof window.LANG_SV !== 'undefined' && window.LANG_SV) {
+            return window.LANG_SV;
+        }
         if (langCode === 'pt' && typeof window.LANG_PT !== 'undefined' && window.LANG_PT) {
             return window.LANG_PT;
         }
@@ -100,6 +105,30 @@
     }
 
     /**
+     * Keep the public language list aligned with language files actually loaded.
+     */
+    function refreshAvailableLanguages() {
+        var hasDefaultLanguage = false;
+        AVAILABLE_LANGUAGES.length = 0;
+
+        for (var i = 0; i < LANGUAGE_CODES.length; i++) {
+            var code = LANGUAGE_CODES[i];
+            if (getLanguageData(code)) {
+                AVAILABLE_LANGUAGES.push(code);
+                if (code === DEFAULT_LANGUAGE) {
+                    hasDefaultLanguage = true;
+                }
+            }
+        }
+
+        if (!hasDefaultLanguage) {
+            AVAILABLE_LANGUAGES.unshift(DEFAULT_LANGUAGE);
+        }
+
+        return AVAILABLE_LANGUAGES;
+    }
+
+    /**
      * Get nested value from object by key path
      */
     function getNestedValue(obj, keyPath) {
@@ -117,7 +146,7 @@
     }
 
     /**
-     * Get translation string - safe version that always returns something
+     * Get translation string.
      */
     function getString(keyPath, params) {
         if (!keyPath) return "";
@@ -135,9 +164,9 @@
             value = getNestedValue(fallbackData, keyPath);
         }
 
-        // Return key if no translation found
+        // Return an empty string if no translation found so caller fallbacks can run.
         if (value === null) {
-            return keyPath;
+            return "";
         }
 
         // Replace parameters
@@ -155,6 +184,7 @@
      */
     function initSync() {
         if (currentLanguage !== null) return;
+        refreshAvailableLanguages();
 
         // Get saved language
         var savedLang = null;
@@ -210,6 +240,8 @@
      * Set language and save to storage
      */
     function setLanguage(langCode) {
+        refreshAvailableLanguages();
+
         if (AVAILABLE_LANGUAGES.indexOf(langCode) === -1) {
             console.error("[I18n] Invalid language: " + langCode);
             return Promise.resolve(false);
@@ -251,6 +283,8 @@
      * Get list of available languages
      */
     function getAvailableLanguages() {
+        refreshAvailableLanguages();
+
         return AVAILABLE_LANGUAGES.map(function (code) {
             return { code: code, name: LANGUAGE_NAMES[code] || code };
         });
@@ -272,8 +306,9 @@
     function getAllTranslations(keyPath) {
         if (!keyPath) return [];
         var translations = [];
-        for (var i = 0; i < AVAILABLE_LANGUAGES.length; i++) {
-            var langData = getLanguageData(AVAILABLE_LANGUAGES[i]);
+        var availableLanguages = refreshAvailableLanguages();
+        for (var i = 0; i < availableLanguages.length; i++) {
+            var langData = getLanguageData(availableLanguages[i]);
             if (langData) {
                 var value = getNestedValue(langData, keyPath);
                 if (value && translations.indexOf(value) === -1) {
@@ -290,6 +325,8 @@
     function isInitialized() {
         return currentLanguage !== null;
     }
+
+    refreshAvailableLanguages();
 
     // Create the I18n object
     var I18n = {

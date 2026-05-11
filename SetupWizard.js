@@ -1347,6 +1347,127 @@ const NowPlayingTipStep = ({ nowPlayingEnabled, onNowPlayingChange, onNext, onBa
   );
 };
 
+const PseudoKaraokeTipStep = ({ pseudoKaraokeEnabled, onPseudoKaraokeChange, onNext, onBack }) => {
+  return react.createElement(
+    "div",
+    {
+      className: "wizard-step pseudo-karaoke-tip-step",
+      style: wizardStepStyle,
+    },
+    react.createElement(
+      "h2",
+      { style: wizardTitleStyle },
+      I18n.t("setupWizard.pseudoKaraokeTip.title")
+    ),
+    react.createElement(
+      "p",
+      { style: wizardSubtitleStyle },
+      I18n.t("setupWizard.pseudoKaraokeTip.subtitle")
+    ),
+    react.createElement(
+      "div",
+      {
+        style: {
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: "20px",
+        },
+      },
+      react.createElement(
+        "div",
+        {
+          style: {
+            padding: "28px",
+            background: WIZARD_COLORS.surfaceRaised,
+            border: `1px solid ${WIZARD_COLORS.border}`,
+            borderRadius: 0,
+          },
+        },
+        react.createElement(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              marginBottom: "16px",
+            },
+          },
+          react.createElement("svg", {
+            width: 22,
+            height: 22,
+            viewBox: "0 0 24 24",
+            fill: WIZARD_COLORS.accent,
+            dangerouslySetInnerHTML: { __html: WizardIcons.lyrics },
+          }),
+          react.createElement(
+            "strong",
+            {
+              style: {
+                fontSize: "15px",
+                color: WIZARD_COLORS.text,
+                fontWeight: "600",
+              },
+            },
+            I18n.t("setupWizard.pseudoKaraokeTip.enabled")
+          )
+        ),
+        react.createElement(
+          "p",
+          {
+            style: {
+              margin: 0,
+              fontSize: "13px",
+              lineHeight: "1.7",
+              color: WIZARD_COLORS.subdued,
+            },
+          },
+          I18n.t("setupWizard.pseudoKaraokeTip.description")
+        )
+      ),
+      react.createElement(
+        "button",
+        {
+          onClick: () => onPseudoKaraokeChange(!pseudoKaraokeEnabled),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            padding: "16px 22px",
+            background: pseudoKaraokeEnabled
+              ? WIZARD_COLORS.surfaceSelected
+              : WIZARD_COLORS.surfaceRaised,
+            borderRadius: 0,
+            border: pseudoKaraokeEnabled
+              ? `1px solid ${WIZARD_COLORS.borderStrong}`
+              : `1px solid ${WIZARD_COLORS.border}`,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          },
+        },
+        react.createElement(
+          "span",
+          {
+            style: {
+              fontSize: "14px",
+              fontWeight: "500",
+              color: pseudoKaraokeEnabled ? WIZARD_COLORS.accent : WIZARD_COLORS.muted,
+            },
+          },
+          I18n.t("setupWizard.pseudoKaraokeTip.enabled")
+        ),
+        react.createElement(WizardToggleVisual, {
+          enabled: pseudoKaraokeEnabled,
+        })
+      )
+    ),
+    react.createElement(WizardNavigation, { onBack, onNext })
+  );
+};
+
 // Video Test step - Check if YouTube embed requires login
 const VideoTestStep = ({ onNext, onBack, onNeedHelper, onSkip }) => {
   const [loginRequired, setLoginRequired] = useState(null);
@@ -2012,6 +2133,9 @@ const SetupWizard = ({ onComplete }) => {
   // Feature toggles - overlay off by default, nowplaying on by default
   const [overlayEnabled, setOverlayEnabled] = useState(false);
   const [nowPlayingEnabled, setNowPlayingEnabled] = useState(true);
+  const [pseudoKaraokeEnabled, setPseudoKaraokeEnabled] = useState(
+    !!CONFIG?.visual?.["spotify-fake-karaoke-enabled"]
+  );
 
   // Video test state - whether we need to show helper test step
   const [showHelperTestStep, setShowHelperTestStep] = useState(false);
@@ -2036,7 +2160,7 @@ const SetupWizard = ({ onComplete }) => {
       }
     }
 
-    baseSteps.push("overlay", "nowPlaying", "translationTip", "complete");
+    baseSteps.push("overlay", "nowPlaying", "pseudoKaraoke", "translationTip", "complete");
     return baseSteps;
   };
 
@@ -2107,6 +2231,10 @@ const SetupWizard = ({ onComplete }) => {
       // Save NowPlaying panel setting
       StorageManager.saveConfig("panel-lyrics-enabled", nowPlayingEnabled);
       CONFIG.visual["panel-lyrics-enabled"] = nowPlayingEnabled;
+
+      // Save pseudo karaoke setting
+      StorageManager.saveConfig("spotify-fake-karaoke-enabled", pseudoKaraokeEnabled);
+      CONFIG.visual["spotify-fake-karaoke-enabled"] = pseudoKaraokeEnabled;
     }
 
     // Also save to localStorage directly for overlay (uses different storage mechanism)
@@ -2213,6 +2341,13 @@ const SetupWizard = ({ onComplete }) => {
         return react.createElement(NowPlayingTipStep, {
           nowPlayingEnabled,
           onNowPlayingChange: setNowPlayingEnabled,
+          onNext: goNext,
+          onBack: goBack,
+        });
+      case "pseudoKaraoke":
+        return react.createElement(PseudoKaraokeTipStep, {
+          pseudoKaraokeEnabled,
+          onPseudoKaraokeChange: setPseudoKaraokeEnabled,
           onNext: goNext,
           onBack: goBack,
         });

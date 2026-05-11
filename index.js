@@ -12,33 +12,63 @@ const FuriganaConverter = (() => {
   // Debug mode - set to false to reduce console logs
   const DEBUG_MODE = false;
   const MAX_CONVERSION_CACHE_SIZE = 1000;
+  const KUROMOJI_DICT_PATHS = [
+    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict",
+    "https://unpkg.com/kuromoji@0.1.2/dict",
+  ];
   let hasLoggedKuromojiWarning = false;
 
-// Patch XMLHttpRequest once to fix Kuromoji dictionary URLs
-if (!XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) {
-  const originalXHROpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function (method, url, ...args) {
-    // Fix Kuromoji dictionary URLs
-    if (
-      typeof url === "string" &&
-      url.includes("/dict/") &&
-      url.includes(".dat.gz")
-    ) {
-      // If URL doesn't start with http/https, fix it
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url =
-          "https://unpkg.com/kuromoji@0.1.2/dict/" + url.split("/dict/").pop();
-      }
-      // If URL has wrong host, fix it
-      else if (url.includes("xpui.app.spotify.com")) {
-        const filename = url.split("/dict/").pop();
-        url = "https://unpkg.com/kuromoji@0.1.2/dict/" + filename;
-      }
+  const normalizeKuromojiDictUrl = (url) => {
+    if (typeof url !== "string" || !url.includes(".dat.gz")) {
+      return url;
     }
-    return originalXHROpen.call(this, method, url, ...args);
+
+    const fileName = url.split("/").pop();
+    if (!fileName) {
+      return url;
+    }
+
+    if (url.includes("kuromoji@0.1.2/dict/") && url.startsWith("https:/") && !url.startsWith("https://")) {
+      return url.replace(/^https:\//, "https://");
+    }
+
+    if (url.includes("/dict/") && (!url.startsWith("http://") && !url.startsWith("https://"))) {
+      return `${KUROMOJI_DICT_PATHS[0]}/${fileName}`;
+    }
+
+    if (url.includes("xpui.app.spotify.com") && url.includes("/dict/")) {
+      return `${KUROMOJI_DICT_PATHS[0]}/${fileName}`;
+    }
+
+    return url;
   };
-  XMLHttpRequest.prototype.__ivLyricsFuriganaPatched = true;
-}
+
+  const patchKuromojiDictionaryRequests = () => {
+    if (XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) return;
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function patchedFuriganaOpen(method, url, ...args) {
+      return originalOpen.call(this, method, normalizeKuromojiDictUrl(url), ...args);
+    };
+    XMLHttpRequest.prototype.__ivLyricsFuriganaPatched = true;
+  };
+
+  patchKuromojiDictionaryRequests();
+
+  const buildTokenizer = (dictPath) =>
+    new Promise((resolve, reject) => {
+      window.kuromoji
+        .builder({
+          dicPath: dictPath,
+        })
+        .build((err, tokenizer) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(tokenizer);
+        });
+    });
 
   const init = async () => {
     if (kuromojiInstance) {
@@ -50,36 +80,32 @@ if (!XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) {
     }
 
     isInitializing = true;
-    initPromise = new Promise((resolve, reject) => {
+    initPromise = (async () => {
       if (typeof window.kuromoji === "undefined") {
-        reject(new Error("Kuromoji library not loaded"));
-        return;
+        throw new Error("Kuromoji library not loaded");
       }
 
-      // Use any path - our XHR patch will fix it
-      const dicPath = "/dict";
-
-      window.kuromoji
-        .builder({
-          dicPath: dicPath,
-        })
-        .build((err, tokenizer) => {
-          if (err) {
-            isInitializing = false;
-            reject(err);
-            return;
-          }
-
-          kuromojiInstance = tokenizer;
+      let lastError = null;
+      for (const dictPath of KUROMOJI_DICT_PATHS) {
+        try {
+          kuromojiInstance = await buildTokenizer(dictPath);
           isInitializing = false;
 
-          // Trigger re-render by dispatching a custom event
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent("furigana-ready"));
           }, 100);
 
-          resolve();
-        });
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      isInitializing = false;
+      throw lastError || new Error("Kuromoji dictionary load failed");
+    })().catch((err) => {
+      isInitializing = false;
+      throw err;
     });
 
     return initPromise;
@@ -207,7 +233,7 @@ if (!XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) {
         }
       }
 
-      if (conversionCache.size > MAX_CONVERSION_CACHE_SIZE) {
+      if (conversionCache.size >= MAX_CONVERSION_CACHE_SIZE) {
         const firstKey = conversionCache.keys().next().value;
         conversionCache.delete(firstKey);
       }
@@ -241,39 +267,44 @@ if (!XMLHttpRequest.prototype.__ivLyricsFuriganaPatched) {
 
 window.FuriganaConverter = FuriganaConverter;
 
+const initializeFuriganaConverter = () => {
+  if (typeof window.FuriganaConverter === "undefined") return;
+
+  window.FuriganaConverter.init()
+    .then(() => {
+      if (window.CONFIG?.visual?.["furigana-enabled"] && window.lyricContainer) {
+        try {
+          window.lyricContainer.forceUpdate();
+        } catch (e) { }
+      }
+    })
+    .catch((err) => { });
+};
+
 // Load Kuromoji library for furigana conversion
 if (typeof window.kuromoji === "undefined") {
-  const kuromojiScript = document.createElement("script");
-  kuromojiScript.src =
-    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js";
-  kuromojiScript.async = false; // Load synchronously to ensure it's available
-  kuromojiScript.onload = () => {
-    // Initialize immediately
-    if (typeof window.FuriganaConverter !== "undefined") {
-      window.FuriganaConverter.init()
-        .then(() => {
-          // Trigger lyrics re-render if furigana is enabled
-          if (CONFIG?.visual?.["furigana-enabled"]) {
-            // Try multiple methods to trigger re-render
-            if (window.lyricContainer) {
-              try {
-                window.lyricContainer.forceUpdate();
-              } catch (e) { }
-            }
-          }
-        })
-        .catch((err) => { });
-    }
+  const kuromojiScriptUrls = [
+    "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js",
+    "https://unpkg.com/kuromoji@0.1.2/build/kuromoji.js",
+  ];
+
+  const loadKuromojiScript = (index = 0) => {
+    if (index >= kuromojiScriptUrls.length) return;
+
+    const kuromojiScript = document.createElement("script");
+    kuromojiScript.src = kuromojiScriptUrls[index];
+    kuromojiScript.async = false; // Load synchronously to ensure it's available
+    kuromojiScript.onload = initializeFuriganaConverter;
+    kuromojiScript.onerror = () => {
+      kuromojiScript.remove();
+      loadKuromojiScript(index + 1);
+    };
+    document.head.appendChild(kuromojiScript);
   };
-  kuromojiScript.onerror = (err) => { };
-  document.head.appendChild(kuromojiScript);
+
+  loadKuromojiScript();
 } else {
-  // If Kuromoji is already loaded, initialize immediately
-  if (typeof window.FuriganaConverter !== "undefined") {
-    window.FuriganaConverter.init()
-      .then(() => { })
-      .catch((err) => { });
-  }
+  initializeFuriganaConverter();
 }
 
 // === ivLyrics-overlay 전송 모듈 ===
@@ -303,12 +334,33 @@ if (!window.OverlaySender) {
 }
 
 // 하위 호환성을 위해 OverlaySender 별칭 생성
-const OverlaySender = window.OverlaySender;
-
-
 /** @type {React} */
 const react = Spicetify.React;
 const { useState, useEffect, useCallback, useMemo, useRef } = react;
+
+const getNonSectionLyricsText = (lyrics = []) =>
+  lyrics
+    .map((line) => line?.text || "")
+    .filter((line) => line && !Utils.isSectionHeader(line))
+    .join("\n");
+
+const hasInstrumentalMarker = (lyrics = []) => {
+  if (!lyrics || lyrics.length === 0 || lyrics.length > 3) return false;
+
+  const firstLine = lyrics[0]?.text?.toLowerCase()?.trim() || "";
+  if (firstLine.includes("no lyrics") || firstLine.includes("instrumental")) {
+    return true;
+  }
+
+  for (const line of lyrics) {
+    const text = line?.text?.toLowerCase() || "";
+    if (text.includes("no lyrics") || text.includes("instrumental")) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 // Update Banner Component - Fluent Design Style
 const UpdateBanner = ({ updateInfo, onDismiss }) => {
@@ -343,7 +395,7 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
           "0 8px 32px 0 rgba(0, 0, 0, 0.18), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)",
         animation: "slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
         position: "relative",
-        zIndex: 150,
+        zIndex: "var(--iv-layer-update-banner, 1000)",
         overflow: "hidden",
         transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
       },
@@ -1116,13 +1168,13 @@ const DBExportManager = {
     for (const target of DB_EXPORT_TARGETS) {
       try {
         const db = await this._openDB(target.name, target.version, target.stores);
-        const existingStores = Array.from(db.objectStoreNames);
-        result[target.name] = {};
-        for (const storeName of target.stores) {
-          if (existingStores.includes(storeName)) {
+      const existingStores = new Set(Array.from(db.objectStoreNames));
+      result[target.name] = {};
+      for (const storeName of target.stores) {
+          if (existingStores.has(storeName)) {
             result[target.name][storeName] = await this._readStore(db, storeName);
           }
-        }
+      }
         db.close();
       } catch (e) {
         console.warn(`[ivLyrics] Failed to export DB ${target.name}:`, e);
@@ -1136,9 +1188,9 @@ const DBExportManager = {
       if (!data[target.name]) continue;
       try {
         const db = await this._openDB(target.name, target.version, target.stores);
-        const existingStores = Array.from(db.objectStoreNames);
+        const existingStores = new Set(Array.from(db.objectStoreNames));
         for (const storeName of target.stores) {
-          if (existingStores.includes(storeName) && data[target.name][storeName]) {
+          if (existingStores.has(storeName) && data[target.name][storeName]) {
             await this._writeStore(db, storeName, data[target.name][storeName]);
           }
         }
@@ -1156,8 +1208,7 @@ const UNSYNCED = 2;
 
 const CONFIG = {
   visual: {
-    language:
-      StorageManager.getItem("ivLyrics:visual:language") || StorageManager.getItem("ivLyrics:visual:language"),
+    language: StorageManager.getItem("ivLyrics:visual:language"),
     "playbar-button": StorageManager.get(
       "ivLyrics:visual:playbar-button",
       false
@@ -1372,6 +1423,9 @@ const CONFIG = {
     "translation-mode:german":
       StorageManager.getItem("ivLyrics:visual:translation-mode:german") ||
       "none",
+    "translation-mode:swedish":
+      StorageManager.getItem("ivLyrics:visual:translation-mode:swedish") ||
+      "none",
     "translation-mode:spanish":
       StorageManager.getItem("ivLyrics:visual:translation-mode:spanish") ||
       "none",
@@ -1432,6 +1486,9 @@ const CONFIG = {
       ) || "none",
     "translation-mode-2:german":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:german") ||
+      "none",
+    "translation-mode-2:swedish":
+      StorageManager.getItem("ivLyrics:visual:translation-mode-2:swedish") ||
       "none",
     "translation-mode-2:spanish":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:spanish") ||
@@ -1497,6 +1554,14 @@ const CONFIG = {
     "karaoke-mode-enabled": StorageManager.get(
       "ivLyrics:visual:karaoke-mode-enabled",
       true
+    ),
+    "spotify-fake-karaoke-enabled": StorageManager.get(
+      "ivLyrics:visual:spotify-fake-karaoke-enabled",
+      false
+    ),
+    "pseudo-karaoke-render-advance": StorageManager.get(
+      "ivLyrics:visual:pseudo-karaoke-render-advance",
+      250
     ),
     // Prefetch settings
     "prefetch-enabled": StorageManager.get(
@@ -1623,6 +1688,10 @@ const CONFIG = {
     "fullscreen-browser-fullscreen": StorageManager.get(
       "ivLyrics:visual:fullscreen-browser-fullscreen",
       false
+    ),
+    "fullscreen-hide-overlay": StorageManager.get(
+      "ivLyrics:visual:fullscreen-hide-overlay",
+      true
     ),
     // TMI font size
     "fullscreen-tmi-font-size":
@@ -1926,9 +1995,16 @@ const RateLimiter = {
   canMakeCall(key, maxCalls = 5, windowMs = 60000) {
     const now = Date.now();
     const calls = this._calls.get(key) || [];
+    let firstValidIndex = 0;
+    while (
+      firstValidIndex < calls.length &&
+      now - calls[firstValidIndex] >= windowMs
+    ) {
+      firstValidIndex++;
+    }
 
-    // Remove calls outside the window
-    const validCalls = calls.filter((time) => now - time < windowMs);
+    const validCalls =
+      firstValidIndex === 0 ? calls : calls.slice(firstValidIndex);
 
     if (validCalls.length >= maxCalls) {
       return false;
@@ -2049,28 +2125,27 @@ const Prefetcher = {
       ivLyricsDebug(`[Prefetcher] Starting prefetch for: ${trackInfo.title}`);
 
       try {
-        // 1단계: 가사 먼저 프리페치 (필수)
-        const lyrics = await this._prefetchLyrics(trackInfo, mode);
-
-        if (!lyrics || (!lyrics.synced && !lyrics.unsynced && !lyrics.karaoke)) {
-          ivLyricsDebug(`[Prefetcher] No lyrics found for: ${trackInfo.title}`);
-          return;
-        }
-
-        // 2단계: 가사 로드 완료 후 병렬로 번역/발음 및 영상 배경 프리페치
+        // 영상 배경 프리페치는 가사 유무와 무관하게 독립적으로 시작
         const prefetchPromises = [];
-
-        // 발음/번역 프리페치 (Gemini)
-        if (CONFIG.visual["prefetch-enabled"] !== false) {
-          prefetchPromises.push(this._prefetchTranslations(trackInfo, lyrics));
-        }
-
-        // 영상 배경 프리페치
         if (CONFIG.visual["video-background"] && CONFIG.visual["prefetch-video-enabled"] !== false) {
           prefetchPromises.push(this._prefetchVideoBackground(trackInfo.uri));
         }
 
-        await Promise.allSettled(prefetchPromises);
+        // 1단계: 가사 먼저 프리페치
+        const lyrics = await this._prefetchLyrics(trackInfo, mode);
+
+        if (!lyrics || (!lyrics.synced && !lyrics.unsynced && !lyrics.karaoke)) {
+          ivLyricsDebug(`[Prefetcher] No lyrics found for: ${trackInfo.title}`);
+        } else {
+          // 2단계: 가사 로드 완료 후 번역/발음 프리페치
+          if (CONFIG.visual["prefetch-enabled"] !== false) {
+            prefetchPromises.push(this._prefetchTranslations(trackInfo, lyrics));
+          }
+        }
+
+        if (prefetchPromises.length > 0) {
+          await Promise.allSettled(prefetchPromises);
+        }
         ivLyricsDebug(`[Prefetcher] Completed all prefetch for: ${trackInfo.title}`);
       } catch (error) {
         console.warn(`[Prefetcher] Prefetch failed:`, error);
@@ -2196,9 +2271,7 @@ const Prefetcher = {
     }
 
     // Section header 제외한 텍스트 추출
-    const allLines = lyricsArray.map((l) => l?.text || "").filter(Boolean);
-    const nonSectionLines = allLines.filter((line) => !Utils.isSectionHeader(line));
-    const text = nonSectionLines.join("\n");
+    const text = getNonSectionLyricsText(lyricsArray);
 
     if (!text.trim()) return;
 
@@ -2224,11 +2297,12 @@ const Prefetcher = {
             return null;
           }
 
-          const originalNonSectionIndices = [];
+          const originalNonSectionIndexMap = new Map();
+          let nonSectionLineIndex = 0;
           lyricsArray.forEach((line, i) => {
             const lineText = line?.text || "";
             if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-              originalNonSectionIndices.push(i);
+              originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
             }
           });
 
@@ -2244,7 +2318,7 @@ const Prefetcher = {
             if (originalText.trim() === "") {
               return { ...line, text: "", originalText };
             }
-            const positionInNonSectionLines = originalNonSectionIndices.indexOf(i);
+            const positionInNonSectionLines = originalNonSectionIndexMap.get(i);
             const translatedText = cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
             return { ...line, text: translatedText || line?.text || "", originalText };
           });
@@ -2966,10 +3040,34 @@ class LyricsContainer extends react.Component {
     return this.shouldReduceMotion() ? 24 : 280;
   }
 
+  getFloatingMenuContentTopOffset() {
+    if (!this.state?.isFullscreen || typeof document === "undefined") {
+      return 0;
+    }
+
+    const isBrowserFullscreen =
+      CONFIG.visual["fullscreen-browser-fullscreen"] === true ||
+      !!document.fullscreenElement;
+    return isBrowserFullscreen ? 0 : 130;
+  }
+
   clearFloatingMenuCloseTimer() {
     if (this.floatingMenuCloseTimer) {
       clearTimeout(this.floatingMenuCloseTimer);
       this.floatingMenuCloseTimer = null;
+    }
+  }
+
+  resetFloatingMenuScroll() {
+    const reset = () => {
+      if (this.floatingMenuContentRef) {
+        this.floatingMenuContentRef.scrollTop = 0;
+      }
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(reset);
+    } else {
+      setTimeout(reset, 0);
     }
   }
 
@@ -2978,7 +3076,7 @@ class LyricsContainer extends react.Component {
     this.setState({
       isFloatingMenuOpen: true,
       isFloatingMenuClosing: false,
-    });
+    }, () => this.resetFloatingMenuScroll());
   }
 
   closeFloatingMenu() {
@@ -3489,11 +3587,7 @@ class LyricsContainer extends react.Component {
       }
 
       // Section line 제거하고 원문 텍스트만 추출 (getGeminiTranslation과 동일)
-      const allLines = originalLyrics.map((l) => l?.text || "").filter(Boolean);
-      const nonSectionLines = allLines.filter(
-        (line) => !Utils.isSectionHeader(line)
-      );
-      const text = nonSectionLines.join("\n");
+      const text = getNonSectionLyricsText(originalLyrics);
 
       const currentUri = lyricsState.uri;
       const currentProvider = lyricsState.provider || "";
@@ -3509,13 +3603,14 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].lastMode2 = mode2;
       this._dmResults[currentUri].lastProvider = currentProvider;
 
-      const originalNonSectionIndices = [];
-      originalLyrics.forEach((line, i) => {
-        const lineText = line?.text || "";
-        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-          originalNonSectionIndices.push(i);
-        }
-      });
+	      const originalNonSectionIndexMap = new Map();
+	      let nonSectionLineIndex = 0;
+	      originalLyrics.forEach((line, i) => {
+	        const lineText = line?.text || "";
+	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
+	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
+	        }
+	      });
 
       const mapResultLinesToLyrics = (linesInput) => {
         if (!Array.isArray(linesInput)) return null;
@@ -3547,10 +3642,10 @@ class LyricsContainer extends react.Component {
             };
           }
 
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText =
-            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText =
+	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,
@@ -3763,9 +3858,9 @@ class LyricsContainer extends react.Component {
           }
 
           // Find the translation index for this non-section, non-empty line
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText = lines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText = lines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,
@@ -4055,21 +4150,7 @@ class LyricsContainer extends react.Component {
       // 2. First line contains "no lyrics" or "instrumental"
       const checkNoLyrics = (lyrics) => {
         if (!lyrics || lyrics.length === 0) return false;
-        if (lyrics.length > 3) return false;
-
-        // Check first non-empty line
-        const firstLine = lyrics[0]?.text?.toLowerCase()?.trim() || '';
-        if (firstLine.includes('no lyrics') || firstLine.includes('instrumental')) {
-          return true;
-        }
-
-        // Also check if all lines combined contain these keywords
-        const allText = lyrics.map(line => line.text || '').join(' ').toLowerCase();
-        if (allText.includes('no lyrics') || allText.includes('instrumental')) {
-          return true;
-        }
-
-        return false;
+        return hasInstrumentalMarker(lyrics);
       };
 
       // If all lyrics types indicate no lyrics, treat as instrumental
@@ -4613,7 +4694,8 @@ class LyricsContainer extends react.Component {
       const words1 = norm1.split(" ").filter((w) => w.length > 2);
       const words2 = norm2.split(" ").filter((w) => w.length > 2);
       if (words1.length === 0 || words2.length === 0) return false;
-      const commonWords = words1.filter((word) => words2.includes(word));
+	      const words2Set = new Set(words2);
+	      const commonWords = words1.filter((word) => words2Set.has(word));
       const similarity =
         commonWords.length / Math.max(words1.length, words2.length);
       return similarity > 0.85;
@@ -4825,20 +4907,17 @@ class LyricsContainer extends react.Component {
       }
 
       // Filter out section headers before sending to Gemini for translation
-      const allLines = lyrics.map((l) => l?.text || "").filter(Boolean);
-      const nonSectionLines = allLines.filter(
-        (line) => !Utils.isSectionHeader(line)
-      );
-      const text = nonSectionLines.join("\n");
+      const text = getNonSectionLyricsText(lyrics);
 
       // Create mapping arrays for proper alignment
-      const originalNonSectionIndices = [];
-      lyrics.forEach((line, i) => {
-        const lineText = line?.text || "";
-        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-          originalNonSectionIndices.push(i);
-        }
-      });
+	      const originalNonSectionIndexMap = new Map();
+	      let nonSectionLineIndex = 0;
+	      lyrics.forEach((line, i) => {
+	        const lineText = line?.text || "";
+	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
+	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
+	        }
+	      });
 
       const mapResultLinesToLyrics = (linesInput) => {
         if (!Array.isArray(linesInput)) return null;
@@ -4870,10 +4949,10 @@ class LyricsContainer extends react.Component {
             };
           }
 
-          const positionInNonSectionLines =
-            originalNonSectionIndices.indexOf(i);
-          const translatedText =
-            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
+	          const positionInNonSectionLines =
+	            originalNonSectionIndexMap.get(i);
+	          const translatedText =
+	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
 
           return {
             ...line,
@@ -5316,7 +5395,7 @@ class LyricsContainer extends react.Component {
     if (this._inflightGemini) {
       const keysToDelete = [];
       for (const [key] of this._inflightGemini) {
-        if (key.includes(uri)) {
+        if (key.startsWith(`${uri}:`)) {
           keysToDelete.push(key);
         }
       }
@@ -5546,7 +5625,7 @@ class LyricsContainer extends react.Component {
       // 진행 중인 Gemini 요청도 취소
       if (this._inflightGemini && trackUri) {
         for (const [key] of this._inflightGemini) {
-          if (key.includes(trackUri)) {
+          if (key.startsWith(`${trackUri}:`)) {
             this._inflightGemini.delete(key);
           }
         }
@@ -5713,9 +5792,20 @@ class LyricsContainer extends react.Component {
       if (event.detail?.name === "karaoke-mode-enabled") {
         // 노래방 모드 설정이 변경되면 현재 모드를 다시 계산
         this.setState({ explicitMode: -1 });
+      } else if (event.detail?.name === "spotify-fake-karaoke-enabled") {
+        this.reloadLyrics?.(false);
+      } else if (event.detail?.name === "pseudo-karaoke-render-advance") {
+        this.forceUpdate?.();
       }
     };
     window.addEventListener("ivLyrics", this.handleConfigChange);
+
+    this.handleFuriganaReady = () => {
+      if (window.CONFIG?.visual?.["furigana-enabled"]) {
+        this.forceUpdate();
+      }
+    };
+    window.addEventListener("furigana-ready", this.handleFuriganaReady);
 
     // Listen for lyric index changes from Pages.js
     this.handleLyricIndexChange = (event) => {
@@ -5749,6 +5839,7 @@ class LyricsContainer extends react.Component {
     this.mousetrap?.reset();
     window.removeEventListener("fad-request", lyricContainerUpdate);
     window.removeEventListener("ivLyrics", this.handleConfigChange);
+    window.removeEventListener("furigana-ready", this.handleFuriganaReady);
     window.removeEventListener("ivLyrics:lyric-index-changed", this.handleLyricIndexChange);
     if (this._cleanupFloatingMenuOutsideClick) {
       this._cleanupFloatingMenuOutsideClick();
@@ -5976,6 +6067,13 @@ class LyricsContainer extends react.Component {
     }
 
     const backgroundStyle = {};
+    const compositedBackgroundStyle = {
+      willChange: "filter, transform, opacity",
+      backfaceVisibility: "hidden",
+      WebkitBackfaceVisibility: "hidden",
+      transform: "translateZ(0)",
+      contain: "paint",
+    };
     // Disable background features when in FAD mode (Full Screen extension)
     if (!this.state.isFADMode && CONFIG.visual["video-background"]) {
       // Video background is handled by the component
@@ -5989,6 +6087,7 @@ class LyricsContainer extends react.Component {
         Spicetify.Player.data?.item?.metadata?.image_url;
 
       if (albumArtUrl) {
+        Object.assign(backgroundStyle, compositedBackgroundStyle);
         backgroundStyle.backgroundImage = `url(${albumArtUrl})`;
         backgroundStyle.backgroundRepeat = "no-repeat";
         backgroundStyle.filter = `brightness(${brightness}) blur(${blurAmount}px)`;
@@ -6027,6 +6126,7 @@ class LyricsContainer extends react.Component {
       backgroundStyle["--ivLyrics-c1"] = `${c1.r}, ${c1.g}, ${c1.b}`;
       backgroundStyle["--ivLyrics-c2"] = `${c2.r}, ${c2.g}, ${c2.b}`;
       backgroundStyle["--ivLyrics-c3"] = `${c3.r}, ${c3.g}, ${c3.b}`;
+      Object.assign(backgroundStyle, compositedBackgroundStyle);
       backgroundStyle.filter = `brightness(${brightness}) saturate(2.5)`;
     } else if (
       !this.state.isFADMode &&
@@ -6120,6 +6220,13 @@ class LyricsContainer extends react.Component {
     };
 
     let mode = this.getCurrentMode();
+    const firstTimedLyricStartTimeMs = Number(this.state.currentLyrics?.[0]?.startTime);
+    const defaultCommunityVideoStartTime =
+      (mode === KARAOKE || mode === SYNCED) &&
+        Number.isFinite(firstTimedLyricStartTimeMs) &&
+        firstTimedLyricStartTimeMs >= 0
+        ? firstTimedLyricStartTimeMs / 1000
+        : 0;
 
     let showTranslationButton;
 
@@ -6222,6 +6329,7 @@ class LyricsContainer extends react.Component {
         trackUri: this.state.uri,
         currentLyrics: this.state.currentLyrics,
         karaoke: this.state.karaoke,
+        karaokeSource: this.state.karaokeSource,
         synced: this.state.synced,
         unsynced: this.state.unsynced,
         provider: this.state.provider,
@@ -6263,10 +6371,14 @@ class LyricsContainer extends react.Component {
     const isLayoutReversed = CONFIG.visual["fullscreen-layout-reverse"] === true;
     const centerWhenNoLyrics = CONFIG.visual["fullscreen-center-when-no-lyrics"] !== false;
     const shouldReduceMotion = this.shouldReduceMotion();
+    const isFullscreenMarketplace = this.state.isFullscreen && this.state.showMarketplace;
     const shouldRenderFloatingMenu =
       !this.state.isFullscreen ||
       this.state.isFloatingMenuOpen ||
       this.state.isFloatingMenuClosing;
+    const floatingToolbarStyle = this.state.isFullscreen
+      ? { "--iv-floating-menu-content-top-offset": `${this.getFloatingMenuContentTopOffset()}px` }
+      : undefined;
     const modeButtons = [
       this.state.karaoke &&
       CONFIG.visual["karaoke-mode-enabled"] &&
@@ -6373,6 +6485,9 @@ class LyricsContainer extends react.Component {
       if (CONFIG.visual["fullscreen-tv-mode"] === true) {
         fullscreenClasses += " tv-mode-active";
       }
+      if (this.state.showMarketplace) {
+        fullscreenClasses += " marketplace-active";
+      }
       // TMI 폰트 크기 CSS 변수 업데이트
       if (this.fullscreenContainer) {
         const tmiScale = (CONFIG.visual["fullscreen-tmi-font-size"] || 100) / 100;
@@ -6402,7 +6517,7 @@ class LyricsContainer extends react.Component {
         },
       },
       // Left panel for fullscreen mode
-      this.state.isFullscreen && window.FullscreenOverlay && react.createElement(window.FullscreenOverlay, {
+      this.state.isFullscreen && !this.state.showMarketplace && window.FullscreenOverlay && react.createElement(window.FullscreenOverlay, {
         coverUrl: this.state.coverUrl,
         title: this.state.title,
         artist: this.state.artist,
@@ -6444,7 +6559,7 @@ class LyricsContainer extends react.Component {
       }),
       // Phonetic loading indicator
       this.state.isPhoneticLoading &&
-      react.createElement(
+      !isFullscreenMarketplace && react.createElement(
         "div",
         {
           className: "lyrics-translation-loading-indicator",
@@ -6466,7 +6581,7 @@ class LyricsContainer extends react.Component {
       ),
       // Translation loading indicator
       this.state.isTranslationLoading &&
-      react.createElement(
+      !isFullscreenMarketplace && react.createElement(
         "div",
         {
           className: "lyrics-translation-loading-indicator",
@@ -6488,13 +6603,14 @@ class LyricsContainer extends react.Component {
         )
       ),
       // ===== 플로팅 바 (일반 모드: 전체 표시, 전체화면: 메뉴 토글 방식) =====
-      react.createElement(
+      !isFullscreenMarketplace && react.createElement(
         "div",
         {
           className: "lyrics-config-button-container lyrics-fluent-floating-toolbar" +
             (this.state.isFullscreen ? " fullscreen-mode-container" : "") +
             (this.state.isFullscreen && this.state.isFloatingMenuOpen ? " menu-open" : "") +
             (this.state.isFullscreen && this.state.isFloatingMenuClosing ? " menu-closing" : ""),
+          style: floatingToolbarStyle,
           ref: (el) => {
             if (this._cleanupFloatingMenuOutsideClick) {
               this._cleanupFloatingMenuOutsideClick();
@@ -6504,7 +6620,18 @@ class LyricsContainer extends react.Component {
             if (el && this.state.isFullscreen) {
               // 전체화면에서 바깥 클릭 시 메뉴 닫기
               const handleClickOutside = (e) => {
-                if (!el.contains(e.target) && (this.state.isFloatingMenuOpen || this.state.isFloatingMenuClosing)) {
+                const target = e.target;
+                const isExternalMenuSurface = target?.closest?.([
+                  ".lyrics-sync-adjust-floating",
+                  "#ivLyrics-sync-creator-overlay",
+                  ".ivlyrics-fluent-overlay",
+                  ".community-video-overlay",
+                  "#ivLyrics-share-image-overlay",
+                  ".ivlyrics-cache-edit-overlay",
+                  ".lyrics-creator-profile-overlay",
+                ].join(","));
+
+                if (!el.contains(target) && !isExternalMenuSurface && (this.state.isFloatingMenuOpen || this.state.isFloatingMenuClosing)) {
                   this.closeFloatingMenu();
                 }
               };
@@ -6547,6 +6674,13 @@ class LyricsContainer extends react.Component {
           "div",
           {
             className: `lyrics-floating-menu-content${this.state.isFullscreen && this.state.isFloatingMenuOpen ? " menu-open" : ""}${this.state.isFullscreen && this.state.isFloatingMenuClosing ? " menu-closing" : ""}`,
+            ref: (el) => {
+              this.floatingMenuContentRef = el;
+              if (el && !el.__ivLyricsScrollInitialized) {
+                el.__ivLyricsScrollInitialized = true;
+                this.resetFloatingMenuScroll();
+              }
+            },
           },
           showTranslationButton &&
           react.createElement(TranslationMenu, {
@@ -6568,6 +6702,7 @@ class LyricsContainer extends react.Component {
           react.createElement(CommunityVideoButton, {
             trackUri: this.currentTrackUri,
             videoInfo: this.state.videoInfo,
+            defaultStartTime: defaultCommunityVideoStartTime,
             onVideoSelect: async (newVideoInfo) => {
               this.setState({ videoInfo: newVideoInfo });
               if (newVideoInfo && this.currentTrackUri) {
@@ -6627,7 +6762,14 @@ class LyricsContainer extends react.Component {
               {
                 className: `lyrics-config-button lyrics-marketplace-button${this.state.showMarketplace ? " active" : ""}`,
                 type: "button",
-                onClick: () => this.setState({ showMarketplace: !this.state.showMarketplace }),
+                onClick: () => {
+                  this.clearFloatingMenuCloseTimer();
+                  this.setState((prevState) => ({
+                    showMarketplace: !prevState.showMarketplace,
+                    isFloatingMenuOpen: false,
+                    isFloatingMenuClosing: false,
+                  }));
+                },
               },
               react.createElement("svg", {
                 width: 18,
@@ -6703,7 +6845,8 @@ class LyricsContainer extends react.Component {
             },
             showHint: true,
             provider: this.state.provider,
-            initialLyrics: this.state.currentLyrics
+            initialLyrics: this.state.currentLyrics,
+            isFullscreen: this.state.isFullscreen
           })
         )
       ),
@@ -6762,6 +6905,7 @@ class LyricsContainer extends react.Component {
     "Merriweather",
     "Playfair Display",
   ];
+  const GOOGLE_FONT_SET = new Set(GOOGLE_FONTS);
 
   const fontsToLoad = new Set();
 
@@ -6770,7 +6914,7 @@ class LyricsContainer extends react.Component {
     if (!fontString) return;
     const fonts = fontString.split(",").map((f) => f.trim().replace(/['"]/g, ""));
     fonts.forEach((font) => {
-      if (font && GOOGLE_FONTS.includes(font)) {
+      if (font && GOOGLE_FONT_SET.has(font)) {
         fontsToLoad.add(font);
       }
     });
@@ -6814,6 +6958,7 @@ class LyricsContainer extends react.Component {
       initialized: false,
       unlisten: null,
       lastRouteKey: null,
+      lastLoginToken: null,
     });
 
   // 현재 URL의 파라미터를 확인
@@ -6839,8 +6984,14 @@ class LyricsContainer extends react.Component {
         // 다른 파라미터들도 처리 가능
         // 예: action, data 등
         const action = searchParams.get('action');
-        if (action) {
-          // 향후 action 처리 로직 추가 가능
+        if (action === 'discord-auth') {
+          const loginToken = searchParams.get('loginToken');
+          if (loginToken && moduleState.lastLoginToken !== loginToken) {
+            moduleState.lastLoginToken = loginToken;
+            if (typeof Utils !== 'undefined' && Utils.handleDiscordAuthCallback) {
+              Utils.handleDiscordAuthCallback(loginToken);
+            }
+          }
         }
       }
     } catch (error) {

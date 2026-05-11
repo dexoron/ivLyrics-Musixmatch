@@ -376,6 +376,14 @@ window.LANG_JA = {
     },
     "solidBackgroundInUse": "ℹ️ 単色背景を使用中",
     "fontPlaceholder": "フォント名を入力 (例: Arial, Meiryo)",
+    "shortcuts": {
+      "primary": "メイン",
+      "secondary": "サブ"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator ショートカット",
+      "subtitle": "Sync Creator 録音用のメインキーとサブキーを設定します。"
+    },
     "aiProviders": {
       "title": "AIプロバイダー",
       "description": "AIプロバイダーを選択し、優先順位を設定します。上にあるプロバイダーから先に試行され、失敗した場合は次のプロバイダーが自動的に使用されます。",
@@ -695,6 +703,36 @@ window.LANG_JA = {
     "lyricsProvider": "歌詞提供者",
     "syncContributor": "同期作成者"
   },
+  "creatorProfile": {
+    "title": "同期制作者",
+    "anonymous": "匿名",
+    "openProfile": "制作者プロフィールを開く",
+    "loading": "制作者プロフィールを読み込み中...",
+    "loadFailed": "制作者プロフィールを読み込めませんでした。",
+    "back": "戻る",
+    "contributions": "追加した同期歌詞",
+    "tracks": "同期歌詞数",
+    "likes": "いいね",
+    "like": "いいね",
+    "liked": "いいね済み",
+    "likeActionFailed": "制作者へのいいねを更新できませんでした。",
+    "likeLoginRequired": "制作者にいいねするにはDiscordログインが必要です。",
+    "ownProfile": "あなたのプロフィールです。",
+    "loadMore": "もっと見る",
+    "loadingMore": "さらに読み込み中...",
+    "noContributions": "まだ追加した同期歌詞はありません。",
+    "unknownTrack": "不明な楽曲",
+    "updated": "更新",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "パッチノートはありません。"
@@ -971,6 +1009,14 @@ window.LANG_JA = {
       "bounce": {
         "label": "文字バウンス効果",
         "desc": "カラオケモードで現在歌っている文字に弾むようなアニメーションを適用します"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "バーチャルカラオケ",
+        "desc": "歌詞が行単位の同期タイミングしか提供しない場合、Spotify の audio analysis をもとにカラオケタイミングを合成します。信頼度が高いときは韓国語、日本語、中国語の行をより細かく分割します。"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "バーチャルカラオケのレンダリング先行値",
+        "desc": "バーチャルカラオケにのみ、レンダリング時のタイミングオフセットを適用します。正の値ほどハイライトが早く進みます。"
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_JA = {
       "browserFullscreen": {
         "desc": "Spotifyフルスクリーンを使用",
         "info": "フルスクリーンモードに入る際、Spotifyを全画面にしてモニターいっぱいに表示します"
+      },
+      "hideOverlay": {
+        "desc": "ivLyricsフルスクリーンでオーバーレイを非表示",
+        "info": "ivLyricsフルスクリーン中はオーバーレイアプリへ一時停止状態を送り、デスクトップオーバーレイの歌詞をフェードアウトさせます"
       }
     },
     "normalMode": {
@@ -1285,17 +1335,26 @@ window.LANG_JA = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discordへのログインが必要です。",
+        "checking": "アカウント情報を確認しています...",
         "title": "アカウント連携",
-        "subtitle": "ivLoginアカウントと連携",
-        "description": "ivLis STUDIO統合アカウントサービス",
-        "info": "ivLoginと連携すると、設定同期などの機能が利用できます。ログインページでUser Hashを入力して連携してください。",
-        "loginButton": "ivLoginで連携",
+        "subtitle": "Discordアカウントと連携",
+        "description": "DiscordベースのivLyrics貢献アカウント",
+        "info": "Discordでログインすると、現在のuserhashがDiscord IDに置き換わり、既存の貢献データも移行されます。",
+        "loginButton": "Discordでログイン",
         "loading": "アカウント情報を読み込み中...",
         "linked": "連携済み",
-        "linkedAt": "連携日",
-        "lastSync": "最終同期",
-        "manageAccount": "アカウント管理",
+        "linkedAt": "連携日時",
+        "lastSync": "最終ログイン",
+        "manageAccount": "アカウントを変更",
         "refresh": "更新",
+        "loggingIn": "ブラウザを開いています...",
+        "startHint": "ブラウザでDiscord認証を完了してください。",
+        "failed": "Discordログインに失敗しました。",
+        "loadFailed": "アカウント情報を読み込めませんでした。",
+        "discordLoginSuccess": "Discordアカウントの連携が完了しました。",
+        "logout": "ログアウト",
+        "logoutSuccess": "Discordアカウントからログアウトし、新しいuser_hashを作成しました。",
         "nickname": {
           "label": "ニックネーム",
           "enter": "ニックネームを入力してください。",
@@ -1493,6 +1552,7 @@ window.LANG_JA = {
     "unsynced": "通常歌詞"
   },
   "communityVideo": {
+    "loginRequired": "コミュニティ動画を登録するにはDiscordへのログインが必要です。",
     "title": "コミュニティ動画推薦",
     "loading": "動画リストを読み込み中...",
     "loadError": "動画リストを読み込めませんでした",
@@ -1595,7 +1655,7 @@ window.LANG_JA = {
     "copied": "✓ クリップボードにコピー済み",
     "downloaded": "✓ ダウンロード済み",
     "shared": "✓ 共有済み",
-    "maxLinesReached": "最大3行まで選択できます",
+    "maxLinesReached": "最大10行まで選択できます",
     "noSelection": "歌詞を選択してください"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_JA = {
       "description": "Spotifyの「再生中」パネルに現在の歌詞を表示します。フルスクリーンモードなしでも歌詞を確認できます。",
       "enabled": "パネル歌詞を表示",
       "linesCount": "表示する行数"
+    },
+    "pseudoKaraokeTip": {
+      "title": "バーチャルカラオケ",
+      "subtitle": "ほぼすべての曲でカラオケ風ハイライトを有効化",
+      "description": "行単位の同期歌詞に対して Spotify の audio analysis を使い、カラオケタイミングを合成します。これによりほぼすべての曲でカラオケモードが動作しますが、タイミングは近似値のため正確ではない場合があります。",
+      "enabled": "バーチャルカラオケを有効化"
     },
     "complete": {
       "title": "準備完了！",
@@ -1736,6 +1802,7 @@ window.LANG_JA = {
     "dismissAll": "すべて閉じる"
   },
   "syncCreator": {
+    "loginRequired": "カラオケ同期を作成するにはDiscordへのログインが必要です。",
     "title": "カラオケ同期作成",
     "buttonTooltip": "カラオケ同期作成",
     "clickHereHint": "ここをクリックして歌詞の同期を合わせてください！",
@@ -1774,6 +1841,21 @@ window.LANG_JA = {
     "loadedExistingSyncData": "既存の同期データを読み込みました",
     "providerMismatch": "既存の同期データは別の歌詞プロバイダーのものです。現在のアカウントのプロバイダーで新しく作成してください。",
     "back": "閉じる",
+    "lrclibSearchResults": "LRCLIB検索結果",
+    "showLrclibSearchResults": "検索結果を表示",
+    "hideLrclibSearchResults": "検索結果を隠す",
+    "lrclibNoCandidates": "LRCLIB候補が見つかりません",
+    "lrclibSelectCandidate": "候補を選択してください",
+    "lrclibApplyCandidate": "この歌詞を読み込む",
+    "lrclibLoaded": "読み込み済み",
+    "lrclibBadgeExact": "完全一致",
+    "lrclibBadgeSynced": "同期",
+    "lrclibBadgePlain": "通常",
+    "lrclibBadgePrimary": "通常検索",
+    "lrclibBadgeEnglish": "英語検索",
+    "lrclibMetricArtist": "アーティスト",
+    "lrclibMetricTitle": "タイトル",
+    "lrclibMetricDiff": "差",
     "lrclib": {
       "registerLyrics": "LRCLIBに歌詞を登録する",
       "title": "LRCLIBに歌詞登録",
@@ -1808,6 +1890,7 @@ window.LANG_JA = {
       "syllable": "音節"
     },
     "copyLyrics": "歌詞をコピー",
+    "virtualKaraoke": "バーチャルカラオケデータ",
     "lyricsCopied": "歌詞をクリップボードにコピーしました",
     "copyError": "コピー失敗",
     "export": "エクスポート",

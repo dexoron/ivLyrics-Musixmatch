@@ -376,6 +376,14 @@ window.LANG_RU = {
     },
     "solidBackgroundInUse": "ℹ️ Используется сплошной фон",
     "fontPlaceholder": "Название шрифта (напр. Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Основная",
+      "secondary": "Дополнительная"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Горячие клавиши Sync Creator",
+      "subtitle": "Настройте основную и дополнительную клавиши записи для Sync Creator."
+    },
     "aiProviders": {
       "title": "AI-провайдеры",
       "description": "Выберите AI-провайдеров и расставьте их приоритеты. Провайдеры наверху будут опрашиваться первыми. При сбое будет автоматически использован следующий провайдер.",
@@ -696,6 +704,36 @@ window.LANG_RU = {
     "lyricsProvider": "Поставщик текста",
     "syncContributor": "Автор синхронизации"
   },
+  "creatorProfile": {
+    "title": "Автор синхронизации",
+    "anonymous": "Аноним",
+    "openProfile": "Открыть профиль автора",
+    "loading": "Загрузка профиля автора...",
+    "loadFailed": "Не удалось загрузить профиль автора.",
+    "back": "Назад",
+    "contributions": "Добавленные синхронизации",
+    "tracks": "Синхронизированные треки",
+    "likes": "Лайки",
+    "like": "Лайк",
+    "liked": "Лайкнуто",
+    "likeActionFailed": "Не удалось обновить лайк автора.",
+    "likeLoginRequired": "Чтобы ставить лайки авторам, нужно войти через Discord.",
+    "ownProfile": "Это ваш профиль.",
+    "loadMore": "Загрузить еще",
+    "loadingMore": "Загрузка...",
+    "noContributions": "Пока нет добавленных синхронизаций.",
+    "unknownTrack": "Неизвестный трек",
+    "updated": "Обновлено",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Список изменений пуст."
@@ -972,6 +1010,14 @@ window.LANG_RU = {
       "bounce": {
         "label": "Эффект отскока",
         "desc": "Анимация подпрыгивания для текущего слога в режиме караоке"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Виртуальное караоке",
+        "desc": "Когда текст песни предоставляет только построчную синхронизацию, тайминг караоке синтезируется на основе аудиоанализа Spotify. Корейские, японские и китайские строки разбиваются более подробно при высокой уверенности."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Опережение рендера виртуального караоке",
+        "desc": "Применяет временное смещение при рендеринге только к виртуальному караоке. Положительные значения заставляют подсветку появляться раньше."
       }
     },
     "prefetch": {
@@ -1149,6 +1195,10 @@ window.LANG_RU = {
       "browserFullscreen": {
         "desc": "Полный экран браузера",
         "info": "Переводит Spotify в полноэкранный режим браузера (F11) при входе"
+      },
+      "hideOverlay": {
+        "desc": "Скрывать оверлей в полноэкранном режиме ivLyrics",
+        "info": "Отправляет приложению оверлея состояние паузы, пока открыт полноэкранный режим ivLyrics, чтобы текст в настольном оверлее исчезал"
       }
     },
     "normalMode": {
@@ -1286,17 +1336,26 @@ window.LANG_RU = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Требуется вход через Discord.",
+        "checking": "Проверка данных аккаунта...",
         "title": "Привязка аккаунта",
-        "subtitle": "Привяжите аккаунт ivLogin",
-        "description": "Единый сервис аккаунтов ivLis STUDIO",
-        "info": "Привяжите ivLogin для синхронизации настроек и других функций. Введите User Hash на странице входа для привязки.",
-        "loginButton": "Привязать через ivLogin",
+        "subtitle": "Привяжите свой аккаунт Discord",
+        "description": "Аккаунт для вклада в ivLyrics на базе Discord",
+        "info": "Когда вы входите через Discord, текущий user hash заменяется вашим Discord ID, а существующие данные о вкладе переносятся.",
+        "loginButton": "Войти через Discord",
         "loading": "Загрузка данных аккаунта...",
         "linked": "Привязан",
-        "linkedAt": "Привязан",
-        "lastSync": "Последняя синхронизация",
-        "manageAccount": "Управление аккаунтом",
+        "linkedAt": "Дата привязки",
+        "lastSync": "Последний вход",
+        "manageAccount": "Сменить аккаунт",
         "refresh": "Обновить",
+        "loggingIn": "Открываем браузер...",
+        "startHint": "Завершите вход через Discord в браузере.",
+        "failed": "Не удалось войти через Discord.",
+        "loadFailed": "Не удалось загрузить информацию об аккаунте.",
+        "discordLoginSuccess": "Аккаунт Discord успешно привязан.",
+        "logout": "Выйти",
+        "logoutSuccess": "Вы вышли из Discord, создан новый user_hash.",
         "nickname": {
           "label": "Никнейм",
           "enter": "Пожалуйста, введите никнейм.",
@@ -1494,6 +1553,7 @@ window.LANG_RU = {
     "unsynced": "Текст"
   },
   "communityVideo": {
+    "loginRequired": "Чтобы регистрировать видео сообщества, требуется вход через Discord.",
     "title": "Видео от сообщества",
     "loading": "Загрузка списка видео...",
     "loadError": "Не удалось загрузить список",
@@ -1596,7 +1656,7 @@ window.LANG_RU = {
     "copied": "✓ Скопировано в буфер",
     "downloaded": "✓ Скачано",
     "shared": "✓ Опубликовано",
-    "maxLinesReached": "Максимум 3 строки",
+    "maxLinesReached": "Максимум 10 строк",
     "noSelection": "Выберите текст"
   },
   "setupWizard": {
@@ -1663,6 +1723,12 @@ window.LANG_RU = {
       "description": "Показывает текст в панели 'Сейчас играет' внутри Spotify. Удобно без перехода в полный экран.",
       "enabled": "Показать в панели",
       "linesCount": "Количество строк"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Виртуальное караоке",
+      "subtitle": "Включить караоке-подсветку почти для всех треков",
+      "description": "Использует аудиоанализ Spotify, чтобы синтезировать караоке-тайминг для построчно синхронизированных текстов. Благодаря этому караоке-режим работает почти на всех треках, но тайминг является приблизительным и может быть неточным.",
+      "enabled": "Включить виртуальное караоке"
     },
     "complete": {
       "title": "Готово!",
@@ -1737,6 +1803,7 @@ window.LANG_RU = {
     "dismissAll": "Закрыть все"
   },
   "syncCreator": {
+    "loginRequired": "Чтобы создать караоке-синхронизацию, требуется вход через Discord.",
     "title": "Создание синхронизации",
     "buttonTooltip": "Создать синхронизацию (Караоке)",
     "clickHereHint": "Нажмите здесь, чтобы синхронизировать текст!",
@@ -1775,6 +1842,21 @@ window.LANG_RU = {
     "loadedExistingSyncData": "Загружены данные синхронизации",
     "providerMismatch": "Существующие данные синхронизации используют другого провайдера. Вам нужно создать новые данные для провайдера вашей учетной записи.",
     "back": "Закрыть",
+    "lrclibSearchResults": "Результаты поиска LRCLIB",
+    "showLrclibSearchResults": "Показать результаты поиска",
+    "hideLrclibSearchResults": "Скрыть результаты поиска",
+    "lrclibNoCandidates": "Кандидаты LRCLIB не найдены",
+    "lrclibSelectCandidate": "Выберите вариант",
+    "lrclibApplyCandidate": "Загрузить этот текст",
+    "lrclibLoaded": "Загружено",
+    "lrclibBadgeExact": "Точное",
+    "lrclibBadgeSynced": "Синхр.",
+    "lrclibBadgePlain": "Текст",
+    "lrclibBadgePrimary": "Основной",
+    "lrclibBadgeEnglish": "Англ.",
+    "lrclibMetricArtist": "исп.",
+    "lrclibMetricTitle": "назв.",
+    "lrclibMetricDiff": "разн.",
     "lrclib": {
       "registerLyrics": "Добавить текст в LRCLIB",
       "title": "Регистрация в LRCLIB",
@@ -1809,6 +1891,7 @@ window.LANG_RU = {
       "syllable": "Слог"
     },
     "copyLyrics": "Копировать текст",
+    "virtualKaraoke": "Данные виртуального караоке",
     "lyricsCopied": "Текст скопирован в буфер обмена",
     "copyError": "Ошибка копирования",
     "export": "Экспорт",

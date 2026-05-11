@@ -2,11 +2,147 @@
  * SyncDataCreator - 노래방 싱크 데이터 생성 UI
  */
 
+const SYNC_CREATOR_RTL_STRONG_CHAR_REGEX = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/u;
+const SYNC_CREATOR_LTR_STRONG_CHAR_REGEX = /[A-Za-z\u00C0-\u02AF\u0370-\u052F\u1E00-\u1EFF]/u;
+
+const getSyncCreatorTextDirection = (text) => {
+	const normalizedText = typeof text === 'string' ? text : '';
+	let rtlCount = 0;
+	let ltrCount = 0;
+
+	for (const char of Array.from(normalizedText)) {
+		if (SYNC_CREATOR_RTL_STRONG_CHAR_REGEX.test(char)) {
+			rtlCount++;
+			continue;
+		}
+		if (SYNC_CREATOR_LTR_STRONG_CHAR_REGEX.test(char)) {
+			ltrCount++;
+		}
+	}
+
+	return rtlCount > ltrCount ? 'rtl' : 'ltr';
+};
+
+const hasSyncCreatorRtlText = (text) => {
+	const normalizedText = typeof text === 'string' ? text : '';
+	return SYNC_CREATOR_RTL_STRONG_CHAR_REGEX.test(normalizedText);
+};
+
+const getSyncCreatorCodeUnitOffsets = (chars) => {
+	const offsets = [0];
+	let offset = 0;
+	(Array.isArray(chars) ? chars : []).forEach((char) => {
+		offset += String(char || '').length;
+		offsets.push(offset);
+	});
+	return offsets;
+};
+
+const getSyncCreatorCharIndexFromCodeUnitOffset = (offsets, offset) => {
+	if (!Array.isArray(offsets) || offsets.length < 2) {
+		return 0;
+	}
+
+	const safeOffset = Math.max(0, Math.min(offset, offsets[offsets.length - 1]));
+	for (let index = 0; index < offsets.length - 1; index++) {
+		if (safeOffset >= offsets[index] && safeOffset < offsets[index + 1]) {
+			return index;
+		}
+	}
+	return Math.max(0, offsets.length - 2);
+};
+
 const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const { useState, useEffect, useRef, useCallback, useMemo } = react;
 
 	const roundSyncTime = (time) => Math.round(time * 1000) / 1000;
 	const EDGE_INTERPOLATION_GAP_SEC = 0.045;
+	const SYNC_CREATOR_SHORTCUTS = {
+		charForward: { primary: 'sync-creator-char-forward-key', secondary: 'sync-creator-char-forward-alt-key', defaultPrimary: 'right' },
+		charBack: { primary: 'sync-creator-char-back-key', secondary: 'sync-creator-char-back-alt-key', defaultPrimary: 'left' },
+		wordForward: { primary: 'sync-creator-word-forward-key', secondary: 'sync-creator-word-forward-alt-key', defaultPrimary: '.' },
+		wordBack: { primary: 'sync-creator-word-back-key', secondary: 'sync-creator-word-back-alt-key', defaultPrimary: ',' },
+		syllable: { primary: 'sync-creator-syllable-key', secondary: 'sync-creator-syllable-alt-key', defaultPrimary: ';' },
+	};
+	const normalizeHotkeyToken = (value) => {
+		if (value === null || value === undefined) return '';
+		const normalized = String(value).trim().toLowerCase();
+		if (!normalized) return '';
+
+		const aliases = {
+			arrowright: 'right',
+			arrowleft: 'left',
+			arrowup: 'up',
+			arrowdown: 'down',
+			' ': 'space',
+			spacebar: 'space',
+			escape: 'esc',
+			return: 'enter',
+			del: 'delete',
+			control: 'ctrl',
+			command: 'meta',
+			cmd: 'meta',
+		};
+
+		return aliases[normalized] || normalized;
+	};
+	const readSyncCreatorShortcutSetting = (settingKey, fallback = '') => {
+		try {
+			const fullKey = `ivLyrics:visual:${settingKey}`;
+			const stored = localStorage.getItem(fullKey) ?? Spicetify.LocalStorage?.get(fullKey);
+			const effectiveValue = stored !== null && stored !== undefined ? stored : fallback;
+			return normalizeHotkeyToken(effectiveValue);
+		} catch (e) {
+			return normalizeHotkeyToken(fallback);
+		}
+	};
+	const getSyncCreatorShortcutBindings = () => Object.entries(SYNC_CREATOR_SHORTCUTS).reduce((acc, [action, config]) => {
+		const primary = readSyncCreatorShortcutSetting(config.primary, config.defaultPrimary);
+		const secondary = readSyncCreatorShortcutSetting(config.secondary, '');
+		acc[action] = [primary, secondary].filter(Boolean);
+		return acc;
+	}, {});
+	const getNormalizedHotkeyFromEvent = (event) => {
+		const parts = [];
+		if (event.ctrlKey) parts.push('ctrl');
+		if (event.altKey) parts.push('alt');
+		if (event.shiftKey && normalizeHotkeyToken(event.key) !== 'shift') parts.push('shift');
+		if (event.metaKey) parts.push('meta');
+
+		const baseKey = normalizeHotkeyToken(event.key);
+		if (!['ctrl', 'alt', 'shift', 'meta'].includes(baseKey)) {
+			parts.push(baseKey);
+		}
+		return parts.join('+');
+	};
+	const formatHotkeyToken = (value) => {
+		const token = normalizeHotkeyToken(value);
+		const displayMap = {
+			right: '→',
+			left: '←',
+			up: '↑',
+			down: '↓',
+			enter: 'Enter',
+			backspace: '⌫',
+			space: 'Space',
+			esc: 'Esc',
+			ctrl: 'Ctrl',
+			alt: 'Alt',
+			shift: 'Shift',
+			meta: 'Meta',
+		};
+		if (displayMap[token]) return displayMap[token];
+		return token.length === 1 ? token.toUpperCase() : token;
+	};
+	const formatHotkeyBinding = (binding) => binding
+		.split('+')
+		.filter(Boolean)
+		.map(formatHotkeyToken)
+		.join('+');
+	const getSyncCreatorShortcutDisplay = (action) => {
+		const bindings = getSyncCreatorShortcutBindings()[action] || [];
+		return bindings.length ? bindings.map(formatHotkeyBinding).join(' / ') : '';
+	};
 
 	const isWordChar = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch);
 	const isLatinChar = (ch) => !!ch && /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(ch);
@@ -45,7 +181,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const scaled = (progress - 0.5) * 2;
 		return 0.5 + (0.5 * Math.pow(scaled, 3));
 	};
-	const applyInterpolatedRangeToCharTimes = (target, startIdx, endIdx, startTime, endTime) => {
+	const smoothStepInterpolation = (progress) => {
+		if (progress <= 0) return 0;
+		if (progress >= 1) return 1;
+		return progress * progress * (3 - (2 * progress));
+	};
+	const applyInterpolatedRangeToCharTimes = (target, startIdx, endIdx, startTime, endTime, interpolationFn = edgeInterpolation) => {
 		if (!target || startIdx > endIdx || startIdx < 0) return;
 		const count = endIdx - startIdx + 1;
 		const safeEndTime = Math.max(startTime, endTime);
@@ -55,11 +196,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 		for (let i = 0; i < count; i++) {
 			const progress = count === 1 ? 1 : i / (count - 1);
-			target[startIdx + i] = roundSyncTime(startTime + ((safeEndTime - startTime) * edgeInterpolation(progress)));
+			target[startIdx + i] = roundSyncTime(startTime + ((safeEndTime - startTime) * interpolationFn(progress)));
 		}
 	};
 	const estimateSegmentDuration = (startIdx, endIdx, scale = 0.055, maxDuration = 0.26) =>
 		Math.min(maxDuration, Math.max(0.07, (endIdx - startIdx + 1) * scale));
+	const estimateWordInterpolationDuration = (startIdx, endIdx) => {
+		const charCount = Math.max(1, endIdx - startIdx + 1);
+		const preferredDuration = charCount * 0.085;
+		const minimumDuration = 0.11 + Math.max(0, charCount - 1) * 0.05;
+		return Math.min(0.42, Math.max(minimumDuration, preferredDuration));
+	};
 	const buildLatinWordSyllables = (chars, wordStart, wordEnd) => {
 		const nuclei = [];
 		let index = wordStart;
@@ -226,6 +373,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [lrcLibPublishProgress, setLrcLibPublishProgress] = useState('');
 	const [publishCancelled, setPublishCancelled] = useState(false);
 	const [availableProviders, setAvailableProviders] = useState([]);
+	const [lrclibCandidates, setLrclibCandidates] = useState([]);
+	const [selectedLrclibCandidateKey, setSelectedLrclibCandidateKey] = useState('');
+	const [previewLrclibCandidateKey, setPreviewLrclibCandidateKey] = useState('');
+	const [lrclibSearchMeta, setLrclibSearchMeta] = useState(null);
+	const [showLrclibCandidates, setShowLrclibCandidates] = useState(true);
 
 	// Refs
 	const containerRef = useRef(null);
@@ -233,6 +385,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const animationRef = useRef(null);
 	const charTimesRef = useRef([]);
 	const charElementsRef = useRef([]);
+	const rtlTextRunRef = useRef(null);
 	const preventNextTrackRef = useRef(false);
 	const publishWorkersRef = useRef([]);
 
@@ -242,8 +395,147 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const trackName = trackInfo?.name || Spicetify.Player?.data?.item?.name || '';
 	const artistName = trackInfo?.artists?.map(a => a.name).join(', ') ||
 		Spicetify.Player?.data?.item?.artists?.map(a => a.name).join(', ') || '';
+	const isVirtualKaraokeSource =
+		lyrics?.karaokeSource === 'spotify-audio-analysis' ||
+		lyrics?.karaokeSource === 'audio-analysis-pseudo';
 	const albumArt = trackInfo?.album?.images?.[0]?.url ||
 		Spicetify.Player?.data?.item?.album?.images?.[0]?.url || '';
+
+	const stripLrclibTimestamp = useCallback((text) => {
+		if (!text || typeof text !== 'string') return '';
+		return text.replace(/^\[\d+:\d+(?:[.,]\d+)?\]\s*/, '').trim();
+	}, []);
+
+	const extractLyricsText = useCallback((lyricsSource) => {
+		let text = '';
+
+		if (Array.isArray(lyricsSource)) {
+			text = lyricsSource.map(line => {
+				if (typeof line === 'string') return line;
+				if (line.originalText && typeof line.originalText === 'string' && line.originalText.trim().length > 0) return line.originalText;
+				if (line.text) return typeof line.text === 'string' ? line.text : '';
+				return '';
+			}).filter(t => t.trim().length > 0).join('\n');
+		} else if (typeof lyricsSource === 'string') {
+			text = lyricsSource;
+		}
+
+		return text ? text.normalize('NFC') : '';
+	}, []);
+
+	const buildLineObjectsFromText = useCallback((text) => {
+		if (!text || typeof text !== 'string') return [];
+		return text
+			.split('\n')
+			.map(line => line.trim())
+			.filter(Boolean)
+			.map(line => ({ text: line.normalize('NFC') }));
+	}, []);
+
+	const getLrclibCandidateText = useCallback((candidate) => {
+		if (!candidate) return '';
+
+		const usePlain = candidate.preferredLyricsSource === 'plain' && candidate.plainLyrics;
+		const sourceText = usePlain
+			? candidate.plainLyrics
+			: (candidate.syncedLyrics || candidate.plainLyrics || '');
+
+		if (!sourceText) return '';
+
+		if (usePlain || !candidate.syncedLyrics) {
+			return sourceText.normalize('NFC');
+		}
+
+		return sourceText
+			.split('\n')
+			.map(line => stripLrclibTimestamp(line))
+			.filter(Boolean)
+			.join('\n')
+			.normalize('NFC');
+	}, [stripLrclibTimestamp]);
+
+	const buildSyntheticLrclibResult = useCallback((candidate) => {
+		const text = getLrclibCandidateText(candidate);
+		const lines = buildLineObjectsFromText(text);
+		return {
+			provider: 'lrclib',
+			synced: candidate?.preferredLyricsSource === 'synced' ? lines : null,
+			unsynced: lines
+		};
+	}, [buildLineObjectsFromText, getLrclibCandidateText]);
+
+	const clearLrclibCandidateState = useCallback(() => {
+		setLrclibCandidates([]);
+		setSelectedLrclibCandidateKey('');
+		setPreviewLrclibCandidateKey('');
+		setLrclibSearchMeta(null);
+	}, []);
+
+	const applyLoadedLyricsResult = useCallback(async (result, usedProvider) => {
+		let finalProvider = result.provider || usedProvider;
+
+		if ((finalProvider === 'Spotify' || finalProvider === 'spotify') && result.spotifyLyricsProvider) {
+			finalProvider = `spotify-${result.spotifyLyricsProvider}`;
+		}
+
+		setProvider(finalProvider);
+		setAddonId(usedProvider);
+		setLyrics(result);
+
+		if (window.SyncDataService && trackId) {
+			try {
+				const existingSyncData = await window.SyncDataService.getSyncData(trackId, finalProvider);
+				if (existingSyncData && existingSyncData.syncData && existingSyncData.syncData.lines) {
+					window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
+					setSyncData(existingSyncData.syncData);
+					Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || '기존 싱크 데이터를 불러왔습니다');
+				}
+			} catch (e) {
+				console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
+			}
+		}
+
+		const text = extractLyricsText(result.synced || result.unsynced);
+		if (text.trim().length > 0) {
+			setLyricsText(text);
+			setError(null);
+		} else {
+			setError(I18n.t('syncCreator.noLyrics'));
+		}
+	}, [extractLyricsText, trackId]);
+
+	const previewLrclibCandidate = useMemo(() => {
+		if (!lrclibCandidates.length) return null;
+		return lrclibCandidates.find(candidate => candidate.candidateKey === previewLrclibCandidateKey)
+			|| lrclibCandidates.find(candidate => candidate.candidateKey === selectedLrclibCandidateKey)
+			|| lrclibCandidates[0]
+			|| null;
+	}, [lrclibCandidates, previewLrclibCandidateKey, selectedLrclibCandidateKey]);
+
+	const applySelectedLrclibCandidate = useCallback(async (candidateKey) => {
+		const candidate = lrclibCandidates.find(item => item.candidateKey === candidateKey);
+		if (!candidate) return;
+
+		setIsLoading(true);
+		setError(null);
+		setLyrics(null);
+		setLyricsText('');
+		setSyncData(null);
+		setCurrentLineIndex(0);
+		setMode('idle');
+
+		try {
+			const syntheticResult = buildSyntheticLrclibResult(candidate);
+			await applyLoadedLyricsResult(syntheticResult, 'lrclib');
+			setSelectedLrclibCandidateKey(candidate.candidateKey);
+			setPreviewLrclibCandidateKey(candidate.candidateKey);
+		} catch (e) {
+			console.error('[SyncDataCreator] Failed to apply LRCLIB candidate:', e);
+			setError(I18n.t('syncCreator.loadError'));
+		}
+
+		setIsLoading(false);
+	}, [applyLoadedLyricsResult, buildSyntheticLrclibResult, lrclibCandidates]);
 
 	// 가사를 줄 단위로 파싱
 	// NFC 정규화를 적용하여 결합 문자(NFD)를 합성 문자로 변환
@@ -279,6 +571,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (currentLineIndex < 0 || currentLineIndex >= lyricsLines.length) return [];
 		return Array.from(lyricsLines[currentLineIndex]);
 	}, [lyricsLines, currentLineIndex]);
+	const currentLineText = currentLineIndex >= 0 && currentLineIndex < lyricsLines.length
+		? lyricsLines[currentLineIndex]
+		: '';
+	const currentLineDirection = useMemo(
+		() => getSyncCreatorTextDirection(currentLineText),
+		[currentLineText]
+	);
+	const isCurrentLineRtl = currentLineDirection === 'rtl';
+	const useCurrentLineTextRun = useMemo(
+		() => hasSyncCreatorRtlText(currentLineText),
+		[currentLineText]
+	);
+	const currentLineCodeUnitOffsets = useMemo(
+		() => getSyncCreatorCodeUnitOffsets(currentLineChars),
+		[currentLineChars]
+	);
 
 	const currentLineSyllableSegments = useMemo(
 		() => buildLineSyllableSegments(currentLineChars),
@@ -386,6 +694,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSyncData(null);
 		setCurrentLineIndex(0);
 		setMode('idle');
+		clearLrclibCandidateState();
 
 		try {
 			const firstArtist = trackInfo?.artists?.[0]?.name ||
@@ -429,7 +738,34 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				window.__ivLyricsDebugLog?.('[SyncDataCreator] Trying provider:', tryProvider);
 
 				try {
-					if (window.LyricsAddonManager) {
+					if (realProvider === 'lrclib' && window.LyricsAddonManager?.getAddon) {
+						const lrclibAddon = window.LyricsAddonManager.getAddon(realProvider);
+						if (typeof lrclibAddon?.searchCandidates === 'function') {
+							const searchResult = await lrclibAddon.searchCandidates(info);
+							if (!searchResult?.success) {
+								throw new Error(searchResult?.error || 'No lyrics found');
+							}
+
+							const candidates = Array.isArray(searchResult.candidates) ? searchResult.candidates : [];
+							const selectedCandidate = candidates.find(candidate => candidate.candidateKey === searchResult.selectedCandidateKey)
+								|| candidates[0]
+								|| null;
+
+							if (!selectedCandidate) {
+								throw new Error('No ranked LRCLIB candidates');
+							}
+
+							setLrclibCandidates(candidates);
+							setSelectedLrclibCandidateKey(selectedCandidate.candidateKey);
+							setPreviewLrclibCandidateKey(selectedCandidate.candidateKey);
+							setLrclibSearchMeta(searchResult);
+							setShowLrclibCandidates(true);
+							result = buildSyntheticLrclibResult(selectedCandidate);
+						} else {
+							result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
+						}
+						if (result && result.error) throw new Error(result.error);
+					} else if (window.LyricsAddonManager) {
 						result = await window.LyricsAddonManager.getLyricsFrom(realProvider, info);
 						if (result && result.error) throw new Error(result.error);
 					} else if (typeof Providers !== 'undefined' && Providers[realProvider]) {
@@ -449,56 +785,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			if (result && (result.synced || result.unsynced)) {
-				// provider 설정
-				// result.provider(가사에서 리턴한 실제 provider)를 우선 사용
-				// result.provider가 없으면 usedProvider(addon ID) 사용
-				let finalProvider = result.provider || usedProvider;
-
-				// Spotify addon의 경우 spotifyLyricsProvider를 사용해 상세 provider 표기
-				if ((finalProvider === 'Spotify' || finalProvider === 'spotify') && result.spotifyLyricsProvider) {
-					finalProvider = `spotify-${result.spotifyLyricsProvider}`;
-				}
-
-				setProvider(finalProvider);
-				setAddonId(usedProvider);
-				setLyrics(result);
-
-				// 기존 싱크 데이터 로드
-				if (window.SyncDataService && trackId) {
-					try {
-						const existingSyncData = await window.SyncDataService.getSyncData(trackId, finalProvider);
-						if (existingSyncData && existingSyncData.syncData && existingSyncData.syncData.lines) {
-							window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
-							setSyncData(existingSyncData.syncData);
-							Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || '기존 싱크 데이터를 불러왔습니다');
-						}
-					} catch (e) {
-						console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
-					}
-				}
-
-				const lyricsSource = result.synced || result.unsynced;
-				let text = '';
-
-				if (Array.isArray(lyricsSource)) {
-					text = lyricsSource.map(line => {
-						if (typeof line === 'string') return line;
-						if (line.originalText && typeof line.originalText === 'string' && line.originalText.trim().length > 0) return line.originalText;
-						if (line.text) return typeof line.text === 'string' ? line.text : '';
-						return '';
-					}).filter(t => t.trim().length > 0).join('\n');
-				} else if (typeof lyricsSource === 'string') {
-					text = lyricsSource;
-				}
-
-				// NFC 정규화 적용 - 결합 문자를 합성 문자로 변환
-				text = text.normalize('NFC');
-
-				if (text.trim().length > 0) {
-					setLyricsText(text);
-				} else {
-					setError(I18n.t('syncCreator.noLyrics'));
-				}
+				await applyLoadedLyricsResult(result, usedProvider);
 			} else {
 				// 만약 수동 선택했는데 실패했으면 provider는 그 선택한걸로 유지해서 UI에 보여줌? 
 				// 아니면 실패 메시지 띄우고 provider는 유지
@@ -511,7 +798,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		setIsLoading(false);
-	}, [trackInfo, trackName, artistName]);
+	}, [trackInfo, trackName, artistName, applyLoadedLyricsResult, buildSyntheticLrclibResult, clearLrclibCandidateState]);
 
 
 
@@ -634,6 +921,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const autoScroll = useCallback((charIndex) => {
 		if (!lyricsScrollRef.current || charIndex < 0) return;
 		const scrollContainer = lyricsScrollRef.current;
+		if (useCurrentLineTextRun && currentLineChars.length > 0) {
+			const maxScrollLeft = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+			const progress = charIndex / Math.max(1, currentLineChars.length - 1);
+			scrollContainer.scrollLeft = isCurrentLineRtl ? -maxScrollLeft * progress : maxScrollLeft * progress;
+			return;
+		}
 		const charElement = charElementsRef.current[charIndex];
 		if (!charElement) return;
 
@@ -646,9 +939,51 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (Math.abs(scrollOffset) > 50) {
 			scrollContainer.scrollLeft += scrollOffset * 0.3;
 		}
-	}, []);
+	}, [currentLineChars.length, isCurrentLineRtl, useCurrentLineTextRun]);
 
 	const getCharIndexFromPoint = useCallback((clientX, clientY) => {
+		if (useCurrentLineTextRun && rtlTextRunRef.current && currentLineChars.length > 0) {
+			const textEl = rtlTextRunRef.current;
+			const resolveTextOffset = (node, offset) => {
+				if (!node || !textEl.contains(node)) return null;
+				if (node.nodeType === Node.TEXT_NODE) {
+					let totalOffset = 0;
+					const walker = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT);
+					let textNode = walker.nextNode();
+					while (textNode) {
+						if (textNode === node) {
+							return totalOffset + offset;
+						}
+						totalOffset += textNode.nodeValue?.length || 0;
+						textNode = walker.nextNode();
+					}
+				}
+				return null;
+			};
+
+			let textOffset = null;
+			if (typeof document.caretPositionFromPoint === 'function') {
+				const caretPosition = document.caretPositionFromPoint(clientX, clientY);
+				textOffset = resolveTextOffset(caretPosition?.offsetNode, caretPosition?.offset || 0);
+			}
+			if (textOffset === null && typeof document.caretRangeFromPoint === 'function') {
+				const caretRange = document.caretRangeFromPoint(clientX, clientY);
+				textOffset = resolveTextOffset(caretRange?.startContainer, caretRange?.startOffset || 0);
+			}
+			if (textOffset !== null) {
+				return getSyncCreatorCharIndexFromCodeUnitOffset(currentLineCodeUnitOffsets, textOffset);
+			}
+
+			const rect = textEl.getBoundingClientRect();
+			if (rect.width > 0) {
+				const rawRatio = isCurrentLineRtl
+					? (rect.right - clientX) / rect.width
+					: (clientX - rect.left) / rect.width;
+				const ratio = Math.max(0, Math.min(1, rawRatio));
+				return Math.max(0, Math.min(currentLineChars.length - 1, Math.floor(ratio * currentLineChars.length)));
+			}
+		}
+
 		for (let i = 0; i < charElementsRef.current.length; i++) {
 			const el = charElementsRef.current[i];
 			if (!el) continue;
@@ -684,7 +1019,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		}
 		return 0;
-	}, []);
+	}, [currentLineChars.length, currentLineCodeUnitOffsets, isCurrentLineRtl, useCurrentLineTextRun]);
 
 	const handleDragStart = useCallback((charIndex, e) => {
 		if (mode !== 'record' || currentLineIndex >= lyricsLines.length) return;
@@ -739,6 +1074,66 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [mode, isDragging, dragStartTime, recordingCharIndex, autoScroll]);
 
+	// Commit-time normalization keeps the client aligned with backend validation:
+	// chars must be non-decreasing and a line must not start before the previous line ends.
+	const normalizeCommittedLineChars = useCallback((rawChars, previousLineEndTime = -1) => {
+		const normalizedChars = [];
+		let minimumAllowedTime = previousLineEndTime >= 0 ? previousLineEndTime : 0;
+
+		for (let i = 0; i < rawChars.length; i++) {
+			const rawTime = typeof rawChars[i] === 'number' ? rawChars[i] : minimumAllowedTime;
+			const normalizedTime = roundSyncTime(Math.max(minimumAllowedTime, rawTime));
+			normalizedChars.push(normalizedTime);
+			minimumAllowedTime = normalizedTime;
+		}
+
+		return normalizedChars;
+	}, []);
+
+	const commitCurrentLineSync = useCallback((rawChars) => {
+		const lineStart = lineCharOffsets[currentLineIndex];
+		const lineEnd = lineStart + currentLineChars.length - 1;
+		const nextLines = syncData?.lines
+			? syncData.lines.map((line) => ({
+				...line,
+				chars: Array.isArray(line.chars) ? [...line.chars] : []
+			}))
+			: [];
+		const existingIndex = nextLines.findIndex((line) => line.start === lineStart);
+		const lineData = {
+			start: lineStart,
+			end: lineEnd,
+			chars: rawChars.map((time) => roundSyncTime(time))
+		};
+
+		if (existingIndex >= 0) {
+			nextLines[existingIndex] = lineData;
+		} else {
+			nextLines.push(lineData);
+		}
+
+		nextLines.sort((a, b) => a.start - b.start);
+
+		const committedLineIndex = nextLines.findIndex((line) => line.start === lineStart);
+		const previousLine = committedLineIndex > 0 ? nextLines[committedLineIndex - 1] : null;
+		const previousLineEndTime = previousLine?.chars?.[previousLine.chars.length - 1] ?? -1;
+		const normalizedLineData = {
+			...lineData,
+			chars: normalizeCommittedLineChars(lineData.chars, previousLineEndTime)
+		};
+		const normalizedLastCharTime = normalizedLineData.chars[normalizedLineData.chars.length - 1];
+
+		nextLines[committedLineIndex] = normalizedLineData;
+
+		const validLines = nextLines.filter((line, index) => {
+			if (index <= committedLineIndex) return true;
+			return !(line.chars && line.chars[0] < normalizedLastCharTime);
+		});
+
+		setSyncData(validLines.length > 0 ? { lines: validLines } : null);
+		return normalizedLineData;
+	}, [syncData, lineCharOffsets, currentLineIndex, currentLineChars.length, normalizeCommittedLineChars]);
+
 	const handleDragEnd = useCallback((e) => {
 		if (mode !== 'record' || !isDragging || dragStartTime === null || recordingCharIndex === -1) {
 			setIsDragging(false);
@@ -752,8 +1147,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		const endTime = Spicetify.Player.getProgress() / 1000;
 		const endCharIndex = recordingCharIndex;
-		const lineStart = lineCharOffsets[currentLineIndex];
-		const lineEnd = lineStart + currentLineChars.length - 1;
 		const charCount = currentLineChars.length;
 
 		// 유효성 체크: 만약 드래그 시작하자마자 바로 끝나거나 이상한 경우
@@ -783,30 +1176,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			chars.push(Math.round(time * 1000) / 1000);
 		}
 
-		const lastCharTime = chars[chars.length - 1];
-
-		setSyncData(prev => {
-			let newLines = prev?.lines ? [...prev.lines] : [];
-			const existingIndex = newLines.findIndex(l => l.start === lineStart);
-			const lineData = { start: lineStart, end: lineEnd, chars: chars };
-
-			if (existingIndex >= 0) {
-				newLines[existingIndex] = lineData;
-			} else {
-				newLines.push(lineData);
-				newLines.sort((a, b) => a.start - b.start);
-			}
-
-			// 유효성 검사
-			const validLines = newLines.filter(line => {
-				if (line.start > lineStart && line.chars && line.chars[0] < lastCharTime) {
-					return false;
-				}
-				return true;
-			});
-
-			return { lines: validLines };
-		});
+		commitCurrentLineSync(chars);
 
 		const isComplete = endCharIndex >= charCount - 1;
 		if (isComplete && currentLineIndex < lyricsLines.length - 1) {
@@ -819,7 +1189,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setRecordingCharIndex(-1);
 		setIsDragging(false);
 		charTimesRef.current = [];
-	}, [mode, isDragging, dragStartTime, recordingCharIndex, currentLineIndex, currentLineChars, lineCharOffsets, lyricsLines.length, dragStartCharIndex]);
+	}, [mode, isDragging, dragStartTime, recordingCharIndex, currentLineIndex, currentLineChars, lyricsLines.length, dragStartCharIndex, commitCurrentLineSync]);
 
 	// 키보드 싱크 상태 ref (isDragging과 별개로 키보드용)
 	const isKeyboardSyncingRef = useRef(false);
@@ -877,8 +1247,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 			const endTime = Spicetify.Player.getProgress() / 1000;
 			const endCharIndex = keyboardCharIndexRef.current;
-			const lineStart = lineCharOffsets[currentLineIndex];
-			const lineEnd = lineStart + currentLineChars.length - 1;
 			const charCount = currentLineChars.length;
 
 			const chars = [];
@@ -898,29 +1266,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				chars.push(Math.round(time * 1000) / 1000);
 			}
 
-			const lastCharTime = chars[chars.length - 1];
-
-			setSyncData(prev => {
-				let newLines = prev?.lines ? [...prev.lines] : [];
-				const existingIndex = newLines.findIndex(l => l.start === lineStart);
-				const lineData = { start: lineStart, end: lineEnd, chars: chars };
-
-				if (existingIndex >= 0) {
-					newLines[existingIndex] = lineData;
-				} else {
-					newLines.push(lineData);
-					newLines.sort((a, b) => a.start - b.start);
-				}
-
-				const validLines = newLines.filter(line => {
-					if (line.start > lineStart && line.chars && line.chars[0] < lastCharTime) {
-						return false;
-					}
-					return true;
-				});
-
-				return { lines: validLines };
-			});
+			commitCurrentLineSync(chars);
 
 			// 다음 라인으로 이동
 			if (currentLineIndex < lyricsLines.length - 1) {
@@ -939,14 +1285,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		};
 
 		const handleKeyDown = (e) => {
-			// 방향키, Enter, Backspace, 단어 싱크(,.), 음절 싱크(;), 드래그(/), Seek(z,x)
-			const targetKeys = ['ArrowRight', 'ArrowLeft', 'Enter', 'Backspace', ',', '.', ';', '/', 'z', 'x'];
-			if (!targetKeys.includes(e.key)) return;
+			const normalizedHotkey = getNormalizedHotkeyFromEvent(e);
+			const shortcutBindings = getSyncCreatorShortcutBindings();
+			const shortcutAction = Object.entries(shortcutBindings)
+				.find(([, bindings]) => bindings.includes(normalizedHotkey))?.[0] || null;
+			const staticHotkeys = new Set(['enter', 'backspace', '/', 'z', 'x']);
+			if (!shortcutAction && !staticHotkeys.has(normalizedHotkey)) return;
 
 			// record 모드가 아니면 처리하지 않음
 			if (mode !== 'record') return;
 
-			window.__ivLyricsDebugLog?.('[SyncDataCreator] KeyDown:', e.key, 'mode:', mode, 'lineIndex:', currentLineIndex);
+			window.__ivLyricsDebugLog?.('[SyncDataCreator] KeyDown:', e.key, 'normalized:', normalizedHotkey, 'mode:', mode, 'lineIndex:', currentLineIndex);
 
 			if (currentLineIndex >= lyricsLines.length) return;
 
@@ -1036,7 +1385,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					startIdx,
 					endIdx,
 					startTime,
-					startTime + duration
+					startTime + duration,
+					smoothStepInterpolation
 				);
 
 				window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to word:', startIdx, '-', endIdx, 'duration:', duration.toFixed(3));
@@ -1104,8 +1454,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					if (keyboardCharIndexRef.current >= currentLineChars.length - 1) {
 						// 첫 단어이자 마지막 단어인 경우에도 보간 적용
 						if (interpolationEnabledRef.current && endIdx > 0) {
-							const duration = estimateSegmentDuration(0, endIdx);
-							applyInterpolatedRangeToCharTimes(charTimesRef.current, 0, endIdx, currentTime, currentTime + duration);
+							const duration = estimateWordInterpolationDuration(0, endIdx);
+							applyInterpolatedRangeToCharTimes(charTimesRef.current, 0, endIdx, currentTime, currentTime + duration, smoothStepInterpolation);
 							window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to single word line');
 						}
 						finishKeyboardSync();
@@ -1183,8 +1533,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						const charCount = endIdx - startIdx + 1;
 						if (charCount > 1) {
 							// 마지막 단어는 시작 시간으로부터 글자 수에 비례한 짧은 지속시간 부여
-							const duration = estimateSegmentDuration(startIdx, endIdx); // 최대 260ms
-							applyInterpolatedRangeToCharTimes(charTimesRef.current, startIdx, endIdx, startTime, startTime + duration);
+							const duration = estimateWordInterpolationDuration(startIdx, endIdx);
+							applyInterpolatedRangeToCharTimes(charTimesRef.current, startIdx, endIdx, startTime, startTime + duration, smoothStepInterpolation);
 							window.__ivLyricsDebugLog?.('[SyncDataCreator] Applied interpolation to last word:', startIdx, '-', endIdx);
 						}
 					}
@@ -1239,7 +1589,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			};
 
 			// 오른쪽 방향키: 한 글자 싱크
-			if (e.key === 'ArrowRight') {
+			if (shortcutAction === 'charForward') {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -1248,7 +1598,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			// 왼쪽 방향키: 한 글자 취소 (첫 글자도 취소 가능)
-			if (e.key === 'ArrowLeft') {
+			if (shortcutAction === 'charBack') {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -1269,7 +1619,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			// . (> 키): 한 단어 싱크
-			if (e.key === '.') {
+			if (shortcutAction === 'wordForward') {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -1278,7 +1628,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			// , (< 키): 한 단어 취소
-			if (e.key === ',') {
+			if (shortcutAction === 'wordBack') {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -1287,7 +1637,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 
 			// ; 키: 음절 단위 싱크 (다음 모음까지 진행)
-			if (e.key === ';') {
+			if (shortcutAction === 'syllable') {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -1492,7 +1842,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 			isKeyboardDraggingRef.current = false;
 		};
-	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars, currentLineSyllableSegments, lineCharOffsets, autoScroll]);
+	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars, currentLineSyllableSegments, lineCharOffsets, autoScroll, commitCurrentLineSync]);
 
 	const handleContainerMouseDown = useCallback((e) => {
 		if (mode !== 'record' || currentLineIndex >= lyricsLines.length) return;
@@ -1617,8 +1967,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setIsSubmitting(true);
 
 		try {
+			const submitMetadata = {
+				title: trackName,
+				artist: artistName
+			};
 			if (typeof SyncDataService !== 'undefined' && SyncDataService.submitSyncData) {
-				const result = await SyncDataService.submitSyncData(trackId, provider, syncData);
+				const result = await SyncDataService.submitSyncData(trackId, provider, syncData, submitMetadata);
 				if (result) {
 					Toast.success(I18n.t('syncCreator.submitSuccess'));
 					// 캐시 무효화
@@ -1636,12 +1990,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					Toast.error(I18n.t('syncCreator.submitError'));
 				}
 			} else {
-				const userHash = Utils.getCurrentUserHash();
-				const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync-data', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ trackId, provider, syncData, userHash })
-				});
+					const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync-data', {
+						method: 'POST',
+						headers: Utils.getApiHeaders({ 'Content-Type': 'application/json' }),
+						body: JSON.stringify({ trackId, provider, syncData, ...submitMetadata })
+					});
 
 				if (response.ok) {
 					Toast.success(I18n.t('syncCreator.submitSuccess'));
@@ -1662,11 +2015,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		} catch (e) {
 			console.error('[SyncDataCreator] Submit error:', e);
-			Toast.error(`${I18n.t('syncCreator.submitError')}: ${e.message}`);
+			Toast.error(e?.message || I18n.t('syncCreator.submitError'));
 		}
 
 		setIsSubmitting(false);
-	}, [syncData, lyricsLines.length, trackId, provider, onClose]);
+	}, [syncData, lyricsLines.length, trackId, provider, trackName, artistName, onClose]);
 
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
 	const exportSyncData = useCallback(() => {
@@ -1952,32 +2305,36 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const formatSeconds = useCallback((seconds) => `${seconds.toFixed(1)}s`, []);
+	const syncLinesByStart = useMemo(() => {
+		if (!Array.isArray(syncData?.lines) || syncData.lines.length === 0) return null;
+		return new Map(syncData.lines.map((line) => [line.start, line]));
+	}, [syncData]);
 
 	const isCharSynced = useCallback((lineIndex, charIndex) => {
-		if (!syncData || !syncData.lines) return false;
+		if (!syncLinesByStart) return false;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		return lineData && lineData.chars && lineData.chars.length > charIndex;
-	}, [syncData, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets]);
 
 	const getCharSyncTime = useCallback((lineIndex, charIndex) => {
-		if (!syncData || !syncData.lines) return null;
+		if (!syncLinesByStart) return null;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		return lineData?.chars?.[charIndex] ?? null;
-	}, [syncData, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets]);
 
 	const getPreviewCharIndex = useCallback((lineIndex) => {
-		if (!syncData || !syncData.lines) return -1;
+		if (!syncLinesByStart) return -1;
 		const currentTimeSec = position / 1000;
 		const lineStart = lineCharOffsets[lineIndex];
-		const lineData = syncData.lines.find(l => l.start === lineStart);
+		const lineData = syncLinesByStart.get(lineStart);
 		if (!lineData || !lineData.chars) return -1;
 		for (let i = lineData.chars.length - 1; i >= 0; i--) {
 			if (currentTimeSec >= lineData.chars[i]) return i;
 		}
 		return -1;
-	}, [syncData, position, lineCharOffsets]);
+	}, [syncLinesByStart, position, lineCharOffsets]);
 
 	useEffect(() => { charElementsRef.current = []; }, [currentLineIndex, lyricsText]);
 
@@ -1995,7 +2352,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	// 스타일
 	const s = {
-		overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--spice-main, #121212)', zIndex: 10000, display: 'flex', flexDirection: 'column' },
+		overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--spice-main, #121212)', zIndex: 'var(--iv-layer-modal, 2147483647)', display: 'flex', flexDirection: 'column' },
 		header: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '12px 20px', borderBottom: '1px solid var(--spice-misc)', flexShrink: 0 },
 		backBtn: { background: 'var(--spice-misc)', border: 'none', color: 'var(--spice-text)', cursor: 'pointer', padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600' },
 		title: { fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--spice-text)' },
@@ -2007,8 +2364,28 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		trackName: { fontSize: '14px', fontWeight: '600', color: 'var(--spice-text)' },
 		artistName: { fontSize: '12px', color: 'var(--spice-subtext)' },
 		providerRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+		virtualKaraokeBadge: { background: 'rgba(29, 185, 84, 0.18)', color: '#1db954', border: '1px solid rgba(29, 185, 84, 0.35)', borderRadius: '999px', padding: '4px 10px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' },
 		select: { background: 'var(--spice-card)', color: 'var(--spice-text)', border: '1px solid var(--spice-misc)', borderRadius: '6px', padding: '6px 10px', fontSize: '12px' },
 		loadBtn: { background: 'var(--spice-button)', color: 'var(--spice-button-text, #000)', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
+		candidatePanelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '10px', gridColumn: '1 / -1' },
+		candidatePanelTitle: { fontSize: '12px', fontWeight: '700', color: 'var(--spice-text)' },
+		candidatePanel: { display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)', gap: '12px', padding: '12px 20px', background: 'var(--spice-card)', borderTop: '1px solid var(--spice-misc)', flexShrink: 0 },
+		candidateList: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '230px', overflowY: 'auto', paddingRight: '4px' },
+		candidateItem: { background: 'var(--spice-main)', border: '1px solid var(--spice-misc)', borderRadius: '10px', padding: '10px 12px', cursor: 'pointer', textAlign: 'left' },
+		candidateItemActive: { border: '1px solid var(--spice-button)', boxShadow: '0 0 0 1px rgba(var(--spice-rgb-button), 0.25)' },
+		candidateItemApplied: { background: 'rgba(var(--spice-rgb-button), 0.12)' },
+		candidateTitle: { fontSize: '13px', fontWeight: '700', color: 'var(--spice-text)' },
+		candidateSubtitle: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '2px' },
+		candidateMetaRow: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+		candidateBadge: { display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: '700', background: 'rgba(255,255,255,0.08)', color: 'var(--spice-text)' },
+		candidatePreview: { minHeight: '0', background: 'var(--spice-main)', border: '1px solid var(--spice-misc)', borderRadius: '12px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' },
+		candidatePreviewHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' },
+		candidatePreviewTitle: { fontSize: '14px', fontWeight: '700', color: 'var(--spice-text)' },
+		candidatePreviewSubtitle: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '3px' },
+		candidatePreviewActions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+		candidatePreviewText: { margin: 0, whiteSpace: 'pre-wrap', fontSize: '12px', lineHeight: 1.55, color: 'var(--spice-text)', maxHeight: '180px', overflowY: 'auto' },
+		candidateEmpty: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '180px', fontSize: '12px', color: 'var(--spice-subtext)' },
+		secondaryBtn: { background: 'var(--spice-misc)', color: 'var(--spice-text)', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
 		playbackRow: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--spice-card)', flexShrink: 0 },
 		playbackTime: { fontSize: '11px', color: 'var(--spice-subtext)', minWidth: '40px', fontVariantNumeric: 'tabular-nums' },
 		playbackBar: { flex: 1, height: '6px', background: 'var(--spice-misc)', borderRadius: '3px', cursor: 'pointer' },
@@ -2027,6 +2404,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		lyricsBox: { background: 'var(--spice-card)', borderRadius: '12px', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: mode === 'record' ? 'pointer' : 'default', userSelect: 'none', marginBottom: '12px' },
 		lyricsScroll: { width: '100%', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '28px', display: 'flex', justifyContent: 'center' },
 		lyricsLine: { display: 'inline-flex', flexWrap: 'nowrap', gap: '0px', paddingLeft: '32px', paddingRight: '32px', justifyContent: 'center' },
+		rtlLyricsLine: { display: 'block', width: '100%', paddingLeft: '32px', paddingRight: '32px', textAlign: 'center', direction: 'rtl', unicodeBidi: 'plaintext' },
+		rtlTextRun: { display: 'inline-block', maxWidth: '100%', padding: '10px 1px', fontSize: '32px', fontWeight: '600', lineHeight: 1.45, letterSpacing: 0, whiteSpace: 'pre', cursor: mode === 'record' ? 'pointer' : 'default', color: 'transparent', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' },
 		charSpan: { padding: '10px 1px', borderRadius: '4px', cursor: mode === 'record' ? 'pointer' : 'default', position: 'relative', fontSize: '32px', fontWeight: '600', minWidth: '6px', textAlign: 'center', flexShrink: 0, color: 'var(--spice-text)', letterSpacing: '-1px' },
 		charSynced: { background: 'rgba(var(--spice-rgb-button), 0.2)' },
 		charPlayed: { background: 'var(--spice-button)', color: 'var(--spice-button-text, #000)' },
@@ -2044,7 +2423,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--spice-subtext)' },
 		error: { textAlign: 'center', padding: '40px', color: '#e53935' },
 		// LRCLIB 발행 모달 스타일
-		lrcLibModal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+		lrcLibModal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 'var(--iv-layer-modal, 2147483647)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
 		lrcLibContent: { background: 'var(--spice-card)', borderRadius: '16px', padding: '24px', width: '90%', maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '16px' },
 		lrcLibTitle: { fontSize: '18px', fontWeight: '700', color: 'var(--spice-text)', margin: 0 },
 		lrcLibDesc: { fontSize: '13px', color: 'var(--spice-subtext)', lineHeight: 1.5 },
@@ -2062,6 +2441,23 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		shortcutItem: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--spice-subtext)' },
 		shortcutKey: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '24px', height: '22px', padding: '0 6px', background: 'var(--spice-misc)', color: 'var(--spice-text)', borderRadius: '4px', fontSize: '10px', fontWeight: '700', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 2px 0 rgba(0,0,0,0.3)' },
 		shortcutDesc: { color: 'var(--spice-subtext)' },
+	};
+
+	const currentLineData = syncLinesByStart?.get(lineCharOffsets[currentLineIndex]);
+	const currentLinePreviewIndex = currentLineText ? getPreviewCharIndex(currentLineIndex) : -1;
+	const currentLineSyncedIndex = (currentLineData?.chars?.length || 0) - 1;
+	const currentLineProgressIndex = mode === 'preview'
+		? currentLinePreviewIndex
+		: mode === 'record' && recordingCharIndex >= 0
+			? recordingCharIndex
+			: currentLineSyncedIndex;
+	const currentLineProgressPercent = currentLineChars.length > 0 && currentLineProgressIndex >= 0
+		? Math.max(0, Math.min(100, ((currentLineProgressIndex + 1) / currentLineChars.length) * 100))
+		: 0;
+	const rtlTextRunStyle = {
+		...s.rtlTextRun,
+		direction: currentLineDirection,
+		backgroundImage: `linear-gradient(${currentLineDirection === 'rtl' ? 'to left' : 'to right'}, var(--spice-button) 0%, var(--spice-button) ${currentLineProgressPercent}%, var(--spice-subtext) ${currentLineProgressPercent}%, var(--spice-subtext) 100%)`,
 	};
 
 	return react.createElement('div', { style: s.overlay, ref: containerRef },
@@ -2124,7 +2520,94 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				),
 				react.createElement('button', { style: { ...s.loadBtn, opacity: isLoading ? 0.5 : 1 }, onClick: () => loadLyrics(addonId), disabled: isLoading },
 					isLoading ? I18n.t('syncCreator.loading') : I18n.t('syncCreator.reload') || '다시 로드'
+				),
+				isVirtualKaraokeSource && react.createElement('span', { style: s.virtualKaraokeBadge },
+					I18n.t('syncCreator.virtualKaraoke') || '가상 노래방 데이터'
 				)
+			)
+		),
+
+		addonId === 'lrclib' && react.createElement('div', { style: s.candidatePanel },
+			react.createElement('div', { style: s.candidatePanelHeader },
+				react.createElement('div', { style: s.candidatePanelTitle },
+					`${I18n.t('syncCreator.lrclibSearchResults') || 'LRCLIB Search Results'} ${(lrclibSearchMeta?.totalResults || lrclibCandidates.length || 0) > 0 ? `(${lrclibSearchMeta?.totalResults || lrclibCandidates.length})` : ''}`
+				),
+				react.createElement('button', {
+					type: 'button',
+					style: s.secondaryBtn,
+					onClick: () => setShowLrclibCandidates(prev => !prev)
+				}, showLrclibCandidates
+					? (I18n.t('syncCreator.hideLrclibSearchResults') || 'Hide Search Results')
+					: (I18n.t('syncCreator.showLrclibSearchResults') || 'Show Search Results'))
+			),
+			showLrclibCandidates && react.createElement('div', { style: s.candidateList },
+				isLoading && lrclibCandidates.length === 0 && react.createElement('div', { style: s.candidateEmpty },
+					I18n.t('syncCreator.loadingLyrics') || '가사를 불러오는 중...'
+				),
+				!isLoading && lrclibCandidates.length === 0 && react.createElement('div', { style: s.candidateEmpty },
+					lrclibSearchMeta?.error || (I18n.t('syncCreator.lrclibNoCandidates') || 'No LRCLIB candidates found')
+				),
+				lrclibCandidates.map((candidate, index) => {
+					const isPreviewing = previewLrclibCandidate?.candidateKey === candidate.candidateKey;
+					const isApplied = selectedLrclibCandidateKey === candidate.candidateKey;
+					let itemStyle = { ...s.candidateItem };
+					if (isPreviewing) itemStyle = { ...itemStyle, ...s.candidateItemActive };
+					if (isApplied) itemStyle = { ...itemStyle, ...s.candidateItemApplied };
+
+					return react.createElement('button', {
+						key: candidate.candidateKey,
+						type: 'button',
+						style: itemStyle,
+						onClick: () => setPreviewLrclibCandidateKey(candidate.candidateKey)
+					},
+						react.createElement('div', { style: s.candidateTitle }, `${index + 1}. ${candidate.trackName || candidate.name || trackName}`),
+						react.createElement('div', { style: s.candidateSubtitle },
+							`${candidate.artistName || artistName} · ${formatSeconds(Number(candidate.duration || 0))}`
+						),
+						react.createElement('div', { style: s.candidateMetaRow },
+							candidate.syncLineExactMatch && react.createElement('span', { style: { ...s.candidateBadge, color: '#4caf50' } }, I18n.t('syncCreator.lrclibBadgeExact') || 'Exact'),
+							candidate.hasSyncedLyrics && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgeSynced') || 'Synced'),
+							candidate.hasPlainLyrics && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgePlain') || 'Plain'),
+							candidate.searchSource === 'primary' && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgePrimary') || 'Primary'),
+							candidate.searchSource === 'english' && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgeEnglish') || 'English'),
+							isApplied && react.createElement('span', { style: { ...s.candidateBadge, color: '#1db954' } }, I18n.t('syncCreator.lrclibLoaded') || 'Loaded')
+						)
+					);
+				})
+			),
+			showLrclibCandidates && react.createElement('div', { style: s.candidatePreview },
+				previewLrclibCandidate
+					? react.createElement(react.Fragment, null,
+						react.createElement('div', { style: s.candidatePreviewHeader },
+							react.createElement('div', null,
+								react.createElement('div', { style: s.candidatePreviewTitle }, previewLrclibCandidate.trackName || previewLrclibCandidate.name || trackName),
+								react.createElement('div', { style: s.candidatePreviewSubtitle },
+									`${previewLrclibCandidate.artistName || artistName} · ${previewLrclibCandidate.albumName || ''}`.replace(/\s·\s$/, '')
+								)
+							),
+							react.createElement('div', { style: s.candidatePreviewActions },
+								react.createElement('button', {
+									type: 'button',
+									style: { ...s.secondaryBtn, opacity: selectedLrclibCandidateKey === previewLrclibCandidate.candidateKey ? 0.7 : 1 },
+									onClick: () => applySelectedLrclibCandidate(previewLrclibCandidate.candidateKey),
+									disabled: isLoading
+								}, selectedLrclibCandidateKey === previewLrclibCandidate.candidateKey
+									? (I18n.t('syncCreator.lrclibLoaded') || 'Loaded')
+									: (I18n.t('syncCreator.lrclibApplyCandidate') || 'Load This Lyrics'))
+							)
+						),
+						react.createElement('div', { style: s.candidateMetaRow },
+							react.createElement('span', { style: s.candidateBadge }, `${I18n.t('syncCreator.lrclibMetricArtist') || 'artist'} ${Number(previewLrclibCandidate.artistScore || 0).toFixed(3)}`),
+							react.createElement('span', { style: s.candidateBadge }, `${I18n.t('syncCreator.lrclibMetricTitle') || 'title'} ${Number(previewLrclibCandidate.titleScore || 0).toFixed(3)}`),
+							react.createElement('span', { style: s.candidateBadge }, `${I18n.t('syncCreator.lrclibMetricDiff') || 'diff'} ${formatSeconds(Number(previewLrclibCandidate.durationDiff || 0))}`),
+							previewLrclibCandidate.preferredLyricsSource === 'synced' && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgeSynced') || 'Synced'),
+							previewLrclibCandidate.preferredLyricsSource === 'plain' && react.createElement('span', { style: s.candidateBadge }, I18n.t('syncCreator.lrclibBadgePlain') || 'Plain')
+						),
+						react.createElement('pre', { style: s.candidatePreviewText }, previewLrclibCandidate.previewText || '')
+					)
+					: react.createElement('div', { style: s.candidateEmpty },
+						I18n.t('syncCreator.lrclibSelectCandidate') || 'Select a candidate'
+					)
 			)
 		),
 
@@ -2176,8 +2659,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 				// Lyrics Box
 				react.createElement('div', { style: s.lyricsBox, onMouseDown: handleContainerMouseDown, onTouchStart: handleContainerMouseDown, ref: lyricsScrollRef },
-					react.createElement('div', { style: s.lyricsLine },
-						currentLineChars.map((char, i) => {
+					react.createElement('div', { style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection } : s.lyricsLine },
+						useCurrentLineTextRun
+							? react.createElement('span', {
+								ref: rtlTextRunRef,
+								style: rtlTextRunStyle,
+								dir: currentLineDirection,
+								'data-rtl-text-run': 'true'
+							}, currentLineText)
+							: currentLineChars.map((char, i) => {
 							const isSynced = isCharSynced(currentLineIndex, i);
 							const isRec = mode === 'record' && recordingCharIndex >= 0 && i <= recordingCharIndex;
 							const previewIdx = getPreviewCharIndex(currentLineIndex);
@@ -2199,7 +2689,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				// Next Line
 				currentLineIndex < lyricsLines.length - 1 && react.createElement('div', { style: s.nextLineBox },
 					react.createElement('div', { style: s.nextLineLabel }, I18n.t('syncCreator.nextLine')),
-					react.createElement('div', { style: s.nextLineText }, lyricsLines[currentLineIndex + 1])
+					react.createElement('div', {
+						style: {
+							...s.nextLineText,
+							direction: getSyncCreatorTextDirection(lyricsLines[currentLineIndex + 1]),
+							unicodeBidi: 'plaintext'
+						}
+					}, lyricsLines[currentLineIndex + 1])
 				),
 
 				mode === 'record' && react.createElement('div', { style: s.hint }, I18n.t('syncCreator.dragHint')),
@@ -2208,25 +2704,25 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				mode === 'record' && react.createElement('div', { style: s.shortcutsContainer },
 					// 한 글자
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, '→'),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('charForward')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.charForward') || '한 글자')
 					),
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, '←'),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('charBack')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.charBack') || '한 글자 취소')
 					),
 					// 한 단어
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, '.'),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('wordForward')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.wordForward') || '한 단어')
 					),
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, ','),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('wordBack')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.wordBack') || '한 단어 취소')
 					),
 					// 음절
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, ';'),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('syllable')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.syllable') || '음절')
 					),
 					// 드래그

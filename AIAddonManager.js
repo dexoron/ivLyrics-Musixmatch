@@ -371,7 +371,8 @@
             // 2. 저장된 순서에 없는 새로운 Addon을 뒤에 추가
             const validAttributes = new Set(allIds);
             const filteredOrder = order.filter(id => validAttributes.has(id));
-            const newIds = allIds.filter(id => !order.includes(id));
+            const orderedIds = new Set(order);
+            const newIds = allIds.filter(id => !orderedIds.has(id));
 
             return [...filteredOrder, ...newIds];
         }
@@ -774,4 +775,3 @@
 
     window.__ivLyricsDebugLog?.('[AIAddonManager] Module loaded');
 })();
-

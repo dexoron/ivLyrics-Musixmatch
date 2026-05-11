@@ -376,6 +376,14 @@ window.LANG_ID = {
     },
     "solidBackgroundInUse": "ℹ️ Latar belakang warna solid sedang digunakan",
     "fontPlaceholder": "Nama font (contoh: Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Utama",
+      "secondary": "Sekunder"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Pintasan Sync Creator",
+      "subtitle": "Atur tombol utama dan sekunder untuk perekaman Sync Creator."
+    },
     "aiProviders": {
       "title": "Penyedia AI",
       "description": "Pilih dan prioritaskan penyedia AI. Penyedia di urutan teratas akan dicoba terlebih dahulu. Jika gagal, penyedia berikutnya akan digunakan secara otomatis.",
@@ -695,6 +703,36 @@ window.LANG_ID = {
     "lyricsProvider": "Penyedia Lirik",
     "syncContributor": "Kontributor Sinkronisasi"
   },
+  "creatorProfile": {
+    "title": "Pembuat Sinkronisasi",
+    "anonymous": "Anonim",
+    "openProfile": "Buka profil pembuat",
+    "loading": "Memuat profil pembuat...",
+    "loadFailed": "Gagal memuat profil pembuat.",
+    "back": "Kembali",
+    "contributions": "Sinkronisasi yang ditambahkan",
+    "tracks": "Track tersinkron",
+    "likes": "Suka",
+    "like": "Suka",
+    "liked": "Disukai",
+    "likeActionFailed": "Gagal memperbarui suka pembuat.",
+    "likeLoginRequired": "Login Discord diperlukan untuk menyukai pembuat.",
+    "ownProfile": "Ini profil Anda.",
+    "loadMore": "Muat lebih banyak",
+    "loadingMore": "Memuat lebih banyak...",
+    "noContributions": "Belum ada sinkronisasi yang ditambahkan.",
+    "unknownTrack": "Track tidak dikenal",
+    "updated": "Diperbarui",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Tidak ada catatan patch."
@@ -971,6 +1009,14 @@ window.LANG_ID = {
       "bounce": {
         "label": "Efek Pantulan Huruf",
         "desc": "Terapkan animasi memantul pada huruf yang sedang dinyanyikan di mode karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke virtual",
+        "desc": "Saat lirik hanya menyediakan sinkronisasi per baris, timing karaoke akan disintesis dari analisis audio Spotify. Baris berbahasa Korea, Jepang, dan Tionghoa akan dipecah lebih rapat saat tingkat keyakinannya tinggi."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pemajuan render karaoke virtual",
+        "desc": "Menerapkan offset waktu saat render hanya untuk karaoke virtual. Nilai positif membuat sorotan muncul lebih awal."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_ID = {
       "browserFullscreen": {
         "desc": "Gunakan Layar Penuh Spotify",
         "info": "Alihkan Spotify ke layar penuh saat masuk ke mode layar penuh untuk memenuhi monitor"
+      },
+      "hideOverlay": {
+        "desc": "Sembunyikan Overlay saat ivLyrics Layar Penuh",
+        "info": "Mengirim status pemutaran dijeda ke aplikasi overlay saat layar penuh ivLyrics terbuka agar lirik overlay desktop memudar"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_ID = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Login Discord diperlukan.",
+        "checking": "Memeriksa informasi akun...",
         "title": "Penautan Akun",
-        "subtitle": "Tautkan dengan akun ivLogin Anda",
-        "description": "Layanan akun terpadu ivLis STUDIO",
-        "info": "Tautkan dengan ivLogin untuk menggunakan fitur seperti sinkronisasi pengaturan. Masukkan User Hash Anda di halaman login untuk menautkan.",
-        "loginButton": "Tautkan dengan ivLogin",
+        "subtitle": "Tautkan dengan akun Discord Anda",
+        "description": "Akun kontribusi ivLyrics berbasis Discord",
+        "info": "Saat Anda masuk dengan Discord, user hash saat ini akan diganti dengan ID Discord Anda dan data kontribusi yang sudah ada juga akan dipindahkan.",
+        "loginButton": "Masuk dengan Discord",
         "loading": "Memuat info akun...",
         "linked": "Tertaut",
         "linkedAt": "Ditautkan pada",
-        "lastSync": "Sinkronisasi terakhir",
-        "manageAccount": "Kelola akun",
+        "lastSync": "Login terakhir",
+        "manageAccount": "Ganti akun",
         "refresh": "Muat ulang",
+        "loggingIn": "Membuka browser...",
+        "startHint": "Selesaikan login Discord di browser Anda.",
+        "failed": "Login Discord gagal.",
+        "loadFailed": "Gagal memuat info akun.",
+        "discordLoginSuccess": "Akun Discord berhasil ditautkan.",
+        "logout": "Keluar",
+        "logoutSuccess": "Keluar dari Discord dan user_hash baru telah dibuat.",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "Nama panggilan",
+          "enter": "Silakan masukkan nama panggilan.",
+          "changed": "Nama panggilan diubah.",
+          "failed": "Gagal mengubah",
+          "error": "Terjadi kesalahan",
+          "placeholder": "Masukkan nama panggilan",
+          "none": "Tidak ada nama panggilan",
+          "saving": "Menyimpan...",
+          "save": "Simpan",
+          "change": "Ubah"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_ID = {
     "unsynced": "Lirik Umum"
   },
   "communityVideo": {
+    "loginRequired": "Login Discord diperlukan untuk mendaftarkan video komunitas.",
     "title": "Rekomendasi Video Komunitas",
     "loading": "Memuat daftar video...",
     "loadError": "Gagal memuat daftar video",
@@ -1594,7 +1654,7 @@ window.LANG_ID = {
     "copied": "✓ Disalin ke Papan Klip",
     "downloaded": "✓ Diunduh",
     "shared": "✓ Dibagikan",
-    "maxLinesReached": "Maksimal memilih 3 baris",
+    "maxLinesReached": "Maksimal memilih 10 baris",
     "noSelection": "Pilih lirik terlebih dahulu"
   },
   "setupWizard": {
@@ -1661,6 +1721,12 @@ window.LANG_ID = {
       "description": "Tampilkan lirik saat ini di panel 'Sedang Diputar' Spotify. Anda bisa melihat lirik tanpa mode layar penuh.",
       "enabled": "Tampilkan Lirik Panel",
       "linesCount": "Jumlah Baris"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke virtual",
+      "subtitle": "Aktifkan sorotan gaya karaoke di hampir semua lagu",
+      "description": "Menggunakan analisis audio Spotify untuk menyusun timing karaoke dari lirik yang hanya sinkron per baris. Ini membuat mode karaoke bekerja di hampir semua lagu, tetapi timing-nya bersifat perkiraan dan bisa tidak akurat.",
+      "enabled": "Aktifkan karaoke virtual"
     },
     "complete": {
       "title": "Siap Digunakan!",
@@ -1735,6 +1801,7 @@ window.LANG_ID = {
     "dismissAll": "Tutup Semua"
   },
   "syncCreator": {
+    "loginRequired": "Login Discord diperlukan untuk membuat sinkronisasi karaoke.",
     "title": "Buat Sinkronisasi Karaoke",
     "buttonTooltip": "Buat Sinkronisasi Karaoke",
     "clickHereHint": "Klik di sini untuk menyinkronkan lirik!",
@@ -1773,6 +1840,21 @@ window.LANG_ID = {
     "loadedExistingSyncData": "Data sinkronisasi yang ada dimuat",
     "providerMismatch": "Data sinkronisasi yang ada menggunakan penyedia berbeda. Anda perlu membuat data baru untuk penyedia akun Anda.",
     "back": "Tutup",
+    "lrclibSearchResults": "Hasil pencarian LRCLIB",
+    "showLrclibSearchResults": "Tampilkan hasil pencarian",
+    "hideLrclibSearchResults": "Sembunyikan hasil pencarian",
+    "lrclibNoCandidates": "Tidak ada kandidat LRCLIB yang ditemukan",
+    "lrclibSelectCandidate": "Pilih kandidat",
+    "lrclibApplyCandidate": "Muat lirik ini",
+    "lrclibLoaded": "Dimuat",
+    "lrclibBadgeExact": "Tepat",
+    "lrclibBadgeSynced": "Sinkron",
+    "lrclibBadgePlain": "Biasa",
+    "lrclibBadgePrimary": "Utama",
+    "lrclibBadgeEnglish": "Inggris",
+    "lrclibMetricArtist": "artis",
+    "lrclibMetricTitle": "judul",
+    "lrclibMetricDiff": "selisih",
     "lrclib": {
       "registerLyrics": "Daftarkan Lirik ke LRCLIB",
       "title": "Daftarkan Lirik ke LRCLIB",
@@ -1807,6 +1889,7 @@ window.LANG_ID = {
       "syllable": "Suku kata"
     },
     "copyLyrics": "Salin lirik",
+    "virtualKaraoke": "Data karaoke virtual",
     "lyricsCopied": "Lirik disalin ke clipboard",
     "copyError": "Gagal menyalin",
     "export": "Ekspor",

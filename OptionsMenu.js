@@ -151,7 +151,7 @@ function ensureFluentModalStyles() {
   background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  z-index: 9999;
+  z-index: var(--iv-layer-modal, 2147483647);
 }
 
 .ivlyrics-fluent-overlay[data-ui-theme="light"] {
@@ -572,6 +572,7 @@ function ensureFluentModalStyles() {
   background: rgba(15, 23, 42, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  z-index: var(--iv-layer-modal, 2147483647) !important;
 }
 
 .optionsMenu-dropdown-list[data-ui-theme="light"] {
@@ -615,7 +616,7 @@ function ensureFluentModalStyles() {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 99999;
+  z-index: var(--iv-layer-modal, 2147483647);
   pointer-events: none;
 }
 
@@ -1369,14 +1370,18 @@ const OptionsMenu = react.memo(
 
     // React 31 방지: options 배열 유효성 검사
     const safeOptions = Array.isArray(options) ? options : [];
+    const optionByKey = react.useMemo(
+      () => new Map(safeOptions.map((option) => [option.key, option])),
+      [safeOptions]
+    );
 
     // 초기 선택 값 결정 (selected 또는 defaultValue에서)
     const getInitialSelected = () => {
       let initialItem = selected || defaultValue;
       if (initialItem && typeof initialItem !== 'object') {
-        initialItem = safeOptions.find(o => o.key === initialItem);
+        initialItem = optionByKey.get(initialItem);
       } else if (initialItem && initialItem.key && !initialItem.value) {
-        const found = safeOptions.find(o => o.key === initialItem.key);
+        const found = optionByKey.get(initialItem.key);
         if (found) initialItem = found;
       }
       return initialItem;
@@ -1388,14 +1393,14 @@ const OptionsMenu = react.memo(
     // props가 변경되면 내부 상태 업데이트
     react.useEffect(() => {
       setSelectedItem(getInitialSelected());
-    }, [selected, defaultValue]);
+    }, [selected, defaultValue, optionByKey]);
 
     // Resolve default item for display fallback
     let defaultItem = defaultValue;
     if (defaultValue && typeof defaultValue !== 'object') {
-      defaultItem = safeOptions.find(o => o.key === defaultValue);
+      defaultItem = optionByKey.get(defaultValue);
     } else if (defaultValue && defaultValue.key && !defaultValue.value) {
-      const found = safeOptions.find(o => o.key === defaultValue.key);
+      const found = optionByKey.get(defaultValue.key);
       if (found) defaultItem = found;
     }
 
@@ -1468,7 +1473,7 @@ const OptionsMenu = react.memo(
             minWidth: `${dropdownPosition.width}px`,
             maxWidth: '300px',
             marginTop: '0', // Portal 사용 시 margin 불필요
-            zIndex: 99999 // 최상위
+            zIndex: 'var(--iv-layer-modal, 2147483647)' // 최상위
           }
         },
         safeOptions.map(({ key, value }) => {
@@ -1484,7 +1489,7 @@ const OptionsMenu = react.memo(
                 e.stopPropagation();
 
                 // 내부 상태 업데이트
-                const selectedOption = safeOptions.find(o => o.key === key);
+                const selectedOption = optionByKey.get(key);
                 if (selectedOption) {
                   setSelectedItem(selectedOption);
                 }
@@ -1801,6 +1806,10 @@ const getStaticOptions = () => ({
       gemini_romaji: I18n.t("translationMenu.romajiGemini"),
       gemini_ko: I18n.t("translationMenu.koGemini"),
     },
+    swedish: {
+      gemini_romaji: I18n.t("translationMenu.romajiGemini"),
+      gemini_ko: I18n.t("translationMenu.koGemini"),
+    },
     spanish: {
       gemini_romaji: I18n.t("translationMenu.romajiGemini"),
       gemini_ko: I18n.t("translationMenu.koGemini"),
@@ -1922,6 +1931,7 @@ const TranslationMenu = react.memo(({ friendlyLanguage, hasTranslation }) => {
       { key: "ru", value: getDisplayLanguageName("ru") },
       { key: "vi", value: getDisplayLanguageName("vi") },
       { key: "de", value: getDisplayLanguageName("de") },
+      { key: "sv", value: getDisplayLanguageName("sv") },
       { key: "es", value: getDisplayLanguageName("es") },
       { key: "fr", value: getDisplayLanguageName("fr") },
       { key: "pt", value: getDisplayLanguageName("pt") },
@@ -2300,6 +2310,8 @@ const SyncAdjustButtonFluent = react.memo(({ trackUri, provider, onOffsetChange 
         "div",
         {
           className: "lyrics-sync-adjust-floating",
+          onMouseDown: (event) => event.stopPropagation(),
+          onClick: (event) => event.stopPropagation(),
         },
         react.createElement(
           "div",
@@ -2528,7 +2540,7 @@ const SyncAdjustButtonFluent = react.memo(({ trackUri, provider, onOffsetChange 
 });
 
 // Community Video Selector를 document.body에 직접 렌더링
-function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect) {
+function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect, defaultStartTime = 0) {
   // 이미 열려있으면 무시
   if (document.getElementById("ivLyrics-community-video-overlay")) {
     return;
@@ -2548,6 +2560,7 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect) {
       react.createElement(CommunityVideoSelector, {
         trackUri: trackUri,
         currentVideoId: currentVideoId,
+        defaultStartTime,
         onVideoSelect: (newVideoInfo) => {
           if (onVideoSelect) {
             onVideoSelect(newVideoInfo);
@@ -2560,7 +2573,7 @@ function openCommunityVideoSelector(trackUri, currentVideoId, onVideoSelect) {
 }
 
 // Community Video Selector Button
-const CommunityVideoButton = react.memo(({ trackUri, videoInfo, onVideoSelect }) => {
+const CommunityVideoButton = react.memo(({ trackUri, videoInfo, onVideoSelect, defaultStartTime = 0 }) => {
   // 비디오 배경이 비활성화되어 있으면 버튼 숨김
   if (!CONFIG.visual["video-background"]) {
     return null;
@@ -2570,7 +2583,8 @@ const CommunityVideoButton = react.memo(({ trackUri, videoInfo, onVideoSelect })
     openCommunityVideoSelector(
       trackUri,
       videoInfo?.youtubeVideoId,
-      onVideoSelect
+      onVideoSelect,
+      defaultStartTime
     );
   };
 
@@ -2625,7 +2639,7 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
   const [customSettings, setCustomSettings] = react.useState({});
   const [showCopyrightModal, setShowCopyrightModal] = react.useState(false);
   const [pendingAction, setPendingAction] = react.useState(null); // 'copy' | 'download' | 'share'
-  const MAX_LINES = 3;
+  const MAX_LINES = 10;
 
   const presets = Object.entries(LyricsShareImage?.PRESETS || {}).map(([key, val]) => ({
     key,
@@ -2693,9 +2707,14 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
   }, [lyrics]);
 
   // 선택된 가사 라인 객체들
+  const normalizedLyricsByIdx = react.useMemo(
+    () => new Map(normalizedLyrics.map((line) => [line.idx, line])),
+    [normalizedLyrics]
+  );
+  const selectedIndexSet = react.useMemo(() => new Set(selectedIndices), [selectedIndices]);
   const selectedLines = react.useMemo(() => {
-    return selectedIndices.map(idx => normalizedLyrics.find(l => l.idx === idx)).filter(Boolean);
-  }, [selectedIndices, normalizedLyrics]);
+    return selectedIndices.map((idx) => normalizedLyricsByIdx.get(idx)).filter(Boolean);
+  }, [selectedIndices, normalizedLyricsByIdx]);
 
   // Generate preview when selection or template changes
   react.useEffect(() => {
@@ -2714,7 +2733,7 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
           albumCover: trackInfo.cover || '',
           template,
           customSettings,
-          width: 800, // smaller for preview
+          width: 1080, // same width as export for consistency
         });
         setPreviewUrl(result.dataUrl);
       } catch (e) {
@@ -2939,15 +2958,15 @@ const ShareImageModal = ({ lyrics, trackInfo, onClose }) => {
             react.createElement("div", {
               key: line.idx,
               className: "share-image-modal-lyric-line",
-              "data-selected": selectedIndices.includes(line.idx),
+              "data-selected": selectedIndexSet.has(line.idx),
               onClick: () => toggleLine(line.idx),
               style: {
                 padding: '10px 12px',
                 marginBottom: '4px',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                background: selectedIndices.includes(line.idx) ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255,255,255,0.05)',
-                border: selectedIndices.includes(line.idx) ? '1px solid rgba(29, 185, 84, 0.5)' : '1px solid transparent',
+                background: selectedIndexSet.has(line.idx) ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255,255,255,0.05)',
+                border: selectedIndexSet.has(line.idx) ? '1px solid rgba(29, 185, 84, 0.5)' : '1px solid transparent',
                 transition: 'all 0.15s ease',
               }
             },
@@ -3738,7 +3757,17 @@ const ShareImageButton = react.memo(({ lyrics, trackInfo }) => {
 });
 
 // Sync Data Creator - 노래방 싱크 데이터 생성 (전체화면)
-function openSyncDataCreator(trackInfo, initialData = null) {
+async function openSyncDataCreator(trackInfo, initialData = null) {
+  try {
+    await Utils.requireDiscordAuth(
+      I18n.t("syncCreator.loginRequired"),
+      { checkingMessage: I18n.t("settingsAdvanced.aboutTab.account.checking") }
+    );
+  } catch (e) {
+    Utils.promptDiscordLoginRequired(e?.message || I18n.t("syncCreator.loginRequired"));
+    return;
+  }
+
   // 이미 열려있으면 무시
   if (document.getElementById("ivLyrics-sync-creator-overlay")) {
     return;
@@ -3746,6 +3775,7 @@ function openSyncDataCreator(trackInfo, initialData = null) {
 
   const overlay = document.createElement("div");
   overlay.id = "ivLyrics-sync-creator-overlay";
+  overlay.className = "ivlyrics-sync-creator-overlay";
 
   // Render React component
   const dom = window.Spicetify?.ReactDOM ?? window.ReactDOM ?? null;
@@ -3794,7 +3824,7 @@ function openSyncDataCreator(trackInfo, initialData = null) {
 }
 
 // Sync Data Creator Button
-const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initialLyrics }) => {
+const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initialLyrics, isFullscreen = false }) => {
   const handleClick = () => {
     let initialData = null;
     if (provider && initialLyrics) {
@@ -3803,13 +3833,22 @@ const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initi
         lyrics: initialLyrics
       };
     }
-    openSyncDataCreator(trackInfo, initialData);
+    void openSyncDataCreator(trackInfo, initialData);
   };
+  const reactDom = resolveOptionsReactDom();
+  const hint = showHint
+    ? react.createElement("div", {
+      className: "sync-creator-hint",
+      style: { "--iv-floating-toolbar-bottom-gap": isFullscreen ? "40px" : "20px" },
+    }, I18n.t("syncCreator.clickHereHint") || "")
+    : null;
 
   return react.createElement(
     "div",
     { style: { position: "relative" } },
-    showHint && react.createElement("div", { className: "sync-creator-hint" }, I18n.t("syncCreator.clickHereHint") || ""),
+    hint && reactDom?.createPortal && document.body
+      ? reactDom.createPortal(hint, document.body)
+      : hint,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
       { label: I18n.t("syncCreator.buttonTooltip") || "Create Karaoke Sync" },

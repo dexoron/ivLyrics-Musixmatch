@@ -66,20 +66,22 @@ if (!window.ApiTracker) {
 // 하위 호환성을 위해 LyricsCache 별칭 생성 (기존 코드에서 LyricsCache 직접 참조하는 경우)
 const LyricsCache = window.LyricsCache;
 const ApiTracker = window.ApiTracker;
+const HAN_CHARACTER_REGEX = /\p{Script=Han}/u;
+const KANJI_CHARACTER_REGEX = /[\u4E00-\u9FAF\u3400-\u4DBF]/;
+const CLEAN_HTML_RT_REGEX = /<rt[^>]*>.*?<\/rt>/gi;
+const CLEAN_HTML_RUBY_REGEX = /<\/?ruby[^>]*>/gi;
+const CLEAN_HTML_TAG_REGEX = /<[^>]+>/g;
+const YOUTUBE_ID_PATTERNS = [
+  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+  /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
+];
 
 // Optimized Utils with performance improvements and caching
 const Utils = {
   // LRU caches for frequently used operations (최적화 #10 - LRU 캐시 적용)
   _colorCache: new LRUCache(100),
   _normalizeCache: new LRUCache(200),
-
-  // Common cache size limiter (최적화 #1)
-  _limitCacheSize(cache, maxSize) {
-    if (cache.size > maxSize) {
-      const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
-    }
-  },
 
   addQueueListener(callback) {
     Spicetify.Player.origin._events.addListener("queue_update", callback);
@@ -91,9 +93,9 @@ const Utils = {
 
   convertIntToRGB(colorInt, div = 1) {
     const cacheKey = `${colorInt}_${div}`;
-
-    if (this._colorCache.has(cacheKey)) {
-      return this._colorCache.get(cacheKey);
+    const cached = this._colorCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
     // Use bit operations for faster calculations
@@ -103,8 +105,6 @@ const Utils = {
 
     const result = `rgb(${r},${g},${b})`;
 
-    // Cache result (limit cache size)
-    this._limitCacheSize(this._colorCache, 100);
     this._colorCache.set(cacheKey, result);
 
     return result;
@@ -126,9 +126,9 @@ const Utils = {
    */
   normalize(s, emptySymbol = true) {
     const cacheKey = `${s}_${emptySymbol}`;
-
-    if (this._normalizeCache.has(cacheKey)) {
-      return this._normalizeCache.get(cacheKey);
+    const cached = this._normalizeCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
     // Lazy compile the pattern (최적화 #11 - 정규식 사전 컴파일)
@@ -158,8 +158,7 @@ const Utils = {
    * @returns {boolean}
    */
   containsHanCharacter(s) {
-    const hanRegex = /\p{Script=Han}/u;
-    return hanRegex.test(s);
+    return HAN_CHARACTER_REGEX.test(s);
   },
   /**
    * Singleton Translator instance for {@link toSimplifiedChinese}.
@@ -334,8 +333,21 @@ const Utils = {
 
     reactChildren.push(rubyElems[0]);
     for (let i = 1; i < rubyElems.length; i++) {
-      const kanji = rubyElems[i].split("<rp>")[0];
-      const furigana = rubyElems[i].split("<rt>")[1].split("</rt>")[0];
+      const rubySegment = rubyElems[i];
+      const rpIndex = rubySegment.indexOf("<rp>");
+      const rtStart = rubySegment.indexOf("<rt>");
+      const rtEnd = rubySegment.indexOf("</rt>", rtStart);
+      const rubyEnd = rubySegment.indexOf("</ruby>");
+      const kanji =
+        rpIndex >= 0
+          ? rubySegment.substring(0, rpIndex)
+          : rtStart >= 0
+            ? rubySegment.substring(0, rtStart)
+            : rubySegment;
+      const furigana =
+        rtStart >= 0 && rtEnd >= 0
+          ? rubySegment.substring(rtStart + 4, rtEnd)
+          : "";
       reactChildren.push(
         react.createElement(
           "ruby",
@@ -345,7 +357,7 @@ const Utils = {
         )
       );
 
-      reactChildren.push(rubyElems[i].split("</ruby>")[1]);
+      reactChildren.push(rubyEnd >= 0 ? rubySegment.substring(rubyEnd + 7) : "");
     }
     return react.createElement("p1", null, reactChildren);
   },
@@ -377,6 +389,331 @@ const Utils = {
       ? { dangerouslySetInnerHTML: { __html: this.rubyTextToHTML(text) } }
       : {};
   },
+
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  },
+
+  escapeAttribute(value) {
+    return this.escapeHtml(value)
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  },
+
+  sanitizeHttpUrl(url) {
+    if (typeof url !== "string") return null;
+
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+
+    try {
+      const parsed = new URL(trimmed, window.location.origin);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        return null;
+      }
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  },
+
+  sanitizeCodeLanguage(lang) {
+    return String(lang || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  },
+
+  formatCodeLanguageLabel(lang) {
+    const safeLang = this.sanitizeCodeLanguage(lang);
+    if (!safeLang) return "";
+
+    const knownLabels = {
+      js: "JavaScript",
+      jsx: "JSX",
+      ts: "TypeScript",
+      tsx: "TSX",
+      sh: "Shell",
+      bash: "Bash",
+      zsh: "Zsh",
+      pwsh: "PowerShell",
+      powershell: "PowerShell",
+      ps1: "PowerShell",
+      json: "JSON",
+      yaml: "YAML",
+      yml: "YAML",
+      md: "Markdown",
+      csharp: "C#",
+      cpp: "C++",
+      plaintext: "Plain Text",
+      text: "Plain Text",
+    };
+
+    if (knownLabels[safeLang]) return knownLabels[safeLang];
+
+    return safeLang
+      .split(/[-_]/g)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  },
+
+  renderSafeMarkdownToHTML(markdown, options = {}) {
+    const escapeHtml = (value) => this.escapeHtml(value);
+    const escapeAttribute = (value) => this.escapeAttribute(value);
+    const sanitizeUrl = (url) => this.sanitizeHttpUrl(url);
+    const sanitizeCodeLanguage = (lang) => this.sanitizeCodeLanguage(lang);
+    const formatCodeLanguageLabel = (lang) => this.formatCodeLanguageLabel(lang);
+
+    const linkStyle = options.linkStyle ? ` style="${escapeAttribute(options.linkStyle)}"` : "";
+    const codeStyle = options.codeStyle ? ` style="${escapeAttribute(options.codeStyle)}"` : "";
+    const paragraphStyle = options.paragraphStyle ? ` style="${escapeAttribute(options.paragraphStyle)}"` : "";
+    const imageStyle = options.imageStyle || "max-width:100%;border-radius:8px;margin:8px 0;";
+    const blockquoteStyle = options.blockquoteStyle || "";
+    const hrStyle = options.hrStyle || "";
+    const headingStyles = options.headingStyles || {};
+
+    const renderLink = (url, label) => {
+      const safeLabel = escapeHtml(label ?? url ?? "");
+      const safeUrl = sanitizeUrl(url);
+      if (!safeUrl) return safeLabel;
+      return `<a href="${escapeAttribute(safeUrl)}" target="_blank" rel="noopener noreferrer"${linkStyle}>${safeLabel}</a>`;
+    };
+
+    const renderInline = (text) => {
+      const tokens = [];
+      const storeToken = (html) => {
+        const token = `\uE000${tokens.length}\uE001`;
+        tokens.push(html);
+        return token;
+      };
+
+      let source = String(text ?? "");
+
+      source = source.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+        const safeSrc = sanitizeUrl(src);
+        if (!safeSrc) {
+          return storeToken(alt ? escapeHtml(alt) : "");
+        }
+        return storeToken(
+          `<img src="${escapeAttribute(safeSrc)}" alt="${escapeAttribute(alt)}" style="${escapeAttribute(imageStyle)}" loading="lazy" />`
+        );
+      });
+
+      source = source.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
+        storeToken(renderLink(url, label))
+      );
+
+      source = source.replace(/`([^`]+)`/g, (_, code) =>
+        storeToken(`<code${codeStyle}>${escapeHtml(code)}</code>`)
+      );
+
+      let html = escapeHtml(source);
+      html = html
+        .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>")
+        .replace(/~~(.+?)~~/g, "<del>$1</del>")
+        .replace(/\n/g, "<br/>");
+
+      return html.replace(/\uE000(\d+)\uE001/g, (_, index) => tokens[Number(index)] || "");
+    };
+
+    const renderCodeBlock = (code, lang) => {
+      const safeLang = sanitizeCodeLanguage(lang);
+      const className = safeLang ? ` class="language-${escapeAttribute(safeLang)}"` : "";
+      const escapedCode = escapeHtml(String(code ?? "").trim());
+
+      if (typeof options.codeBlockRenderer === "function") {
+        return options.codeBlockRenderer({
+          code: escapedCode,
+          lang: safeLang,
+          className,
+          languageLabel: formatCodeLanguageLabel(lang),
+          escapeHtml,
+          escapeAttribute,
+        });
+      }
+
+      const preStyle = options.preStyle ? ` style="${escapeAttribute(options.preStyle)}"` : "";
+      const blockCodeStyle = options.blockCodeStyle ? ` style="${escapeAttribute(options.blockCodeStyle)}"` : "";
+      return `<pre${preStyle}><code${className}${blockCodeStyle}>${escapedCode}</code></pre>`;
+    };
+
+    const renderList = (items, type) => {
+      if (!items.length) return "";
+
+      const isOrdered = type === "ordered";
+      const isChecklist = type === "check";
+      const tag = isOrdered ? "ol" : "ul";
+      const listStyle = isChecklist
+        ? options.checkListStyle || "margin: 8px 0 16px; padding-left: 8px; list-style: none;"
+        : options.listStyle || `margin: 8px 0 16px; padding-left: 24px; list-style: ${isOrdered ? "decimal" : "disc"};`;
+      const itemStyle = isChecklist
+        ? options.checkListItemStyle || "margin: 6px 0; list-style: none;"
+        : options.listItemStyle || "margin: 6px 0; padding-left: 4px;";
+      const itemHtml = items
+        .map((item) => {
+          const marker = isChecklist
+            ? `<span style="${escapeAttribute(item.checked ? options.checkedMarkerStyle || "color: #4ade80; margin-right: 6px;" : options.uncheckedMarkerStyle || "color: rgba(255,255,255,0.3); margin-right: 6px;")}">${item.checked ? "&#10003;" : "&#9633;"}</span>`
+            : "";
+          return `<li style="${escapeAttribute(itemStyle)}">${marker}${renderInline(item.text)}</li>`;
+        })
+        .join("");
+
+      return `<${tag} style="${escapeAttribute(listStyle)}">${itemHtml}</${tag}>`;
+    };
+
+    const renderYoutubeEmbed = (line) => {
+      if (!options.allowYouTubeEmbeds) return null;
+      const match = line.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)(?:[^\s]*)?$/);
+      const safeVideoId = String(match?.[1] || "").replace(/[^\w-]/g, "");
+      if (!safeVideoId) return null;
+      return `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;margin:8px 0;"><iframe src="https://www.youtube.com/embed/${safeVideoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe></div>`;
+    };
+
+    const renderTable = (headers, rows) => {
+      const headerHtml = headers.map((header) => `<th>${renderInline(header)}</th>`).join("");
+      const rowHtml = rows
+        .map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`)
+        .join("");
+      return `<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowHtml}</tbody></table>`;
+    };
+
+    const lines = String(markdown ?? "").replace(/\r\n/g, "\n").split("\n");
+    const html = [];
+    let paragraph = [];
+    let listItems = [];
+    let listType = null;
+
+    const flushParagraph = () => {
+      if (!paragraph.length) return;
+      html.push(`<p${paragraphStyle}>${renderInline(paragraph.join("\n"))}</p>`);
+      paragraph = [];
+    };
+
+    const flushList = () => {
+      if (!listItems.length) return;
+      html.push(renderList(listItems, listType));
+      listItems = [];
+      listType = null;
+    };
+
+    const pushListItem = (type, item) => {
+      flushParagraph();
+      if (listType && listType !== type) flushList();
+      listType = type;
+      listItems.push(item);
+    };
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      const fenceMatch = trimmed.match(/^```([^\s`]*)/);
+
+      if (fenceMatch) {
+        const codeLines = [];
+        flushParagraph();
+        flushList();
+        i += 1;
+        while (i < lines.length && !lines[i].trim().startsWith("```")) {
+          codeLines.push(lines[i]);
+          i += 1;
+        }
+        html.push(renderCodeBlock(codeLines.join("\n"), fenceMatch[1]));
+        continue;
+      }
+
+      if (!trimmed) {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+
+      const youtubeEmbed = renderYoutubeEmbed(trimmed);
+      if (youtubeEmbed) {
+        flushParagraph();
+        flushList();
+        html.push(youtubeEmbed);
+        continue;
+      }
+
+      if (options.allowTables && /^\|.+\|\s*$/.test(line) && /^\|[-| :]+\|\s*$/.test(lines[i + 1] || "")) {
+        const headers = line.split("|").map((cell) => cell.trim()).filter(Boolean);
+        const rows = [];
+        i += 2;
+        while (i < lines.length && /^\|.+\|\s*$/.test(lines[i])) {
+          rows.push(lines[i].split("|").map((cell) => cell.trim()).filter(Boolean));
+          i += 1;
+        }
+        i -= 1;
+        flushParagraph();
+        flushList();
+        html.push(renderTable(headers, rows));
+        continue;
+      }
+
+      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        const rawLevel = headingMatch[1].length;
+        const mappedLevel = Math.min(rawLevel, 4);
+        const heading = headingStyles[mappedLevel] || headingStyles[rawLevel] || {};
+        const tag = heading.tag || `h${Math.min(rawLevel, 6)}`;
+        const style = heading.style ? ` style="${escapeAttribute(heading.style)}"` : "";
+        flushParagraph();
+        flushList();
+        html.push(`<${tag}${style}>${renderInline(headingMatch[2])}</${tag}>`);
+        continue;
+      }
+
+      if (/^(-{3,}|\*{3,})$/.test(trimmed)) {
+        flushParagraph();
+        flushList();
+        html.push(`<hr${hrStyle ? ` style="${escapeAttribute(hrStyle)}"` : ""} />`);
+        continue;
+      }
+
+      const checkedMatch = line.match(/^\s*[-*+]\s+\[x\]\s+(.+)$/i);
+      if (checkedMatch) {
+        pushListItem("check", { text: checkedMatch[1], checked: true });
+        continue;
+      }
+
+      const uncheckedMatch = line.match(/^\s*[-*+]\s+\[ \]\s+(.+)$/);
+      if (uncheckedMatch) {
+        pushListItem("check", { text: uncheckedMatch[1], checked: false });
+        continue;
+      }
+
+      const unorderedMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+      if (unorderedMatch) {
+        pushListItem("unordered", { text: unorderedMatch[1] });
+        continue;
+      }
+
+      const orderedMatch = line.match(/^\s*\d+\.\s+(.+)$/);
+      if (orderedMatch) {
+        pushListItem("ordered", { text: orderedMatch[1] });
+        continue;
+      }
+
+      const quoteMatch = line.match(/^>\s+(.+)$/);
+      if (quoteMatch) {
+        flushParagraph();
+        flushList();
+        html.push(`<blockquote${blockquoteStyle ? ` style="${escapeAttribute(blockquoteStyle)}"` : ""}>${renderInline(quoteMatch[1])}</blockquote>`);
+        continue;
+      }
+
+      flushList();
+      paragraph.push(line);
+    }
+
+    flushParagraph();
+    flushList();
+
+    return html.join("").trim();
+  },
   /**
    * Parse furigana HTML to extract readings for each kanji (최적화 #3)
    * @param {string} processedText - HTML text with ruby tags
@@ -387,9 +724,6 @@ const Utils = {
     if (!processedText || typeof processedText !== "string") return furiganaMap;
 
     const rubyRegex = /<ruby>([^<]+)<rt>([^<]+)<\/rt><\/ruby>/g;
-
-    // Build clean text from processedText (removing all HTML tags)
-    const cleanText = processedText.replace(/<ruby>([^<]+)<rt>[^<]+<\/rt><\/ruby>/g, '$1');
 
     // Now parse the HTML and map positions
     let currentPos = 0;
@@ -479,8 +813,7 @@ const Utils = {
     }
 
     // Check if text contains kanji
-    const kanjiRegex = /[\u4E00-\u9FAF\u3400-\u4DBF]/;
-    if (!kanjiRegex.test(text)) {
+    if (!KANJI_CHARACTER_REGEX.test(text)) {
       return text;
     }
 
@@ -547,10 +880,11 @@ const Utils = {
     // HTML 태그 제거 헬퍼
     const cleanHtml = (text) => {
       if (!text || typeof text !== "string") return "";
+      if (!text.includes("<")) return text.trim();
       return text
-        .replace(/<rt[^>]*>.*?<\/rt>/gi, "") // rt 태그 제거
-        .replace(/<\/?ruby[^>]*>/gi, "") // ruby 태그 제거
-        .replace(/<[^>]+>/g, "") // 기타 HTML 태그 제거
+        .replace(CLEAN_HTML_RT_REGEX, "") // rt 태그 제거
+        .replace(CLEAN_HTML_RUBY_REGEX, "") // ruby 태그 제거
+        .replace(CLEAN_HTML_TAG_REGEX, "") // 기타 HTML 태그 제거
         .trim();
     };
 
@@ -736,7 +1070,7 @@ const Utils = {
   /**
    * Current version of the ivLyrics app
    */
-  currentVersion: "4.1.4",
+  currentVersion: "4.3.9",
 
   /**
    * Check for updates from remote repository
@@ -1042,15 +1376,415 @@ const Utils = {
     // Fallback logic in case LyricsService is not available (should not happen usually)
     let hash = StorageManager.getPersisted("ivLyrics:user-hash");
     if (!hash) {
-      hash = crypto.randomUUID ? crypto.randomUUID() :
-        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      hash = this.generateUserHash();
+      StorageManager.setPersisted("ivLyrics:user-hash", hash);
+    }
+    return hash;
+  },
+
+  generateUserHash() {
+    return crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
           const r = Math.random() * 16 | 0;
           const v = c === 'x' ? r : (r & 0x3 | 0x8);
           return v.toString(16);
         });
-      StorageManager.setPersisted("ivLyrics:user-hash", hash);
+  },
+
+  setUserHash(userHash) {
+    if (!userHash || typeof userHash !== "string") return;
+
+    try {
+      Spicetify?.LocalStorage?.set?.("ivLyrics:user-hash", userHash);
+    } catch (error) {
+      console.error("[ivLyrics] Failed to update Spicetify user hash:", error);
     }
-    return hash;
+
+    try {
+      if (window.StorageManager?.setPersisted) {
+        window.StorageManager.setPersisted("ivLyrics:user-hash", userHash);
+      }
+    } catch (error) {
+      console.error("[ivLyrics] Failed to update persisted user hash:", error);
+    }
+  },
+
+  getAuthToken() {
+    let token = null;
+
+    try {
+      token = Spicetify?.LocalStorage?.get?.("ivLyrics:auth-token") || null;
+    } catch (error) {
+      console.error("[ivLyrics] Failed to read auth token from Spicetify storage:", error);
+    }
+
+    if (!token) {
+      try {
+        token = window.StorageManager?.getPersisted?.("ivLyrics:auth-token") || null;
+      } catch (error) {
+        console.error("[ivLyrics] Failed to read auth token from persisted storage:", error);
+      }
+    }
+
+    return typeof token === "string" && token.trim() ? token.trim() : null;
+  },
+
+  setAuthToken(token) {
+    if (!token || typeof token !== "string") return;
+
+    try {
+      Spicetify?.LocalStorage?.set?.("ivLyrics:auth-token", token);
+    } catch (error) {
+      console.error("[ivLyrics] Failed to store auth token in Spicetify storage:", error);
+    }
+
+    try {
+      window.StorageManager?.setPersisted?.("ivLyrics:auth-token", token);
+    } catch (error) {
+      console.error("[ivLyrics] Failed to store auth token in persisted storage:", error);
+    }
+  },
+
+  clearAuthToken() {
+    try {
+      Spicetify?.LocalStorage?.remove?.("ivLyrics:auth-token");
+    } catch (error) {
+      console.error("[ivLyrics] Failed to clear auth token from Spicetify storage:", error);
+    }
+
+    try {
+      window.StorageManager?.setPersisted?.("ivLyrics:auth-token", "");
+    } catch (error) {
+      console.error("[ivLyrics] Failed to clear auth token from persisted storage:", error);
+    }
+  },
+
+  getApiHeaders(headers = {}) {
+    const nextHeaders = { ...headers };
+    const authToken = this.getAuthToken();
+    if (authToken) {
+      nextHeaders.Authorization = `Bearer ${authToken}`;
+    }
+    return nextHeaders;
+  },
+
+  queueReturnToSettings(options = {}) {
+    try {
+      localStorage.setItem(
+        "ivLyrics:return-to-settings",
+        JSON.stringify({
+          initialTab: options.initialTab || "about",
+          initialSettingKey: options.initialSettingKey || "about-account",
+        })
+      );
+    } catch (error) {
+      console.error("[ivLyrics] Failed to queue return-to-settings state:", error);
+    }
+  },
+
+  restoreAccountSettings(options = {}) {
+    const nextOptions = {
+      initialTab: options.initialTab || "about",
+      initialSettingKey: options.initialSettingKey || "about-account",
+    };
+
+    try {
+      this.queueReturnToSettings(nextOptions);
+      localStorage.setItem(
+        "ivLyrics:restore-route-after-reload",
+        JSON.stringify({
+          path: "/ivLyrics",
+          expiresAt: Date.now() + 15000,
+        })
+      );
+    } catch (error) {
+      console.error("[ivLyrics] Failed to queue ivLyrics route restore:", error);
+    }
+
+    try {
+      Spicetify?.Platform?.History?.push?.("/ivLyrics");
+    } catch (error) {
+      console.error("[ivLyrics] Failed to navigate to ivLyrics before reload:", error);
+    }
+
+    window.setTimeout(() => {
+      window.location.reload();
+    }, Number(options.reloadDelay) || 300);
+
+    return true;
+  },
+
+  resetUserHash() {
+    const nextUserHash = this.generateUserHash();
+    this.setUserHash(nextUserHash);
+    this.clearAuthToken();
+    window.__ivLyricsDiscordLoginToken = null;
+    return nextUserHash;
+  },
+
+  getAccountApiBase() {
+    return "https://lyrics.api.ivl.is/user";
+  },
+
+  async fetchAccountProfile(options = {}) {
+    const includeUserHash = options.includeUserHash !== false;
+    const requestUrl = new URL(`${this.getAccountApiBase()}/profile`);
+    if (includeUserHash) {
+      requestUrl.searchParams.set("userHash", this.getUserHash());
+    }
+
+    const response = await fetch(
+      requestUrl.toString(),
+      {
+        cache: "no-store",
+        headers: this.getApiHeaders({
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        }),
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          I18n.t("settingsAdvanced.aboutTab.account.loadFailed") ||
+          "Failed to load account information."
+      );
+    }
+
+    return data;
+  },
+
+  async requireDiscordAuth(message, options = {}) {
+    const checkingMessage = options.checkingMessage;
+    const showProgress = !!checkingMessage && !!Toast?.progress;
+
+    if (showProgress) {
+      Toast.progress(checkingMessage, 0);
+    }
+
+    try {
+      const profile = await this.fetchAccountProfile({ includeUserHash: false });
+      if (!profile?.authenticated || !profile?.linked || !profile?.account) {
+        throw new Error(message || I18n.t("settingsAdvanced.aboutTab.account.loginRequired"));
+      }
+
+      return profile;
+    } finally {
+      if (showProgress && Toast?.dismissProgress) {
+        Toast.dismissProgress();
+      }
+    }
+  },
+
+  promptDiscordLoginRequired(message, options = {}) {
+    const text = message || I18n.t("settingsAdvanced.aboutTab.account.loginRequired");
+
+    Toast?.error?.(text);
+    this.restoreAccountSettings({
+      initialTab: "about",
+      initialSettingKey: "about-account",
+      reloadDelay: options.reloadDelay || 900,
+    });
+
+    return text;
+  },
+
+  async startDiscordLogin() {
+    const currentUserHash = this.getUserHash();
+    const response = await fetch(`${this.getAccountApiBase()}/discord/start`, {
+      method: "POST",
+      headers: this.getApiHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ currentUserHash }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success || !data.authorizeUrl) {
+      throw new Error(
+        data.error ||
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+          "Discord login failed."
+      );
+    }
+
+    window.open(data.authorizeUrl, "_blank", "noopener,noreferrer");
+    return data;
+  },
+
+  async handleDiscordAuthCallback(loginToken) {
+    if (!loginToken) return false;
+
+    if (window.__ivLyricsDiscordLoginToken === loginToken) {
+      return false;
+    }
+    window.__ivLyricsDiscordLoginToken = loginToken;
+
+    try {
+      const response = await fetch(
+        `${this.getAccountApiBase()}/discord/session?loginToken=${encodeURIComponent(loginToken)}`,
+        {
+          cache: "no-store",
+          headers: this.getApiHeaders({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+            "Discord login failed."
+        );
+      }
+
+      const newUserHash = data.data?.userHash || data.data?.discordId;
+      const authToken = data.data?.authToken;
+      if (!newUserHash) {
+        throw new Error(
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+            "Discord login failed."
+        );
+      }
+
+      this.setUserHash(newUserHash);
+      if (authToken) {
+        this.setAuthToken(authToken);
+      }
+      window.SyncDataService?.clearCache?.();
+      window.dispatchEvent(
+        new CustomEvent("ivLyrics:account-changed", { detail: data.data })
+      );
+
+      Toast?.success?.(
+        I18n.t("settingsAdvanced.aboutTab.account.discordLoginSuccess") ||
+          "Discord account linked successfully."
+      );
+
+      this.restoreAccountSettings({
+        initialTab: "about",
+        initialSettingKey: "about-account",
+      });
+
+      return true;
+    } catch (error) {
+      Toast?.error?.(
+        error.message ||
+          I18n.t("settingsAdvanced.aboutTab.account.failed") ||
+          "Discord login failed."
+      );
+      window.__ivLyricsDiscordLoginToken = null;
+      return false;
+    }
+  },
+
+  async logoutDiscordSession() {
+    const authToken = this.getAuthToken();
+    if (!authToken) {
+      return true;
+    }
+
+    try {
+      await fetch(`${this.getAccountApiBase()}/logout`, {
+        method: "POST",
+        headers: this.getApiHeaders({
+          "Content-Type": "application/json",
+        }),
+      });
+    } catch (error) {
+      console.error("[ivLyrics] Failed to revoke Discord session:", error);
+    } finally {
+      this.clearAuthToken();
+    }
+
+    return true;
+  },
+
+  async fetchSyncCreatorProfile(userHash, options = {}) {
+    if (!userHash || typeof userHash !== "string") {
+      throw new Error(
+        I18n.t("creatorProfile.loadFailed") || "Failed to load creator profile."
+      );
+    }
+
+    const params = new URLSearchParams({
+      userHash,
+    });
+
+    if (Number.isFinite(options.limit) && options.limit > 0) {
+      params.set("limit", String(Math.floor(options.limit)));
+    }
+
+    if (Number.isFinite(options.offset) && options.offset >= 0) {
+      params.set("offset", String(Math.floor(options.offset)));
+    }
+
+    if (typeof options.sort === "string" && options.sort.trim()) {
+      params.set("sort", options.sort.trim());
+    }
+
+    if (typeof options.artist === "string" && options.artist.trim()) {
+      params.set("artist", options.artist.trim());
+    }
+
+    const response = await fetch(
+      `${this.getAccountApiBase()}/creator-profile?${params.toString()}`,
+      {
+        cache: "no-store",
+        headers: this.getApiHeaders({
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        }),
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok || !data.success || !data.data) {
+      throw new Error(
+        data.error ||
+          I18n.t("creatorProfile.loadFailed") ||
+          "Failed to load creator profile."
+      );
+    }
+
+    return data.data;
+  },
+
+  async setSyncCreatorLike(creatorUserHash, liked) {
+    if (!this.getAuthToken()) {
+      throw new Error(
+        I18n.t("creatorProfile.likeLoginRequired") ||
+          "Discord login is required to like creators."
+      );
+    }
+
+    const response = await fetch(`${this.getAccountApiBase()}/creator-like`, {
+      method: "POST",
+      headers: this.getApiHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        creatorUserHash,
+        liked: !!liked,
+      }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success || !data.data) {
+      throw new Error(
+        data.error ||
+          I18n.t("creatorProfile.likeActionFailed") ||
+          "Failed to update creator like."
+      );
+    }
+
+    return data.data;
   },
 
   /**
@@ -1091,7 +1825,7 @@ const Utils = {
     try {
       const response = await fetch(syncUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           trackId,
           offsetMs,
@@ -1133,7 +1867,7 @@ const Utils = {
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/sync/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           trackId,
           userHash,
@@ -1175,10 +1909,10 @@ const Utils = {
         `https://lyrics.api.ivl.is/lyrics/youtube/community?trackId=${trackId}&userId=${userHash}&_t=${Date.now()}`,
         {
           cache: 'no-store',  // 브라우저 캐시 완전히 우회
-          headers: {
+          headers: this.getApiHeaders({
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
-          }
+          })
         }
       );
       const data = await response.json();
@@ -1200,31 +1934,33 @@ const Utils = {
     const trackId = this.extractTrackId(trackUri);
     if (!trackId) return null;
 
-    const userHash = this.getUserHash();
+    await this.requireDiscordAuth(
+      I18n.t("communityVideo.loginRequired")
+    );
 
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/youtube/community', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action: 'submit',
           trackId,
           videoId,
           videoTitle,
-          startTime,
-          submitterId: userHash
+          startTime
         })
       });
       const data = await response.json();
 
-      if (data.success) {
-        window.__ivLyricsDebugLog?.(`[ivLyrics] Community video submitted: ${videoId}`);
-        return data;
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to submit community video');
       }
-      return null;
+
+      window.__ivLyricsDebugLog?.(`[ivLyrics] Community video submitted: ${videoId}`);
+      return data;
     } catch (error) {
       console.error("[ivLyrics] Failed to submit community video:", error);
-      return null;
+      throw error;
     }
   },
 
@@ -1240,7 +1976,7 @@ const Utils = {
     try {
       const response = await fetch('https://lyrics.api.ivl.is/lyrics/youtube/community', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action: 'vote',
           videoEntryId,
@@ -1274,9 +2010,9 @@ const Utils = {
         `https://lyrics.api.ivl.is/lyrics/youtube/community`,
         {
           method: 'POST',
-          headers: {
+          headers: this.getApiHeaders({
             'Content-Type': 'application/json'
-          },
+          }),
           body: JSON.stringify({
             action: 'delete',
             id: videoEntryId,
@@ -1449,13 +2185,7 @@ const Utils = {
       return url;
     }
 
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/
-    ];
-
-    for (const pattern of patterns) {
+    for (const pattern of YOUTUBE_ID_PATTERNS) {
       const match = url.match(pattern);
       if (match) return match[1];
     }
@@ -1638,7 +2368,7 @@ const Toast = {
 
     // Auto dismiss
     if (duration > 0) {
-      const toastData = this._toasts.find(t => t.id === id);
+      const toastData = this._toasts[this._toasts.length - 1];
       if (toastData) {
         toastData.timeout = setTimeout(() => this.dismiss(id), duration);
       }

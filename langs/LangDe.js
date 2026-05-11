@@ -376,6 +376,14 @@ window.LANG_DE = {
     },
     "solidBackgroundInUse": "ℹ️ Einfarbiger Hintergrund aktiv",
     "fontPlaceholder": "Schriftartname (z.B. Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Primär",
+      "secondary": "Sekundär"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator-Tastenkürzel",
+      "subtitle": "Konfiguriere primäre und sekundäre Aufnahmetasten für Sync Creator."
+    },
     "aiProviders": {
       "title": "KI-Anbieter",
       "description": "Wählen Sie KI-Anbieter aus und priorisieren Sie diese. Anbieter oben werden zuerst versucht. Bei Fehlern wird automatisch der nächste Anbieter verwendet.",
@@ -695,6 +703,36 @@ window.LANG_DE = {
     "lyricsProvider": "Songtext-Anbieter",
     "syncContributor": "Sync-Mitwirkender"
   },
+  "creatorProfile": {
+    "title": "Sync-Ersteller",
+    "anonymous": "Anonym",
+    "openProfile": "Erstellerprofil öffnen",
+    "loading": "Erstellerprofil wird geladen...",
+    "loadFailed": "Erstellerprofil konnte nicht geladen werden.",
+    "back": "Zurück",
+    "contributions": "Sync-Beiträge",
+    "tracks": "Synchronisierte Titel",
+    "likes": "Likes",
+    "like": "Liken",
+    "liked": "Gelikt",
+    "likeActionFailed": "Ersteller-Like konnte nicht aktualisiert werden.",
+    "likeLoginRequired": "Für Likes bei Erstellern ist ein Discord-Login erforderlich.",
+    "ownProfile": "Das ist dein Profil.",
+    "loadMore": "Mehr laden",
+    "loadingMore": "Weitere werden geladen...",
+    "noContributions": "Noch keine Sync-Beiträge vorhanden.",
+    "unknownTrack": "Unbekannter Titel",
+    "updated": "Aktualisiert",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Keine Patch-Notizen vorhanden."
@@ -971,6 +1009,14 @@ window.LANG_DE = {
       "bounce": {
         "label": "Text-Bounce-Effekt",
         "desc": "Animiert die aktuell gesungene Silbe mit einem Hüpf-Effekt"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Pseudo-Karaoke",
+        "desc": "Wenn Songtexte nur zeilensynchrones Timing liefern, wird aus der Spotify-Audioanalyse ein Karaoke-Timing erzeugt. Koreanische, japanische und chinesische Zeilen werden bei hoher Zuverlässigkeit feiner aufgeteilt."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Pseudo-Karaoke-Vorlauf",
+        "desc": "Wendet einen Timing-Offset nur beim Rendern von Pseudo-Karaoke an. Positive Werte lassen die Hervorhebung früher erscheinen."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_DE = {
       "browserFullscreen": {
         "desc": "Spotify-Vollbild verwenden",
         "info": "Schaltet Spotify beim Betreten des Modus in den echten Browser-Vollbildmodus"
+      },
+      "hideOverlay": {
+        "desc": "Overlay im ivLyrics-Vollbild ausblenden",
+        "info": "Sendet der Overlay-App einen pausierten Wiedergabestatus, solange das ivLyrics-Vollbild geöffnet ist, damit die Desktop-Overlay-Texte ausgeblendet werden"
       }
     },
     "normalMode": {
@@ -1285,17 +1335,26 @@ window.LANG_DE = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord-Anmeldung ist erforderlich.",
+        "checking": "Kontoinformationen werden geprüft...",
         "title": "Kontoverknüpfung",
-        "subtitle": "Mit ivLogin-Konto verknüpfen",
-        "description": "ivLis STUDIO einheitlicher Kontodienst",
-        "info": "Mit ivLogin verknüpfen für Einstellungssynchronisierung. Geben Sie Ihren User Hash auf der Anmeldeseite ein.",
-        "loginButton": "Mit ivLogin verknüpfen",
+        "subtitle": "Mit deinem Discord-Konto verknüpfen",
+        "description": "Discord-basiertes ivLyrics-Beitragskonto",
+        "info": "Wenn du dich mit Discord anmeldest, wird dein aktueller User Hash durch deine Discord-ID ersetzt und bestehende Beitragsdaten werden migriert.",
+        "loginButton": "Mit Discord anmelden",
         "loading": "Kontoinformationen werden geladen...",
         "linked": "Verknüpft",
         "linkedAt": "Verknüpft am",
-        "lastSync": "Letzte Sync",
-        "manageAccount": "Konto verwalten",
+        "lastSync": "Letzte Anmeldung",
+        "manageAccount": "Konto wechseln",
         "refresh": "Aktualisieren",
+        "loggingIn": "Browser wird geöffnet...",
+        "startHint": "Bitte schließe die Discord-Anmeldung im Browser ab.",
+        "failed": "Discord-Anmeldung fehlgeschlagen.",
+        "loadFailed": "Kontoinformationen konnten nicht geladen werden.",
+        "discordLoginSuccess": "Discord-Konto erfolgreich verknüpft.",
+        "logout": "Abmelden",
+        "logoutSuccess": "Von Discord abgemeldet und neuer user_hash erstellt.",
         "nickname": {
           "label": "Spitzname",
           "enter": "Bitte geben Sie einen Spitznamen ein.",
@@ -1493,6 +1552,7 @@ window.LANG_DE = {
     "unsynced": "Text"
   },
   "communityVideo": {
+    "loginRequired": "Zum Registrieren von Community-Videos ist eine Discord-Anmeldung erforderlich.",
     "title": "Community-Video-Empfehlungen",
     "loading": "Lade Videoliste...",
     "loadError": "Videoliste konnte nicht geladen werden",
@@ -1594,7 +1654,7 @@ window.LANG_DE = {
     "copied": "✓ In Zwischenablage kopiert",
     "downloaded": "✓ Heruntergeladen",
     "shared": "✓ Geteilt",
-    "maxLinesReached": "Maximal 3 Zeilen auswählbar",
+    "maxLinesReached": "Maximal 10 Zeilen auswählbar",
     "noSelection": "Bitte Songtext auswählen"
   },
   "setupWizard": {
@@ -1661,6 +1721,12 @@ window.LANG_DE = {
       "description": "Zeigt Songtexte im 'Wird abgespielt'-Bereich von Spotify an. Nützlich, wenn Sie den Vollbildmodus nicht nutzen.",
       "enabled": "Panel-Songtext anzeigen",
       "linesCount": "Anzahl Zeilen"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Virtuelles Karaoke",
+      "subtitle": "Karaoke-Hervorhebung bei fast allen Songs aktivieren",
+      "description": "Verwendet die Spotify-Audioanalyse, um Karaoke-Timing für zeilensynchronisierte Texte zu erzeugen. Dadurch funktioniert der Karaoke-Modus bei fast allen Songs, aber das Timing ist nur angenähert und kann ungenau sein.",
+      "enabled": "Virtuelles Karaoke aktivieren"
     },
     "complete": {
       "title": "Fertig!",
@@ -1735,6 +1801,7 @@ window.LANG_DE = {
     "dismissAll": "Alle schließen"
   },
   "syncCreator": {
+    "loginRequired": "Zum Erstellen von Karaoke-Sync ist eine Discord-Anmeldung erforderlich.",
     "title": "Karaoke-Sync erstellen",
     "buttonTooltip": "Karaoke-Sync erstellen",
     "clickHereHint": "Klicken Sie hier, um den Songtext zu synchronisieren!",
@@ -1773,6 +1840,21 @@ window.LANG_DE = {
     "loadedExistingSyncData": "Vorhandene Sync-Daten geladen",
     "providerMismatch": "Vorhandene Sync-Daten verwenden einen anderen Anbieter. Sie müssen neue Daten für den Anbieter Ihres Kontos erstellen.",
     "back": "Schließen",
+    "lrclibSearchResults": "LRCLIB-Suchergebnisse",
+    "showLrclibSearchResults": "Suchergebnisse anzeigen",
+    "hideLrclibSearchResults": "Suchergebnisse ausblenden",
+    "lrclibNoCandidates": "Keine LRCLIB-Kandidaten gefunden",
+    "lrclibSelectCandidate": "Bitte wähle einen Kandidaten",
+    "lrclibApplyCandidate": "Diesen Text laden",
+    "lrclibLoaded": "Geladen",
+    "lrclibBadgeExact": "Exakt",
+    "lrclibBadgeSynced": "Synchron",
+    "lrclibBadgePlain": "Klartext",
+    "lrclibBadgePrimary": "Primär",
+    "lrclibBadgeEnglish": "Englisch",
+    "lrclibMetricArtist": "Interpret",
+    "lrclibMetricTitle": "Titel",
+    "lrclibMetricDiff": "Diff",
     "lrclib": {
       "registerLyrics": "Songtext bei LRCLIB registrieren",
       "title": "Bei LRCLIB registrieren",
@@ -1807,6 +1889,7 @@ window.LANG_DE = {
       "syllable": "Silbe"
     },
     "copyLyrics": "Liedtext kopieren",
+    "virtualKaraoke": "Virtuelle Karaoke-Daten",
     "lyricsCopied": "Liedtext in Zwischenablage kopiert",
     "copyError": "Kopieren fehlgeschlagen",
     "export": "Exportieren",

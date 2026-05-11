@@ -376,6 +376,14 @@ window.LANG_BN = {
     },
     "solidBackgroundInUse": "ℹ️ সলিড কালার ব্যাকগ্রাউন্ড ব্যবহৃত হচ্ছে",
     "fontPlaceholder": "ফন্টের নাম লিখুন (যেমন: Arial, Kalpurush)",
+    "shortcuts": {
+      "primary": "প্রধান",
+      "secondary": "সহায়ক"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator শর্টকাট",
+      "subtitle": "Sync Creator রেকর্ডিংয়ের জন্য প্রধান ও সহায়ক কী কনফিগার করুন।"
+    },
     "aiProviders": {
       "title": "এআই প্রদানকারী",
       "description": "এআই প্রদানকারী নির্বাচন করুন এবং অগ্রাধিকার সেট করুন। তালিকার উপরের প্রদানকারীগুলো আগে ব্যবহার করা হবে। ব্যর্থ হলে, পরবর্তী প্রদানকারী স্বয়ংক্রিয়ভাবে ব্যবহৃত হবে।",
@@ -695,6 +703,36 @@ window.LANG_BN = {
     "lyricsProvider": "লিরিক্স প্রদানকারী",
     "syncContributor": "সিঙ্ক অবদানকারী"
   },
+  "creatorProfile": {
+    "title": "সিঙ্ক নির্মাতা",
+    "anonymous": "নামহীন",
+    "openProfile": "নির্মাতার প্রোফাইল খুলুন",
+    "loading": "নির্মাতার প্রোফাইল লোড হচ্ছে...",
+    "loadFailed": "নির্মাতার প্রোফাইল লোড করা যায়নি।",
+    "back": "ফিরে যান",
+    "contributions": "যোগ করা সিঙ্ক লিরিক্স",
+    "tracks": "সিঙ্ক করা ট্র্যাক",
+    "likes": "লাইক",
+    "like": "লাইক",
+    "liked": "লাইক করা",
+    "likeActionFailed": "নির্মাতার লাইক আপডেট করা যায়নি।",
+    "likeLoginRequired": "নির্মাতাকে লাইক দিতে Discord লগইন প্রয়োজন।",
+    "ownProfile": "এটি আপনার প্রোফাইল।",
+    "loadMore": "আরও লোড করুন",
+    "loadingMore": "আরও লোড হচ্ছে...",
+    "noContributions": "এখনও কোনো সিঙ্ক লিরিক্স যোগ করা হয়নি।",
+    "unknownTrack": "অজানা ট্র্যাক",
+    "updated": "আপডেট",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "কোনো প্যাচ নোট নেই।"
@@ -971,6 +1009,14 @@ window.LANG_BN = {
       "bounce": {
         "label": "বাউন্স এফেক্ট",
         "desc": "কারাওকে মোডে বর্তমানে গাওয়া অক্ষরে বাউন্স বা লাফানোর অ্যানিমেশন যোগ করুন"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "ভার্চুয়াল কারাওকে",
+        "desc": "যখন গানে শুধু লাইন-সিঙ্ক টাইমিং থাকে, তখন Spotify audio analysis থেকে কারাওকে টাইমিং তৈরি করা হয়। নির্ভরযোগ্যতা বেশি হলে কোরিয়ান, জাপানি ও চীনা লাইন আরও ঘনভাবে ভাগ করা হয়।"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "ভার্চুয়াল কারাওকে রেন্ডার অগ্রগতি",
+        "desc": "শুধু ভার্চুয়াল কারাওকের জন্য রেন্ডার-সময়ের টাইমিং অফসেট প্রয়োগ করে। ধনাত্মক মান হলে হাইলাইট আরও আগে দেখা যাবে।"
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_BN = {
       "browserFullscreen": {
         "desc": "Spotify ফুলস্ক্রিন ব্যবহার করুন",
         "info": "ফুলস্ক্রিন মোডে যাওয়ার সময় Spotify-কে পুরো মনিটর জুড়ে ফুলস্ক্রিন করুন"
+      },
+      "hideOverlay": {
+        "desc": "ivLyrics ফুলস্ক্রিনে ওভারলে লুকান",
+        "info": "ivLyrics ফুলস্ক্রিন খোলা থাকলে ওভারলে অ্যাপে paused প্লেব্যাক অবস্থা পাঠায়, যাতে ডেস্কটপ ওভারলের গান স্বচ্ছ হয়ে যায়"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_BN = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Discord-এ লগইন করা প্রয়োজন।",
+        "checking": "অ্যাকাউন্টের তথ্য যাচাই করা হচ্ছে...",
         "title": "অ্যাকাউন্ট লিঙ্কিং",
-        "subtitle": "আপনার ivLogin অ্যাকাউন্টের সাথে লিঙ্ক করুন",
-        "description": "ivLis STUDIO একীভূত অ্যাকাউন্ট সার্ভিস",
-        "info": "সেটিংস সিঙ্ক এর মতো ফিচার ব্যবহার করতে ivLogin এর সাথে লিঙ্ক করুন। লিঙ্ক করতে লগইন পেজে আপনার User Hash লিখুন।",
-        "loginButton": "ivLogin দিয়ে লিঙ্ক করুন",
+        "subtitle": "আপনার Discord অ্যাকাউন্টের সাথে লিঙ্ক করুন",
+        "description": "Discord-ভিত্তিক ivLyrics অবদান অ্যাকাউন্ট",
+        "info": "আপনি Discord দিয়ে লগ ইন করলে, আপনার বর্তমান user hash আপনার Discord ID দিয়ে প্রতিস্থাপিত হবে এবং বিদ্যমান অবদানের ডেটাও মাইগ্রেট হবে।",
+        "loginButton": "Discord দিয়ে লগ ইন করুন",
         "loading": "অ্যাকাউন্ট তথ্য লোড হচ্ছে...",
         "linked": "লিঙ্ক করা হয়েছে",
-        "linkedAt": "লিঙ্কের তারিখ",
-        "lastSync": "শেষ সিঙ্ক",
-        "manageAccount": "অ্যাকাউন্ট পরিচালনা",
+        "linkedAt": "লিঙ্কের সময়",
+        "lastSync": "সর্বশেষ লগইন",
+        "manageAccount": "অ্যাকাউন্ট পরিবর্তন করুন",
         "refresh": "রিফ্রেশ",
+        "loggingIn": "ব্রাউজার খোলা হচ্ছে...",
+        "startHint": "ব্রাউজারে Discord লগইন সম্পূর্ণ করুন।",
+        "failed": "Discord লগইন ব্যর্থ হয়েছে।",
+        "loadFailed": "অ্যাকাউন্ট তথ্য লোড করা যায়নি।",
+        "discordLoginSuccess": "Discord অ্যাকাউন্ট সফলভাবে লিঙ্ক হয়েছে।",
+        "logout": "লগ আউট",
+        "logoutSuccess": "Discord থেকে লগ আউট করা হয়েছে এবং নতুন user_hash তৈরি হয়েছে।",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "ডাকনাম",
+          "enter": "অনুগ্রহ করে একটি ডাকনাম লিখুন।",
+          "changed": "ডাকনাম পরিবর্তন হয়েছে।",
+          "failed": "পরিবর্তন ব্যর্থ",
+          "error": "একটি ত্রুটি ঘটেছে",
+          "placeholder": "ডাকনাম লিখুন",
+          "none": "কোনও ডাকনাম নেই",
+          "saving": "সংরক্ষণ করা হচ্ছে...",
+          "save": "সংরক্ষণ",
+          "change": "পরিবর্তন"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_BN = {
     "unsynced": "সাধারণ লিরিক্স"
   },
   "communityVideo": {
+    "loginRequired": "কমিউনিটি ভিডিও নিবন্ধন করতে Discord-এ লগইন করতে হবে।",
     "title": "কমিউনিটি ভিডিও সুপারিশ",
     "loading": "ভিডিও তালিকা লোড হচ্ছে...",
     "loadError": "ভিডিও তালিকা লোড করা যায়নি",
@@ -1595,7 +1655,7 @@ window.LANG_BN = {
     "copied": "✓ ক্লিপবোর্ডে কপি হয়েছে",
     "downloaded": "✓ ডাউনলোড হয়েছে",
     "shared": "✓ শেয়ার হয়েছে",
-    "maxLinesReached": "সর্বোচ্চ ৩ লাইন নির্বাচন করা যাবে",
+    "maxLinesReached": "সর্বোচ্চ ১০ লাইন নির্বাচন করা যাবে",
     "noSelection": "লিরিক্স নির্বাচন করুন"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_BN = {
       "description": "Spotify-এর 'এখন বাজছে' প্যানেলে বর্তমান লিরিক্স দেখায়। ফুলস্ক্রিন মোড ছাড়াও লিরিক্স দেখা সম্ভব।",
       "enabled": "প্যানেল লিরিক্স প্রদর্শন",
       "linesCount": "প্রদর্শন লাইন সংখ্যা"
+    },
+    "pseudoKaraokeTip": {
+      "title": "ভার্চুয়াল কারাওকে",
+      "subtitle": "প্রায় সব গানে কারাওকে-স্টাইল হাইলাইট চালু করুন",
+      "description": "লাইন-সিঙ্ক লিরিক্সের জন্য Spotify audio analysis ব্যবহার করে কারাওকে টাইমিং তৈরি করা হয়। এতে প্রায় সব গানেই কারাওকে মোড কাজ করে, তবে টাইমিং আনুমানিক এবং পুরোপুরি সঠিক নাও হতে পারে।",
+      "enabled": "ভার্চুয়াল কারাওকে চালু করুন"
     },
     "complete": {
       "title": "প্রস্তুতি সম্পন্ন!",
@@ -1736,6 +1802,7 @@ window.LANG_BN = {
     "dismissAll": "সব বন্ধ করুন"
   },
   "syncCreator": {
+    "loginRequired": "কারাওকে সিঙ্ক তৈরি করতে Discord-এ লগইন করতে হবে।",
     "title": "কারাওকে সিঙ্ক তৈরি",
     "buttonTooltip": "কারাওকে সিঙ্ক তৈরি করুন",
     "clickHereHint": "গানের লিরিক্স সিঙ্ক মেলাতে এখানে ক্লিক করুন!",
@@ -1774,6 +1841,21 @@ window.LANG_BN = {
     "loadedExistingSyncData": "বিদ্যমান সিঙ্ক ডেটা লোড হয়েছে",
     "providerMismatch": "বিদ্যমান সিঙ্ক ডেটা অন্য প্রদানকারী ব্যবহার করে। আপনার অ্যাকাউন্টের প্রদানকারীর জন্য নতুন ডেটা তৈরি করতে হবে।",
     "back": "বন্ধ করুন",
+    "lrclibSearchResults": "LRCLIB অনুসন্ধান ফলাফল",
+    "showLrclibSearchResults": "অনুসন্ধান ফলাফল দেখান",
+    "hideLrclibSearchResults": "অনুসন্ধান ফলাফল লুকান",
+    "lrclibNoCandidates": "কোনো LRCLIB প্রার্থী পাওয়া যায়নি",
+    "lrclibSelectCandidate": "একটি প্রার্থী নির্বাচন করুন",
+    "lrclibApplyCandidate": "এই লিরিক্স লোড করুন",
+    "lrclibLoaded": "লোড হয়েছে",
+    "lrclibBadgeExact": "সঠিক",
+    "lrclibBadgeSynced": "সিঙ্ক",
+    "lrclibBadgePlain": "প্লেইন",
+    "lrclibBadgePrimary": "প্রাথমিক",
+    "lrclibBadgeEnglish": "ইংরেজি",
+    "lrclibMetricArtist": "শিল্পী",
+    "lrclibMetricTitle": "শিরোনাম",
+    "lrclibMetricDiff": "পার্থক্য",
     "lrclib": {
       "registerLyrics": "LRCLIB-এ লিরিক্স নিবন্ধন করুন",
       "title": "LRCLIB-এ লিরিক্স নিবন্ধন",
@@ -1808,6 +1890,7 @@ window.LANG_BN = {
       "syllable": "Syllable"
     },
     "copyLyrics": "গান কপি করুন",
+    "virtualKaraoke": "ভার্চুয়াল কারাওকে ডেটা",
     "lyricsCopied": "গান ক্লিপবোর্ডে কপি হয়েছে",
     "copyError": "কপি ব্যর্থ",
     "export": "রপ্তানি",

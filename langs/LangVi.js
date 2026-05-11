@@ -376,6 +376,14 @@ window.LANG_VI = {
     },
     "solidBackgroundInUse": "ℹ️ Đang sử dụng nền màu đơn sắc",
     "fontPlaceholder": "Nhập tên phông chữ (VD: Arial, Roboto)",
+    "shortcuts": {
+      "primary": "Chính",
+      "secondary": "Phụ"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Phím tắt Sync Creator",
+      "subtitle": "Cấu hình phím chính và phím phụ để ghi trong Sync Creator."
+    },
     "aiProviders": {
       "title": "Nhà cung cấp AI",
       "description": "Lựa chọn và ưu tiên các nhà cung cấp AI. Các nhà cung cấp ở đầu danh sách sẽ được thử trước. Nếu thất bại, nhà cung cấp tiếp theo sẽ tự động được sử dụng.",
@@ -695,6 +703,36 @@ window.LANG_VI = {
     "lyricsProvider": "Nhà cung cấp lời bài hát",
     "syncContributor": "Người đóng góp đồng bộ"
   },
+  "creatorProfile": {
+    "title": "Người tạo đồng bộ",
+    "anonymous": "Ẩn danh",
+    "openProfile": "Mở hồ sơ người tạo",
+    "loading": "Đang tải hồ sơ người tạo...",
+    "loadFailed": "Không thể tải hồ sơ người tạo.",
+    "back": "Quay lại",
+    "contributions": "Bản đồng bộ đã thêm",
+    "tracks": "Bài hát đã đồng bộ",
+    "likes": "Lượt thích",
+    "like": "Thích",
+    "liked": "Đã thích",
+    "likeActionFailed": "Không thể cập nhật lượt thích của người tạo.",
+    "likeLoginRequired": "Cần đăng nhập Discord để thích người tạo.",
+    "ownProfile": "Đây là hồ sơ của bạn.",
+    "loadMore": "Tải thêm",
+    "loadingMore": "Đang tải thêm...",
+    "noContributions": "Chưa có bản đồng bộ nào được thêm.",
+    "unknownTrack": "Bài hát không xác định",
+    "updated": "Cập nhật",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "Không có ghi chú bản vá."
@@ -971,6 +1009,14 @@ window.LANG_VI = {
       "bounce": {
         "label": "Hiệu ứng nảy chữ",
         "desc": "Áp dụng hoạt ảnh nảy lên cho các ký tự đang hát trong chế độ Karaoke"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "Karaoke ảo",
+        "desc": "Khi lời bài hát chỉ cung cấp đồng bộ theo dòng, thời gian karaoke sẽ được tổng hợp từ Spotify audio analysis. Các dòng tiếng Hàn, tiếng Nhật và tiếng Trung sẽ được tách dày hơn khi độ tin cậy cao."
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "Độ sớm khi render karaoke ảo",
+        "desc": "Áp dụng độ lệch thời gian khi render chỉ cho karaoke ảo. Giá trị dương sẽ làm phần tô sáng xuất hiện sớm hơn."
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_VI = {
       "browserFullscreen": {
         "desc": "Sử dụng Spotify toàn màn hình",
         "info": "Khi vào chế độ toàn màn hình, chuyển Spotify sang chế độ toàn màn hình để lấp đầy màn hình"
+      },
+      "hideOverlay": {
+        "desc": "Ẩn overlay khi ivLyrics toàn màn hình",
+        "info": "Gửi trạng thái phát đã tạm dừng tới ứng dụng overlay khi ivLyrics đang mở toàn màn hình để lời bài hát trên overlay desktop mờ đi"
       }
     },
     "normalMode": {
@@ -1285,28 +1335,37 @@ window.LANG_VI = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "Cần đăng nhập Discord.",
+        "checking": "Đang kiểm tra thông tin tài khoản...",
         "title": "Liên kết tài khoản",
-        "subtitle": "Liên kết với tài khoản ivLogin",
-        "description": "Dịch vụ tài khoản hợp nhất ivLis STUDIO",
-        "info": "Liên kết với ivLogin để sử dụng các tính năng như đồng bộ cài đặt. Nhập User Hash trên trang đăng nhập để liên kết.",
-        "loginButton": "Liên kết với ivLogin",
+        "subtitle": "Liên kết với tài khoản Discord của bạn",
+        "description": "Tài khoản đóng góp ivLyrics dựa trên Discord",
+        "info": "Khi bạn đăng nhập bằng Discord, user hash hiện tại sẽ được thay bằng ID Discord của bạn và dữ liệu đóng góp hiện có cũng sẽ được di chuyển.",
+        "loginButton": "Đăng nhập bằng Discord",
         "loading": "Đang tải thông tin tài khoản...",
         "linked": "Đã liên kết",
-        "linkedAt": "Liên kết vào",
-        "lastSync": "Đồng bộ lần cuối",
-        "manageAccount": "Quản lý tài khoản",
+        "linkedAt": "Thời điểm liên kết",
+        "lastSync": "Lần đăng nhập gần nhất",
+        "manageAccount": "Đổi tài khoản",
         "refresh": "Làm mới",
+        "loggingIn": "Đang mở trình duyệt...",
+        "startHint": "Hãy hoàn tất đăng nhập Discord trong trình duyệt.",
+        "failed": "Đăng nhập Discord thất bại.",
+        "loadFailed": "Không thể tải thông tin tài khoản.",
+        "discordLoginSuccess": "Đã liên kết tài khoản Discord thành công.",
+        "logout": "Đăng xuất",
+        "logoutSuccess": "Đã đăng xuất khỏi Discord và tạo user_hash mới.",
         "nickname": {
-          "label": "Nickname",
-          "enter": "Please enter a nickname.",
-          "changed": "Nickname changed.",
-          "failed": "Failed to change",
-          "error": "Error occurred",
-          "placeholder": "Enter nickname",
-          "none": "No nickname",
-          "saving": "Saving...",
-          "save": "Save",
-          "change": "Change"
+          "label": "Biệt danh",
+          "enter": "Vui lòng nhập biệt danh.",
+          "changed": "Đã thay đổi biệt danh.",
+          "failed": "Thay đổi thất bại",
+          "error": "Đã xảy ra lỗi",
+          "placeholder": "Nhập biệt danh",
+          "none": "Không có biệt danh",
+          "saving": "Đang lưu...",
+          "save": "Lưu",
+          "change": "Thay đổi"
         },
         "backup": {
           "title": "Backup & Restore",
@@ -1493,6 +1552,7 @@ window.LANG_VI = {
     "unsynced": "Lời thường"
   },
   "communityVideo": {
+    "loginRequired": "Cần đăng nhập Discord để đăng ký video cộng đồng.",
     "title": "Video cộng đồng đề xuất",
     "loading": "Đang tải danh sách video...",
     "loadError": "Không thể tải danh sách video",
@@ -1595,7 +1655,7 @@ window.LANG_VI = {
     "copied": "✓ Đã sao chép vào clipboard",
     "downloaded": "✓ Đã tải xuống",
     "shared": "✓ Đã chia sẻ",
-    "maxLinesReached": "Chỉ được chọn tối đa 3 dòng",
+    "maxLinesReached": "Chỉ được chọn tối đa 10 dòng",
     "noSelection": "Vui lòng chọn lời bài hát"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_VI = {
       "description": "Hiển thị lời bài hát hiện tại trong panel 'Đang phát' của Spotify. Bạn có thể xem lời bài hát mà không cần vào chế độ toàn màn hình.",
       "enabled": "Hiển thị lời bài hát Panel",
       "linesCount": "Số dòng hiển thị"
+    },
+    "pseudoKaraokeTip": {
+      "title": "Karaoke ảo",
+      "subtitle": "Bật tô sáng kiểu karaoke cho gần như mọi bài hát",
+      "description": "Dùng Spotify audio analysis để tổng hợp thời gian karaoke cho lời bài hát chỉ có đồng bộ theo dòng. Nhờ vậy chế độ karaoke hoạt động với gần như mọi bài hát, nhưng thời gian chỉ là ước lượng và có thể không chính xác.",
+      "enabled": "Bật karaoke ảo"
     },
     "complete": {
       "title": "Hoàn tất!",
@@ -1736,6 +1802,7 @@ window.LANG_VI = {
     "dismissAll": "Đóng tất cả"
   },
   "syncCreator": {
+    "loginRequired": "Cần đăng nhập Discord để tạo đồng bộ karaoke.",
     "title": "Tạo đồng bộ Karaoke",
     "buttonTooltip": "Tạo đồng bộ Karaoke",
     "clickHereHint": "Nhấn vào đây để khớp lời bài hát!",
@@ -1774,6 +1841,21 @@ window.LANG_VI = {
     "loadedExistingSyncData": "Đã tải dữ liệu đồng bộ có sẵn",
     "providerMismatch": "Dữ liệu đồng bộ hiện có sử dụng nhà cung cấp khác. Bạn cần tạo dữ liệu mới cho nhà cung cấp của tài khoản.",
     "back": "Đóng",
+    "lrclibSearchResults": "Kết quả tìm kiếm LRCLIB",
+    "showLrclibSearchResults": "Hiện kết quả tìm kiếm",
+    "hideLrclibSearchResults": "Ẩn kết quả tìm kiếm",
+    "lrclibNoCandidates": "Không tìm thấy ứng viên LRCLIB",
+    "lrclibSelectCandidate": "Chọn một ứng viên",
+    "lrclibApplyCandidate": "Tải lời bài hát này",
+    "lrclibLoaded": "Đã tải",
+    "lrclibBadgeExact": "Khớp chính xác",
+    "lrclibBadgeSynced": "Đồng bộ",
+    "lrclibBadgePlain": "Thường",
+    "lrclibBadgePrimary": "Chính",
+    "lrclibBadgeEnglish": "Tiếng Anh",
+    "lrclibMetricArtist": "nghệ sĩ",
+    "lrclibMetricTitle": "tiêu đề",
+    "lrclibMetricDiff": "chênh lệch",
     "lrclib": {
       "registerLyrics": "Đăng ký lời bài hát lên LRCLIB",
       "title": "Đăng ký lời bài hát lên LRCLIB",
@@ -1808,6 +1890,7 @@ window.LANG_VI = {
       "syllable": "Âm tiết"
     },
     "copyLyrics": "Sao chép lời bài hát",
+    "virtualKaraoke": "Dữ liệu karaoke ảo",
     "lyricsCopied": "Đã sao chép lời bài hát vào clipboard",
     "copyError": "Sao chép thất bại",
     "export": "Xuất",

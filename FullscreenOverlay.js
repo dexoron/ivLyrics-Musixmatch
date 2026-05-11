@@ -1,7 +1,7 @@
 // Fullscreen Overlay Component - Enhanced UI/UX
 const FullscreenOverlay = (() => {
     const react = Spicetify.React;
-    const { useState, useEffect, useCallback, useRef } = react;
+    const { useState, useEffect, useCallback, useMemo, useRef } = react;
 
     // Format time helper (ms to mm:ss)
     const formatTime = (ms) => {
@@ -34,15 +34,81 @@ const FullscreenOverlay = (() => {
         return trimmed || title;
     };
 
+    const isUnknownTrackMetadata = (meta) => {
+        if (!meta) return true;
+        const title = meta.title || '';
+        const artist = meta.artist_name || '';
+        return (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
+            (!title && !artist) ||
+            (title === '' && artist === '');
+    };
+
+    const createQueueTrackInfo = (meta, track, fallbackContextUri = "", index = 0) => ({
+        title: meta?.title || "Unknown",
+        artist: meta?.artist_name || "Unknown",
+        image: meta?.image_url || "",
+        uri: track?.uri || "",
+        uid: track?.uid || "",
+        contextUri: fallbackContextUri || meta?.context_uri || "",
+        index
+    });
+
+    const areTrackInfoEqual = (prev, next) => {
+        if (prev === next) return true;
+        if (!prev || !next) return false;
+
+        return prev.title === next.title &&
+            prev.artist === next.artist &&
+            prev.image === next.image &&
+            prev.uri === next.uri &&
+            prev.uid === next.uid &&
+            prev.contextUri === next.contextUri &&
+            prev.index === next.index;
+    };
+
+    const areTrackListsEqual = (prev, next) => {
+        if (prev === next) return true;
+        if (!Array.isArray(prev) || !Array.isArray(next) || prev.length !== next.length) {
+            return false;
+        }
+
+        for (let i = 0; i < prev.length; i++) {
+            if (!areTrackInfoEqual(prev[i], next[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
     // Clock Component
     const Clock = ({ show, showSeconds = false, size = 48 }) => {
         const [time, setTime] = useState(new Date());
 
         useEffect(() => {
             if (!show) return;
-            const interval = showSeconds ? 1000 : 1000;
-            const timer = setInterval(() => setTime(new Date()), interval);
-            return () => clearInterval(timer);
+
+            if (showSeconds) {
+                const timer = setInterval(() => setTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }
+
+            let intervalId = null;
+            const syncToMinute = () => {
+                setTime(new Date());
+                intervalId = setInterval(() => setTime(new Date()), 60000);
+            };
+            const now = new Date();
+            const msUntilNextMinute =
+                (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+            const timeoutId = setTimeout(syncToMinute, Math.max(msUntilNextMinute, 0));
+
+            return () => {
+                clearTimeout(timeoutId);
+                if (intervalId) {
+                    clearInterval(intervalId);
+                }
+            };
         }, [show, showSeconds]);
 
         if (!show) return null;
@@ -176,7 +242,8 @@ const FullscreenOverlay = (() => {
                     }
 
                     const duration = Spicetify.Player.getDuration();
-                    const position = Spicetify.Player.getProgress();
+                    const position = window.Utils?.getSafePlayerProgress?.()
+                        ?? (Spicetify.Player.getProgress?.() || 0);
                     const remaining = (duration - position) / 1000;
 
                     // Show when less than secondsBeforeEnd remaining
@@ -185,24 +252,23 @@ const FullscreenOverlay = (() => {
                         const queue = Spicetify.Queue;
                         if (queue?.nextTracks?.length > 0) {
                             // Unknown 트랙이 아닌 첫 번째 유효한 트랙 찾기
-                            const validNext = queue.nextTracks.find(track => {
+                            const validNext = queue.nextTracks.find((track) => {
                                 const meta = track?.contextTrack?.metadata;
-                                // Unknown 트랙 필터링 (제목과 아티스트 모두 Unknown이거나 비어있는 경우)
-                                if (!meta) return false;
-                                const title = meta.title || '';
-                                const artist = meta.artist_name || '';
-                                const isUnknown = (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
-                                    (!title && !artist) ||
-                                    (title === '' && artist === '');
-                                return !isUnknown;
+                                return !isUnknownTrackMetadata(meta);
                             });
 
                             if (validNext?.contextTrack?.metadata) {
-                                setNextTrack({
+                                const nextTrackData = {
                                     title: validNext.contextTrack.metadata.title,
                                     artist: validNext.contextTrack.metadata.artist_name,
                                     image: validNext.contextTrack.metadata.image_url
-                                });
+                                };
+                                setNextTrack((prev) => (
+                                    prev &&
+                                        prev.title === nextTrackData.title &&
+                                        prev.artist === nextTrackData.artist &&
+                                        prev.image === nextTrackData.image
+                                ) ? prev : nextTrackData);
                                 setVisible(true);
                                 return;
                             }
@@ -244,26 +310,21 @@ const FullscreenOverlay = (() => {
 
         useEffect(() => {
             if (!show) return;
-
-            let rafId = null;
-            let lastUpdate = 0;
             const updateInterval = 200; // ms
 
-            const updateProgress = (timestamp) => {
-                if (timestamp - lastUpdate >= updateInterval) {
-                    if (!isDragging.current) {
-                        setProgress(Spicetify.Player.getProgress() || 0);
-                    }
-                    setDuration(Spicetify.Player.getDuration() || 0);
-                    lastUpdate = timestamp;
+            const updateProgress = () => {
+                if (!isDragging.current) {
+                    setProgress(window.Utils?.getSafePlayerProgress?.()
+                        ?? (Spicetify.Player.getProgress?.() || 0));
                 }
-                rafId = requestAnimationFrame(updateProgress);
+                setDuration(Spicetify.Player.getDuration() || 0);
             };
 
-            rafId = requestAnimationFrame(updateProgress);
+            updateProgress();
+            const intervalId = setInterval(updateProgress, updateInterval);
 
             return () => {
-                if (rafId) cancelAnimationFrame(rafId);
+                clearInterval(intervalId);
             };
         }, [show]);
 
@@ -272,6 +333,7 @@ const FullscreenOverlay = (() => {
             const rect = progressRef.current.getBoundingClientRect();
             const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             const newProgress = percent * duration;
+            window.Utils?.clearSafePlayerProgressCorrection?.();
             Spicetify.Player.seek(newProgress);
             setProgress(newProgress);
         }, [duration]);
@@ -287,6 +349,7 @@ const FullscreenOverlay = (() => {
             if (isDragging.current && progressRef.current) {
                 const rect = progressRef.current.getBoundingClientRect();
                 const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                window.Utils?.clearSafePlayerProgressCorrection?.();
                 Spicetify.Player.seek(percent * duration);
             }
             isDragging.current = false;
@@ -377,24 +440,15 @@ const FullscreenOverlay = (() => {
             checkLiked();
             updateVolume();
 
-            // 볼륨 변경 감지를 위한 RAF 기반 폴링 (500ms 간격)
-            let rafId = null;
-            let lastVolumeCheck = 0;
+            // 볼륨 변경 감지를 위한 저빈도 폴링
             const volumeCheckInterval = 500;
-            const volumeLoop = (timestamp) => {
-                if (timestamp - lastVolumeCheck >= volumeCheckInterval) {
-                    updateVolume();
-                    lastVolumeCheck = timestamp;
-                }
-                rafId = requestAnimationFrame(volumeLoop);
-            };
-            rafId = requestAnimationFrame(volumeLoop);
+            const volumeIntervalId = setInterval(updateVolume, volumeCheckInterval);
 
             Spicetify.Player.addEventListener("onplaypause", updatePlayState);
             Spicetify.Player.addEventListener("songchange", checkLiked);
 
             return () => {
-                if (rafId) cancelAnimationFrame(rafId);
+                clearInterval(volumeIntervalId);
                 Spicetify.Player.removeEventListener("onplaypause", updatePlayState);
                 Spicetify.Player.removeEventListener("songchange", checkLiked);
             };
@@ -424,18 +478,18 @@ const FullscreenOverlay = (() => {
 
         if (!show) return null;
 
-        const buttonStyle = {
+        const buttonStyle = useMemo(() => ({
             width: `${buttonSize}px`,
             height: `${buttonSize}px`
-        };
-        const mainButtonStyle = {
+        }), [buttonSize]);
+        const mainButtonStyle = useMemo(() => ({
             width: `${buttonSize + 12}px`,
             height: `${buttonSize + 12}px`
-        };
-        const smallButtonStyle = {
+        }), [buttonSize]);
+        const smallButtonStyle = useMemo(() => ({
             width: `${buttonSize - 4}px`,
             height: `${buttonSize - 4}px`
-        };
+        }), [buttonSize]);
 
         const handleVolumeChange = (e) => {
             const newVolume = parseFloat(e.target.value);
@@ -683,78 +737,84 @@ const FullscreenOverlay = (() => {
                         playerData?.item?.metadata?.context_uri ||
                         "";
                     const queueState = queueData?.data || Spicetify.Queue || {};
-                    const hasModernQueueShape =
-                        Array.isArray(queueState?.queued) || Array.isArray(queueState?.nextUp);
-                    const nextSource = hasModernQueueShape
-                        ? [...(queueState.queued || []), ...(queueState.nextUp || [])]
-                        : (queueState.nextTracks || []);
                     const prevSource = queueState.prevTracks || Spicetify.Queue?.prevTracks || [];
 
                     // 현재 재생 중인 곡
                     if (playerData?.item) {
                         const meta = playerData.item.metadata;
-                        setCurrentTrack({
+                        const currentTrackData = {
                             title: meta?.title || "Unknown",
                             artist: meta?.artist_name || "Unknown",
                             image: meta?.image_url || "",
                             uri: playerData.item.uri
-                        });
+                        };
+                        setCurrentTrack((prev) => areTrackInfoEqual(prev, currentTrackData) ? prev : currentTrackData);
                     }
 
                     // 다음 곡들 (최대 15곡) - Unknown 트랙 이후 필터링
-                    if (nextSource.length > 0) {
+                    const next = [];
+                    const appendNextTracks = (items) => {
+                        if (!Array.isArray(items) || next.length >= 15) {
+                            return false;
+                        }
+
                         // Unknown 트랙의 인덱스 찾기 (컨텍스트 끝 마커)
-                        const unknownIndex = nextSource.findIndex(track => {
-                            const meta = track?.contextTrack?.metadata || track?.metadata || {};
-                            const title = meta.title || '';
-                            const artist = meta.artist_name || '';
-                            // Unknown 트랙 감지: 제목과 아티스트 모두 Unknown이거나 비어있는 경우
-                            return (title.toLowerCase() === 'unknown' && artist.toLowerCase() === 'unknown') ||
-                                (!title && !artist) ||
-                                (title === '' && artist === '');
-                        });
-
-                        // Unknown 트랙이 있으면 그 이전까지만, 없으면 전체
-                        const tracksToShow = unknownIndex >= 0
-                            ? nextSource.slice(0, unknownIndex)
-                            : nextSource;
-
-                        const next = tracksToShow.slice(0, 15).map((track, index) => {
+                        for (const track of items) {
                             const contextTrack = track?.contextTrack || track || {};
                             const meta = contextTrack.metadata || track?.metadata || {};
-                            return {
-                                title: meta.title || "Unknown",
-                                artist: meta.artist_name || "Unknown",
-                                image: meta.image_url || "",
-                                uri: contextTrack.uri || track?.uri || "",
-                                uid: contextTrack.uid || track?.uid || "",
-                                contextUri: currentContextUri || meta.context_uri || "",
-                                index: index + 1
-                            };
-                        });
-                        setNextTracks(next);
+                            if (isUnknownTrackMetadata(meta)) {
+                                return true;
+                            }
+
+                            next.push(createQueueTrackInfo(
+                                meta,
+                                {
+                                    uri: contextTrack.uri || track?.uri || "",
+                                    uid: contextTrack.uid || track?.uid || ""
+                                },
+                                currentContextUri,
+                                next.length + 1
+                            ));
+
+                            if (next.length >= 15) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    };
+
+                    const hasModernQueueShape =
+                        Array.isArray(queueState?.queued) || Array.isArray(queueState?.nextUp);
+                    if (hasModernQueueShape) {
+                        const stopped = appendNextTracks(queueState.queued || []);
+                        if (!stopped) {
+                            appendNextTracks(queueState.nextUp || []);
+                        }
                     } else {
-                        setNextTracks([]);
+                        appendNextTracks(queueState.nextTracks || []);
                     }
+                    setNextTracks((prev) => areTrackListsEqual(prev, next) ? prev : next);
 
                     // 최근 재생 곡들 (이전 곡 기록)
                     if (prevSource.length > 0) {
-                        const prev = prevSource.slice(-10).reverse().map((track, index) => {
+                        const prev = [];
+                        for (let i = prevSource.length - 1; i >= 0 && prev.length < 10; i--) {
+                            const track = prevSource[i];
                             const contextTrack = track?.contextTrack || track || {};
                             const meta = contextTrack.metadata || track?.metadata || {};
-                            return {
-                                title: meta.title || "Unknown",
-                                artist: meta.artist_name || "Unknown",
-                                image: meta.image_url || "",
-                                uri: contextTrack.uri || track?.uri || "",
-                                uid: contextTrack.uid || track?.uid || "",
-                                contextUri: currentContextUri || meta.context_uri || "",
-                                index: index + 1
-                            };
-                        });
-                        setRecentTracks(prev);
+                            prev.push(createQueueTrackInfo(
+                                meta,
+                                {
+                                    uri: contextTrack.uri || track?.uri || "",
+                                    uid: contextTrack.uid || track?.uid || ""
+                                },
+                                currentContextUri,
+                                prev.length + 1
+                            ));
+                        }
+                        setRecentTracks((current) => areTrackListsEqual(current, prev) ? current : prev);
                     } else {
-                        setRecentTracks([]);
+                        setRecentTracks((current) => current.length === 0 ? current : []);
                     }
                 } catch (e) {
                     console.warn('[FullscreenOverlay] Queue update failed:', e);
@@ -787,13 +847,15 @@ const FullscreenOverlay = (() => {
                 );
                 if (selectedIndex >= 0) {
                     const selected = nextTracks[selectedIndex];
-                    setCurrentTrack({
+                    const selectedTrackData = {
                         title: selected.title || "Unknown",
                         artist: selected.artist || "Unknown",
                         image: selected.image || "",
                         uri: selected.uri
-                    });
-                    setNextTracks(nextTracks.slice(selectedIndex + 1));
+                    };
+                    setCurrentTrack((prev) => areTrackInfoEqual(prev, selectedTrackData) ? prev : selectedTrackData);
+                    const remainingTracks = nextTracks.slice(selectedIndex + 1);
+                    setNextTracks((prev) => areTrackListsEqual(prev, remainingTracks) ? prev : remainingTracks);
                 }
                 // URI로 직접 재생 (불필요한 스킵 요청 방지)
                 const currentContextUri =
@@ -958,6 +1020,7 @@ const FullscreenOverlay = (() => {
             return window.matchMedia("(orientation: portrait)").matches;
         });
         const hideTimerRef = useRef(null);
+        const uiVisibleRef = useRef(true);
 
         // Track playback state for TV mode controls
         useEffect(() => {
@@ -970,28 +1033,22 @@ const FullscreenOverlay = (() => {
 
             updatePlaybackState();
 
-            // RAF 기반 폴링 (500ms 간격)
-            let rafId = null;
-            let lastUpdate = 0;
             const updateInterval = 500;
-            const loop = (timestamp) => {
-                if (timestamp - lastUpdate >= updateInterval) {
-                    updatePlaybackState();
-                    lastUpdate = timestamp;
-                }
-                rafId = requestAnimationFrame(loop);
-            };
-            rafId = requestAnimationFrame(loop);
+            const intervalId = setInterval(updatePlaybackState, updateInterval);
 
             Spicetify.Player?.addEventListener?.("songchange", updatePlaybackState);
             Spicetify.Player?.addEventListener?.("onplaypause", updatePlaybackState);
 
             return () => {
-                if (rafId) cancelAnimationFrame(rafId);
+                clearInterval(intervalId);
                 Spicetify.Player?.removeEventListener?.("songchange", updatePlaybackState);
                 Spicetify.Player?.removeEventListener?.("onplaypause", updatePlaybackState);
             };
         }, []);
+
+        useEffect(() => {
+            uiVisibleRef.current = uiVisible;
+        }, [uiVisible]);
 
         // Get settings from CONFIG
         const showAlbum = CONFIG?.visual?.["fullscreen-show-album"] !== false;
@@ -1068,25 +1125,31 @@ const FullscreenOverlay = (() => {
         // Auto-hide UI on mouse inactivity
         useEffect(() => {
             if (!isFullscreen || !autoHideUI) {
+                uiVisibleRef.current = true;
                 setUiVisible(true);
                 return;
             }
 
             const handleMouseMove = () => {
-                setUiVisible(true);
+                if (!uiVisibleRef.current) {
+                    uiVisibleRef.current = true;
+                    setUiVisible(true);
+                }
                 if (hideTimerRef.current) {
                     clearTimeout(hideTimerRef.current);
                 }
                 hideTimerRef.current = setTimeout(() => {
+                    uiVisibleRef.current = false;
                     setUiVisible(false);
                 }, autoHideDelay);
             };
 
             hideTimerRef.current = setTimeout(() => {
+                uiVisibleRef.current = false;
                 setUiVisible(false);
             }, autoHideDelay);
 
-            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mousemove', handleMouseMove, { passive: true });
 
             return () => {
                 document.removeEventListener('mousemove', handleMouseMove);
@@ -1232,7 +1295,7 @@ const FullscreenOverlay = (() => {
             ),
             // Bottom-left: TV Mode Song Info OR Context info
             tvModeEnabled ? react.createElement("div", {
-                className: `fullscreen-tv-song-info ${!uiVisible ? 'hidden' : ''}`
+                className: "fullscreen-tv-song-info"
             },
                 // Album art (clickable for TMI)
                 react.createElement("div", {
@@ -1349,7 +1412,7 @@ const FullscreenOverlay = (() => {
                 ),
                 // TV Mode Controls & Progress (right side)
                 (tvShowControls || tvShowProgress) && react.createElement("div", {
-                    className: "fullscreen-tv-controls-wrapper"
+                    className: `fullscreen-tv-controls-wrapper ${!uiVisible ? 'hidden' : ''}`
                 },
                     // TV Mode Controls
                     tvShowControls && react.createElement("div", {
@@ -1409,6 +1472,7 @@ const FullscreenOverlay = (() => {
                                 const clickX = e.clientX - rect.left;
                                 const percentage = clickX / rect.width;
                                 const seekPosition = Math.floor(duration * percentage);
+                                window.Utils?.clearSafePlayerProgressCorrection?.();
                                 Spicetify.Player.seek(seekPosition);
                             }
                         },

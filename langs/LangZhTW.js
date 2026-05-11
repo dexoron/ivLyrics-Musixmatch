@@ -376,6 +376,14 @@ window.LANG_ZH_TW = {
     },
     "solidBackgroundInUse": "ℹ️ 正在使用純色背景",
     "fontPlaceholder": "輸入字型名稱 (例: Arial, 微軟正黑體)",
+    "shortcuts": {
+      "primary": "主鍵",
+      "secondary": "副鍵"
+    },
+    "syncCreatorShortcuts": {
+      "title": "Sync Creator 快捷鍵",
+      "subtitle": "設定 Sync Creator 錄製用的主鍵與副鍵。"
+    },
     "aiProviders": {
       "title": "AI 提供者",
       "description": "選擇並劃分 AI 提供者的優先級。排在頂部的提供者將被優先嘗試。失敗時，將自動使用下一個提供者。",
@@ -695,6 +703,36 @@ window.LANG_ZH_TW = {
     "lyricsProvider": "歌詞提供者",
     "syncContributor": "同步貢獻者"
   },
+  "creatorProfile": {
+    "title": "同步製作者",
+    "anonymous": "匿名",
+    "openProfile": "開啟製作者資料",
+    "loading": "正在載入製作者資料...",
+    "loadFailed": "無法載入製作者資料。",
+    "back": "返回",
+    "contributions": "已新增的同步歌詞",
+    "tracks": "同步歌詞數",
+    "likes": "喜歡",
+    "like": "喜歡",
+    "liked": "已喜歡",
+    "likeActionFailed": "更新製作者喜歡失敗。",
+    "likeLoginRequired": "要為製作者按喜歡需要先登入 Discord。",
+    "ownProfile": "這是你的個人資料。",
+    "loadMore": "載入更多",
+    "loadingMore": "正在載入更多...",
+    "noContributions": "還沒有新增任何同步歌詞。",
+    "unknownTrack": "未知歌曲",
+    "updated": "更新",
+    "topArtists": "Top Artists",
+    "artistGroups": "Artist Groups",
+    "noArtistStats": "No artist stats yet.",
+    "sortLabel": "Sort",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "clearArtistFilter": "Clear artist filter",
+    "filteredArtist": "Filtered artist"
+  },
   "settingsAdvanced": {
     "patchNotes": {
       "empty": "沒有更新日誌。"
@@ -971,6 +1009,14 @@ window.LANG_ZH_TW = {
       "bounce": {
         "label": "文字彈跳效果",
         "desc": "在卡拉OK模式中，為目前演唱的文字套用彈跳動畫"
+      },
+      "spotifyFakeKaraoke": {
+        "label": "虛擬卡拉OK",
+        "desc": "當歌詞只提供逐行同步時間時，會根據 Spotify audio analysis 合成卡拉OK時間。當信心度較高時，韓文、日文與中文的行會被切分得更細。"
+      },
+      "pseudoKaraokeRenderAdvance": {
+        "label": "虛擬卡拉OK渲染提前量",
+        "desc": "僅對虛擬卡拉OK套用渲染時序偏移。數值越大，高亮推進越早。"
       }
     },
     "prefetch": {
@@ -1148,6 +1194,10 @@ window.LANG_ZH_TW = {
       "browserFullscreen": {
         "desc": "使用 Spotify 全螢幕",
         "info": "進入全螢幕模式時，將 Spotify 切換至全螢幕以填滿顯示器"
+      },
+      "hideOverlay": {
+        "desc": "在 ivLyrics 全螢幕時隱藏覆蓋層",
+        "info": "ivLyrics 全螢幕開啟時向覆蓋層應用程式傳送暫停播放狀態，讓桌面覆蓋歌詞自動淡出"
       }
     },
     "normalMode": {
@@ -1285,17 +1335,26 @@ window.LANG_ZH_TW = {
     },
     "aboutTab": {
       "account": {
+        "loginRequired": "需要登入 Discord。",
+        "checking": "正在檢查帳戶資訊...",
         "title": "帳戶連動",
-        "subtitle": "與ivLogin帳戶連動",
-        "description": "ivLis STUDIO統一帳戶服務",
-        "info": "與ivLogin連動後可使用設定同步等功能。請在登入頁面輸入User Hash進行連動。",
-        "loginButton": "透過ivLogin連動",
+        "subtitle": "與你的 Discord 帳戶連動",
+        "description": "基於 Discord 的 ivLyrics 貢獻帳戶",
+        "info": "使用 Discord 登入後，目前的 userhash 會改為你的 Discord ID，既有貢獻資料也會一併移轉。",
+        "loginButton": "使用 Discord 登入",
         "loading": "正在載入帳戶資訊...",
         "linked": "已連動",
-        "linkedAt": "連動日期",
-        "lastSync": "最後同步",
-        "manageAccount": "帳戶管理",
+        "linkedAt": "連動時間",
+        "lastSync": "最近登入",
+        "manageAccount": "切換帳戶",
         "refresh": "重新整理",
+        "loggingIn": "正在開啟瀏覽器...",
+        "startHint": "請在瀏覽器中完成 Discord 登入流程。",
+        "failed": "Discord 登入失敗。",
+        "loadFailed": "無法載入帳戶資訊。",
+        "discordLoginSuccess": "Discord 帳戶已成功連動。",
+        "logout": "登出",
+        "logoutSuccess": "已登出 Discord，並產生新的 user_hash。",
         "nickname": {
           "label": "暱稱",
           "enter": "請輸入暱稱。",
@@ -1493,6 +1552,7 @@ window.LANG_ZH_TW = {
     "unsynced": "一般歌詞"
   },
   "communityVideo": {
+    "loginRequired": "註冊社群影片需要登入 Discord。",
     "title": "社群影片推薦",
     "loading": "正在載入影片列表...",
     "loadError": "無法載入影片列表",
@@ -1595,7 +1655,7 @@ window.LANG_ZH_TW = {
     "copied": "✓ 已複製到剪貼簿",
     "downloaded": "✓ 已下載",
     "shared": "✓ 已分享",
-    "maxLinesReached": "最多只能選擇 3 行",
+    "maxLinesReached": "最多只能選擇 10 行",
     "noSelection": "請選擇歌詞"
   },
   "setupWizard": {
@@ -1662,6 +1722,12 @@ window.LANG_ZH_TW = {
       "description": "在 Spotify 的「正在播放」面板顯示目前歌詞。無需全螢幕模式即可確認歌詞。",
       "enabled": "顯示面板歌詞",
       "linesCount": "顯示行數"
+    },
+    "pseudoKaraokeTip": {
+      "title": "虛擬卡拉OK",
+      "subtitle": "讓幾乎所有歌曲都能使用卡拉OK式高亮",
+      "description": "使用 Spotify audio analysis 為只有逐行同步的歌詞合成卡拉OK時間。這樣幾乎所有歌曲都能使用卡拉OK模式，但時間是近似值，可能不夠準確。",
+      "enabled": "啟用虛擬卡拉OK"
     },
     "complete": {
       "title": "準備完成！",
@@ -1736,6 +1802,7 @@ window.LANG_ZH_TW = {
     "dismissAll": "全部關閉"
   },
   "syncCreator": {
+    "loginRequired": "建立卡拉 OK 同步需要登入 Discord。",
     "title": "建立卡拉OK同步",
     "buttonTooltip": "建立卡拉OK同步",
     "clickHereHint": "點此調整歌詞同步！",
@@ -1774,6 +1841,21 @@ window.LANG_ZH_TW = {
     "loadedExistingSyncData": "已載入現有同步資料",
     "providerMismatch": "現有同步資料使用不同的歌詞提供者。您需要為當前帳戶的提供者建立新的同步資料。",
     "back": "關閉",
+    "lrclibSearchResults": "LRCLIB 搜尋結果",
+    "showLrclibSearchResults": "顯示搜尋結果",
+    "hideLrclibSearchResults": "隱藏搜尋結果",
+    "lrclibNoCandidates": "找不到 LRCLIB 候選歌詞",
+    "lrclibSelectCandidate": "請選擇候選項目",
+    "lrclibApplyCandidate": "載入這份歌詞",
+    "lrclibLoaded": "已載入",
+    "lrclibBadgeExact": "精確匹配",
+    "lrclibBadgeSynced": "同步",
+    "lrclibBadgePlain": "純文字",
+    "lrclibBadgePrimary": "主要搜尋",
+    "lrclibBadgeEnglish": "英文搜尋",
+    "lrclibMetricArtist": "歌手",
+    "lrclibMetricTitle": "標題",
+    "lrclibMetricDiff": "差值",
     "lrclib": {
       "registerLyrics": "在 LRCLIB 登錄歌詞",
       "title": "在 LRCLIB 登錄歌詞",
@@ -1808,6 +1890,7 @@ window.LANG_ZH_TW = {
       "syllable": "音節"
     },
     "copyLyrics": "複製歌詞",
+    "virtualKaraoke": "虛擬卡拉OK資料",
     "lyricsCopied": "歌詞已複製到剪貼簿",
     "copyError": "複製失敗",
     "export": "匯出",
