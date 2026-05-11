@@ -10912,6 +10912,12 @@ const ConfigModal = ({
               type: ConfigSlider,
             },
             {
+              desc: I18n.t("settingsAdvanced.karaokeMode.musixmatchFakeKaraoke.label"),
+              info: I18n.t("settingsAdvanced.karaokeMode.musixmatchFakeKaraoke.desc"),
+              key: "musixmatch-fake-karaoke-enabled",
+              type: ConfigSlider,
+            },
+            {
               desc: I18n.t("settingsAdvanced.karaokeMode.pseudoKaraokeRenderAdvance.label"),
               info: I18n.t("settingsAdvanced.karaokeMode.pseudoKaraokeRenderAdvance.desc"),
               key: "pseudo-karaoke-render-advance",

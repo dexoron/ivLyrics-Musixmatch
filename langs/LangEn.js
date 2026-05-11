@@ -1015,6 +1015,10 @@ window.LANG_EN = {
         "label": "Pseudo Karaoke",
         "desc": "When lyrics only provide line-synced timing, synthesize karaoke timing from Spotify audio analysis. Korean, Japanese, and Chinese lines are split more densely when confidence is high."
       },
+      "musixmatchFakeKaraoke": {
+        "label": "Musixmatch Pseudo Karaoke",
+        "desc": "Create fake karaoke timing for Musixmatch synced lyrics by evenly distributing timing across words in each line."
+      },
       "pseudoKaraokeRenderAdvance": {
         "label": "Pseudo Karaoke Render Advance",
         "desc": "Apply a render-time timing offset to pseudo karaoke only. Positive values make the highlight appear earlier."

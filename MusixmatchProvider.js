@@ -745,10 +745,20 @@ const MusixmatchProvider = (() => {
                 karaokeSample: karaokeWithTrans?.[0],
             });
 
+            // Apply fake karaoke if enabled and no real karaoke
+            let finalKaraoke = karaokeWithTrans;
+            if (!finalKaraoke && syncedWithTrans && syncedWithTrans.length > 0) {
+                const fakeKaraokeEnabled = Spicetify.LocalStorage.get("ivLyrics:musixmatch-fake-karaoke-enabled") === "true";
+                if (fakeKaraokeEnabled) {
+                    finalKaraoke = createFakeKaraoke(syncedWithTrans);
+                    console.log("[MusixmatchProvider] Applied fake karaoke");
+                }
+            }
+
             return {
                 uri: info.uri,
                 provider: "musixmatch",
-                karaoke: karaokeWithTrans,
+                karaoke: finalKaraoke,
                 synced: syncedWithTrans,
                 unsynced: unsyncedWithTrans,
                 availableTranslations,
@@ -759,6 +769,35 @@ const MusixmatchProvider = (() => {
             console.error("[MusixmatchProvider] getLyrics failed:", e);
             return { error: e.message, uri: info.uri };
         }
+    }
+
+    // Helper to create fake karaoke from synced lines
+    function createFakeKaraoke(syncedLines) {
+        if (!syncedLines || !syncedLines.length) return null;
+
+        return syncedLines.map((line, index) => {
+            const words = line.text.trim().split(/\s+/).filter(word => word.length > 0);
+            if (words.length === 0) return null;
+
+            const nextLine = syncedLines[index + 1];
+            const lineStart = line.startTime;
+            const lineEnd = nextLine ? nextLine.startTime : lineStart + 5000; // assume 5s for last line
+            const lineDuration = Math.max(lineEnd - lineStart, 1000); // at least 1s
+
+            const wordDuration = lineDuration / words.length;
+            let currentTime = lineStart;
+
+            return words.map(word => {
+                const wordStart = Math.round(currentTime);
+                currentTime += wordDuration;
+                const wordEnd = Math.round(currentTime);
+                return {
+                    text: word,
+                    startTime: wordStart,
+                    endTime: wordEnd
+                };
+            });
+        }).filter(line => line !== null);
     }
 
     return {
