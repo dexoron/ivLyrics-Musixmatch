@@ -432,6 +432,15 @@ body.ivlyrics-page-active .main-topBar-container {
   background: transparent;
   overflow: hidden;
   /* 배경 요소 오버플로우 방지 - 스크롤은 내부 가사 요소에서 처리 */
+  /* Isolate the lyrics subtree from outside layout/paint queries. Every karaoke
+     frame mutates child transforms, fills, and layer state — without containment,
+     anything outside that reads layout (e.g. Spotify's wrapper measuring scrollWidth
+     in microtasks) forces a full reflow because the engine treats those mutations
+     as global invalidation. With contain:layout paint the engine knows changes
+     inside cannot affect outer geometry, so those external reads can use cached
+     layout instead of recomputing. Safe here because we already overflow:hidden
+     and width/height are 100% (no children rely on bubbling size out). */
+  contain: layout paint;
 }
 
 
@@ -970,13 +979,13 @@ div.lyrics-tabBar-headerItemLink {
   color: var(--lyrics-color-inactive);
   filter: var(--lyrics-text-drop-shadow, none);
   text-shadow: none;
-  /* translate3d forces a GPU layer so glyph rasterization stays stable when the
-     bounce animation lands at identity transform. Without the z component the
-     layer can be demoted at the end of the transition, causing sub-pixel reflow. */
-  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
-  transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.28, 1);
   vertical-align: baseline;
   unicode-bidi: isolate;
+}
+
+.lyrics-karaoke-text-run-segment.is-bouncing {
+  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
+  will-change: transform;
 }
 
 /* done segments stay on the transparent + background-clip:text paint path so the
@@ -1027,10 +1036,12 @@ div.lyrics-tabBar-headerItemLink {
   color: var(--lyrics-color-inactive);
   filter: var(--lyrics-text-drop-shadow, none);
   text-shadow: none;
-  /* See the matching note on .lyrics-karaoke-text-run-segment for why translate3d. */
-  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
-  transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.28, 1);
   vertical-align: baseline;
+}
+
+.lyrics-karaoke-char.is-bouncing {
+  transform: translate3d(0, var(--karaoke-bounce-y, 0), 0) scale(var(--karaoke-bounce-scale, 1));
+  will-change: transform;
 }
 
 /* Mirror of --done segment: keep the same paint path as --active to prevent
@@ -1098,9 +1109,19 @@ div.lyrics-tabBar-headerItemLink {
   ruby-position: over;
 }
 
+/* Keep pending rt on the same transparent + background-clip:text path the active
+   and done rt rules use. Without this, the rt switches paint paths on first activation
+   (solid color → text-masked) and the glyph briefly re-rasterizes — visible as the
+   furigana suddenly darkening / sharpening right when the char starts being sung.
+   No opacity fade here: background-clip:text already softens the glyph (no sub-pixel
+   AA on transparent fill), so adding 0.8 on top read as semi-transparent gray. The
+   inactive color's own alpha applies as the user configures it. */
 .lyrics-karaoke-ruby rt {
-  color: var(--lyrics-color-inactive);
-  opacity: 0.8;
+  color: transparent;
+  background-color: var(--lyrics-color-inactive);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   user-select: none;
   white-space: nowrap;
   text-shadow: none;
@@ -2104,7 +2125,6 @@ ruby rt {
   margin-bottom: var(--lyrics-furigana-spacing, 2px);
   user-select: none;
   -webkit-user-select: none;
-  text-shadow: var(--lyrics-text-shadow);
 }
 
 .lyrics-lyricsContainer-LyricsLine-sub ruby rt {
