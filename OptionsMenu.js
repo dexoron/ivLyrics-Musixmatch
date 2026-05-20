@@ -3831,6 +3831,43 @@ async function openSyncDataCreator(trackInfo, initialData = null) {
 
 // Sync Data Creator Button
 const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initialLyrics, isFullscreen = false }) => {
+  const wrapperRef = react.useRef(null);
+  const [hintPosition, setHintPosition] = react.useState(null);
+  const reactDom = resolveOptionsReactDom();
+
+  const updateHintPosition = react.useCallback(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      setHintPosition(null);
+      return;
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    setHintPosition({
+      left: rect.left - 10,
+      top: rect.top + (rect.height / 2)
+    });
+  }, []);
+
+  react.useEffect(() => {
+    if (!showHint) {
+      setHintPosition(null);
+      return undefined;
+    }
+
+    updateHintPosition();
+    const rafId = requestAnimationFrame(updateHintPosition);
+
+    window.addEventListener("resize", updateHintPosition);
+    document.addEventListener("scroll", updateHintPosition, true);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateHintPosition);
+      document.removeEventListener("scroll", updateHintPosition, true);
+    };
+  }, [showHint, isFullscreen, updateHintPosition]);
+
   const handleClick = () => {
     let initialData = null;
     if (provider && initialLyrics) {
@@ -3841,16 +3878,38 @@ const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initi
     }
     void openSyncDataCreator(trackInfo, initialData);
   };
-  const hint = showHint
+  const hintText = I18n.t("syncCreator.clickHereHint") || "";
+  const canPortalHint = !!reactDom?.createPortal;
+  const inlineHint = showHint && !canPortalHint
     ? react.createElement("div", {
       className: `sync-creator-hint${isFullscreen ? " is-fullscreen" : ""}`,
-    }, I18n.t("syncCreator.clickHereHint") || "")
+    }, hintText)
+    : null;
+  const portalHint = showHint && canPortalHint && hintPosition
+    ? reactDom.createPortal(
+      react.createElement("div", {
+        className: `sync-creator-hint sync-creator-hint--portal${isFullscreen ? " is-fullscreen" : ""}`,
+        style: {
+          "--sync-creator-hint-left": `${hintPosition.left}px`,
+          "--sync-creator-hint-top": `${hintPosition.top}px`
+        },
+        "aria-hidden": "true"
+      }, hintText),
+      document.body
+    )
     : null;
 
   return react.createElement(
-    "div",
-    { style: { position: "relative", display: "inline-flex", alignItems: "center" } },
-    hint,
+    react.Fragment,
+    null,
+    react.createElement(
+      "div",
+      {
+        className: "sync-creator-button-wrapper",
+        ref: wrapperRef,
+        style: { position: "relative", display: "inline-flex", alignItems: "center" }
+      },
+      inlineHint,
     react.createElement(
       Spicetify.ReactComponent.TooltipWrapper,
       { label: I18n.t("syncCreator.buttonTooltip") || "Create Karaoke Sync" },
@@ -3870,7 +3929,9 @@ const SyncDataCreatorButton = react.memo(({ trackInfo, showHint, provider, initi
           react.createElement("line", { x1: 8, y1: 23, x2: 16, y2: 23 })
         )
       )
-    )
+    ),
+    ),
+    portalHint
   );
 });
 

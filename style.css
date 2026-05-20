@@ -7199,6 +7199,18 @@ ruby rt {
   border: 1px solid var(--spice-button);
 }
 
+.sync-creator-hint--portal {
+  position: fixed;
+  left: var(--sync-creator-hint-left);
+  top: var(--sync-creator-hint-top);
+  right: auto;
+  max-width: min(280px, calc(100vw - 24px));
+  white-space: normal;
+  transform: translate(-100%, -50%);
+  animation: hint-portal-fade-in-out 4s ease-in-out forwards;
+  z-index: calc(var(--iv-layer-fullscreen) + 8);
+}
+
 .ivlyrics-sync-creator-overlay {
   position: fixed;
   inset: 0;
@@ -7349,6 +7361,28 @@ ruby rt {
   100% {
     opacity: 0;
     transform: translateY(-50%) translateX(10px);
+  }
+}
+
+@keyframes hint-portal-fade-in-out {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-100% + 10px), -50%);
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(-100%, -50%);
+  }
+
+  85% {
+    opacity: 1;
+    transform: translate(-100%, -50%);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-100% + 10px), -50%);
   }
 }
 
