@@ -344,6 +344,59 @@ const getNonSectionLyricsText = (lyrics = []) =>
     .filter((line) => line && !Utils.isSectionHeader(line))
     .join("\n");
 
+const normalizeTranslationOutputLines = (outText) => {
+  if (Array.isArray(outText)) {
+    return outText;
+  }
+  if (typeof outText === "string") {
+    return outText.split("\n");
+  }
+  return null;
+};
+
+const mapTranslationLinesToLyrics = (lyrics = [], linesInput = []) => {
+  if (!Array.isArray(lyrics) || !Array.isArray(linesInput)) {
+    return null;
+  }
+
+  let resultLineIndex = 0;
+  return lyrics.map((line) => {
+    const originalText = line?.text || "";
+
+    if (Utils.isSectionHeader(originalText)) {
+      return {
+        ...line,
+        text: null,
+        originalText,
+      };
+    }
+
+    if (originalText.trim() === "") {
+      return {
+        ...line,
+        text: "",
+        originalText,
+      };
+    }
+
+    while (
+      resultLineIndex < linesInput.length &&
+      linesInput[resultLineIndex] !== undefined &&
+      linesInput[resultLineIndex] !== null &&
+      Utils.isSectionHeader(String(linesInput[resultLineIndex]).trim())
+    ) {
+      resultLineIndex++;
+    }
+
+    const translatedText = String(linesInput[resultLineIndex++] ?? "").trim();
+    return {
+      ...line,
+      text: translatedText || line?.text || "",
+      originalText,
+    };
+  });
+};
+
 const hasInstrumentalMarker = (lyrics = []) => {
   if (!lyrics || lyrics.length === 0 || lyrics.length > 3) return false;
 
@@ -2282,42 +2335,8 @@ const Prefetcher = {
         const processTranslationResult = (outText) => {
           if (!outText) return null;
 
-          let lines;
-          if (Array.isArray(outText)) {
-            lines = outText;
-          } else if (typeof outText === "string") {
-            lines = outText.split("\n");
-          } else {
-            return null;
-          }
-
-          const originalNonSectionIndexMap = new Map();
-          let nonSectionLineIndex = 0;
-          lyricsArray.forEach((line, i) => {
-            const lineText = line?.text || "";
-            if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-              originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
-            }
-          });
-
-          const cleanTranslationLines = lines.filter(
-            (line) => line && line.trim() !== "" && !Utils.isSectionHeader(line.trim())
-          );
-
-          const mapped = lyricsArray.map((line, i) => {
-            const originalText = line?.text || "";
-            if (Utils.isSectionHeader(originalText)) {
-              return { ...line, text: null, originalText };
-            }
-            if (originalText.trim() === "") {
-              return { ...line, text: "", originalText };
-            }
-            const positionInNonSectionLines = originalNonSectionIndexMap.get(i);
-            const translatedText = cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
-            return { ...line, text: translatedText || line?.text || "", originalText };
-          });
-
-          return mapped;
+          const lines = normalizeTranslationOutputLines(outText);
+          return mapTranslationLinesToLyrics(lyricsArray, lines);
         };
 
         // 발음 요청 (wantSmartPhonetic = true)
@@ -3599,56 +3618,8 @@ class LyricsContainer extends react.Component {
       this._dmResults[currentUri].lastMode2 = mode2;
       this._dmResults[currentUri].lastProvider = currentProvider;
 
-	      const originalNonSectionIndexMap = new Map();
-	      let nonSectionLineIndex = 0;
-	      originalLyrics.forEach((line, i) => {
-	        const lineText = line?.text || "";
-	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
-	        }
-	      });
-
       const mapResultLinesToLyrics = (linesInput) => {
-        if (!Array.isArray(linesInput)) return null;
-
-        const cleanTranslationLines = linesInput.filter(
-          (line) =>
-            line !== undefined &&
-            line !== null &&
-            String(line).trim() !== "" &&
-            !Utils.isSectionHeader(String(line).trim())
-        );
-
-        return originalLyrics.map((line, i) => {
-          const originalText = line?.text || "";
-
-          if (Utils.isSectionHeader(originalText)) {
-            return {
-              ...line,
-              text: null,
-              originalText,
-            };
-          }
-
-          if (originalText.trim() === "") {
-            return {
-              ...line,
-              text: "",
-              originalText,
-            };
-          }
-
-	          const positionInNonSectionLines =
-	            originalNonSectionIndexMap.get(i);
-	          const translatedText =
-	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
-
-          return {
-            ...line,
-            text: translatedText || line?.text || "",
-            originalText,
-          };
-        });
+        return mapTranslationLinesToLyrics(originalLyrics, linesInput);
       };
 
       const extractGeminiOutput = (response, wantSmartPhonetic) => {
@@ -3799,73 +3770,8 @@ class LyricsContainer extends react.Component {
       const processTranslationResult = (outText, lyrics) => {
         if (!outText) return null;
 
-        // Handle both array and string formats
-        let lines;
-        if (Array.isArray(outText)) {
-          lines = outText;
-        } else if (typeof outText === "string") {
-          lines = outText.split("\n");
-        } else {
-          return null;
-        }
-
-        // Create mapping arrays for proper alignment
-        const originalNonSectionLines = [];
-        const originalNonSectionIndices = [];
-
-        // Collect non-section lines from original lyrics (excluding empty lines)
-        lyrics.forEach((line, i) => {
-          const text = line?.text || "";
-          if (!Utils.isSectionHeader(text) && text.trim() !== "") {
-            originalNonSectionLines.push(text);
-            originalNonSectionIndices.push(i);
-          }
-        });
-
-        // Filter out section headers and empty lines from translation results
-        const cleanTranslationLines = lines.filter(
-          (line) =>
-            line && line.trim() !== "" && !Utils.isSectionHeader(line.trim())
-        );
-
-        // Use the clean translation lines for mapping
-        lines = cleanTranslationLines;
-
-        // Smart mapping that accounts for section headers and empty lines
-        const mapped = lyrics.map((line, i) => {
-          const originalText = line?.text || "";
-
-          // If this is a section header, keep original and don't show translation
-          if (Utils.isSectionHeader(originalText)) {
-            return {
-              ...line,
-              text: null,
-              originalText: originalText,
-            };
-          }
-
-          // If this is an empty line, keep it empty
-          if (originalText.trim() === "") {
-            return {
-              ...line,
-              text: "",
-              originalText: originalText,
-            };
-          }
-
-          // Find the translation index for this non-section, non-empty line
-	          const positionInNonSectionLines =
-	            originalNonSectionIndexMap.get(i);
-	          const translatedText = lines[positionInNonSectionLines]?.trim() || "";
-
-          return {
-            ...line,
-            text: translatedText || line?.text || "",
-            originalText: originalText,
-          };
-        });
-
-        return mapped;
+        const lines = normalizeTranslationOutputLines(outText);
+        return mapTranslationLinesToLyrics(lyrics, lines);
       };
 
       // mode1과 mode2 각각 처리 - 둘 다 활성화된 경우 각각의 결과를 올바르게 할당
@@ -4920,57 +4826,8 @@ class LyricsContainer extends react.Component {
       // Filter out section headers before sending to Gemini for translation
       const text = getNonSectionLyricsText(lyrics);
 
-      // Create mapping arrays for proper alignment
-	      const originalNonSectionIndexMap = new Map();
-	      let nonSectionLineIndex = 0;
-	      lyrics.forEach((line, i) => {
-	        const lineText = line?.text || "";
-	        if (!Utils.isSectionHeader(lineText) && lineText.trim() !== "") {
-	          originalNonSectionIndexMap.set(i, nonSectionLineIndex++);
-	        }
-	      });
-
       const mapResultLinesToLyrics = (linesInput) => {
-        if (!Array.isArray(linesInput)) return null;
-
-        const cleanTranslationLines = linesInput.filter(
-          (line) =>
-            line !== undefined &&
-            line !== null &&
-            String(line).trim() !== "" &&
-            !Utils.isSectionHeader(String(line).trim())
-        );
-
-        return lyrics.map((line, i) => {
-          const originalText = line?.text || "";
-
-          if (Utils.isSectionHeader(originalText)) {
-            return {
-              ...line,
-              text: null,
-              originalText: originalText,
-            };
-          }
-
-          if (originalText.trim() === "") {
-            return {
-              ...line,
-              text: "",
-              originalText: originalText,
-            };
-          }
-
-	          const positionInNonSectionLines =
-	            originalNonSectionIndexMap.get(i);
-	          const translatedText =
-	            cleanTranslationLines[positionInNonSectionLines]?.trim() || "";
-
-          return {
-            ...line,
-            text: translatedText || line?.text || "",
-            originalText: originalText,
-          };
-        });
+        return mapTranslationLinesToLyrics(lyrics, linesInput);
       };
 
       const streamedLines = [];
