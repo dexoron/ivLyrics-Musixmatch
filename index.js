@@ -6734,7 +6734,7 @@ class LyricsContainer extends react.Component {
               artists: Spicetify.Player.data?.item?.artists || [],
               album: Spicetify.Player.data?.item?.album || {},
             },
-            showHint: true,
+            showHint: !this.state.isFullscreen || this.state.isFloatingMenuOpen,
             provider: this.state.provider,
             initialLyrics: this.state.currentLyrics,
             isFullscreen: this.state.isFullscreen
