@@ -317,7 +317,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 .lyrics-break-indicator { display: inline-flex; align-items: center; gap: 0.3em; max-width: 100%; color: currentColor; vertical-align: middle; white-space: nowrap; }
 .lyrics-break-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.16em; height: 1.16em; min-width: 18px; min-height: 18px; flex: 0 0 auto; overflow: visible; color: currentColor; }
 .lyrics-break-icon span, .lyrics-break-icon svg { flex: 0 0 auto; }
-.lyrics-break-label { font-family: var(--break-label-font-family, var(--ivlyrics-panel-original-font, inherit)); font-size: var(--break-label-font-size, 0.7em); font-weight: var(--break-label-font-weight, 800); line-height: 1; letter-spacing: 0; opacity: var(--break-label-opacity, 0.74); }
+.lyrics-break-label { font-family: var(--break-label-font-family, var(--ivlyrics-panel-original-font, inherit)); font-size: var(--break-label-font-size, 12px); font-weight: var(--break-label-font-weight, 200); line-height: 1; letter-spacing: 0; opacity: var(--break-label-opacity, 0.65); }
 .lyrics-break-icon-equalizer, .lyrics-break-icon-dotWave, .lyrics-break-icon-diamonds, .lyrics-break-icon-splitBars, .lyrics-break-icon-reels, .lyrics-break-icon-piano { display: inline-flex; }
 .lyrics-break-icon-equalizer, .lyrics-break-icon-splitBars { align-items: center; gap: 0.09em; }
 .lyrics-break-icon-equalizer span, .lyrics-break-icon-splitBars span { display: block; width: 0.11em; min-width: 2px; height: 0.76em; border-radius: 999px; background: currentColor; transform: scaleY(0.4); transform-origin: center; }
@@ -827,11 +827,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             CONFIG?.visual?.["panel-lyrics-original-font"] ||
             CONFIG?.visual?.["original-font-family"] ||
             "var(--ivlyrics-panel-original-font, var(--font-family))";
-        const getLabelNumber = (settingKey, panelKey, originalKey, fallback, min, max) => {
+        const getLabelNumber = (settingKey, fallback, min, max) => {
             const settingValue = CONFIG?.visual?.[settingKey];
             const fallbackValue = settingValue !== undefined && settingValue !== null && settingValue !== ""
                 ? settingValue
-                : (CONFIG?.visual?.[panelKey] || CONFIG?.visual?.[originalKey]);
+                : fallback;
             const numericValue = Number(fallbackValue);
             const safeValue = Number.isFinite(numericValue) ? numericValue : fallback;
 
@@ -847,9 +847,9 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 "--break-duration-slow": `${Math.round(duration * 1.65)}ms`,
                 "--break-duration-xslow": `${Math.round(duration * 3.8)}ms`,
                 "--break-label-font-family": labelFontFamily,
-                "--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", "panel-lyrics-original-size", "original-font-size", 18, 12, 128)}px`,
-                "--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", "original-font-weight", "original-font-weight", 400, 100, 900),
-                "--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", "original-opacity", "original-opacity", 100, 0, 100) / 100,
+                "--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", 12, 12, 128)}px`,
+                "--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", 200, 100, 900),
+                "--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", 65, 0, 100) / 100,
             },
         };
     };

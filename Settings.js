@@ -2908,7 +2908,7 @@ const getInstrumentalBreakLabelStyleDefault = (settingSuffix, originalKey, fallb
     return settingValue;
   }
 
-  const originalValue = CONFIG?.visual?.[originalKey];
+  const originalValue = originalKey ? CONFIG?.visual?.[originalKey] : undefined;
   return originalValue !== undefined && originalValue !== null && originalValue !== ""
     ? originalValue
     : fallbackValue;
@@ -10181,7 +10181,7 @@ const ConfigModal = ({
               max: 128,
               step: 2,
               unit: "px",
-              defaultValue: getInstrumentalBreakLabelStyleDefault("font-size", "original-font-size", 32),
+              defaultValue: getInstrumentalBreakLabelStyleDefault("font-size", null, 20),
               disabled: () => CONFIG.visual["instrumental-break-show-label"] !== true,
             },
             {
@@ -10200,7 +10200,7 @@ const ConfigModal = ({
                 800: "Extra Bold (800)",
                 900: "Black (900)",
               },
-              defaultValue: getInstrumentalBreakLabelStyleDefault("font-weight", "original-font-weight", 400),
+              defaultValue: getInstrumentalBreakLabelStyleDefault("font-weight", null, 200),
               disabled: () => CONFIG.visual["instrumental-break-show-label"] !== true,
             },
             {
@@ -10212,7 +10212,7 @@ const ConfigModal = ({
               max: 100,
               step: 5,
               unit: "%",
-              defaultValue: getInstrumentalBreakLabelStyleDefault("opacity", "original-opacity", 100),
+              defaultValue: getInstrumentalBreakLabelStyleDefault("opacity", null, 65),
               disabled: () => CONFIG.visual["instrumental-break-show-label"] !== true,
             },
             {

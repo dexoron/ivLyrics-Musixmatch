@@ -1366,11 +1366,11 @@ const getInstrumentalBreakSettings = () => {
 	const labelFontFamily = CONFIG?.visual?.["instrumental-break-label-font-family"] ||
 		CONFIG?.visual?.["original-font-family"] ||
 		"var(--lyrics-original-font-family, var(--font-family))";
-	const getLabelNumber = (settingKey, originalKey, fallback, min, max) => {
+	const getLabelNumber = (settingKey, fallback, min, max) => {
 		const settingValue = CONFIG?.visual?.[settingKey];
 		const fallbackValue = settingValue !== undefined && settingValue !== null && settingValue !== ""
 			? settingValue
-			: CONFIG?.visual?.[originalKey];
+			: fallback;
 		const numericValue = Number(fallbackValue);
 		const safeValue = Number.isFinite(numericValue) ? numericValue : fallback;
 
@@ -1386,9 +1386,9 @@ const getInstrumentalBreakSettings = () => {
 			"--break-duration-slow": `${Math.round(duration * 1.65)}ms`,
 			"--break-duration-xslow": `${Math.round(duration * 3.8)}ms`,
 			"--break-label-font-family": labelFontFamily,
-			"--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", "original-font-size", 32, 12, 128)}px`,
-			"--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", "original-font-weight", 400, 100, 900),
-			"--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", "original-opacity", 100, 0, 100) / 100,
+			"--break-label-font-size": `${getLabelNumber("instrumental-break-label-font-size", 20, 12, 128)}px`,
+			"--break-label-font-weight": getLabelNumber("instrumental-break-label-font-weight", 200, 100, 900),
+			"--break-label-opacity": getLabelNumber("instrumental-break-label-opacity", 65, 0, 100) / 100,
 		},
 	};
 };

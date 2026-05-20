@@ -1849,11 +1849,11 @@ div.lyrics-tabBar-headerItemLink {
 
 .lyrics-break-label {
   font-family: var(--break-label-font-family, var(--lyrics-original-font-family, inherit));
-  font-size: var(--break-label-font-size, var(--lyrics-original-font-size, 0.42em));
-  font-weight: var(--break-label-font-weight, var(--lyrics-original-font-weight, 800));
+  font-size: var(--break-label-font-size, 20px);
+  font-weight: var(--break-label-font-weight, 200);
   line-height: 1;
   letter-spacing: 0;
-  opacity: var(--break-label-opacity, var(--lyrics-original-opacity, 0.74));
+  opacity: var(--break-label-opacity, 0.65);
 }
 
 .lyrics-break-icon-equalizer,
