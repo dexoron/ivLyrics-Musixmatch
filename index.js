@@ -4754,6 +4754,7 @@ class LyricsContainer extends react.Component {
       const safeLine = {
         ...(line && typeof line === "object" ? line : {}),
         originalText: String(originalText),
+        phoneticText: finalText ? String(finalText) : (line?.phoneticText || null),
         text: finalText ? String(finalText) : null,
         text2: finalText2 ? String(finalText2) : (line.text2 ? String(line.text2) : null),
       };

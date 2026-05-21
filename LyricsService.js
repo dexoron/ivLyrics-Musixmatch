@@ -3862,7 +3862,11 @@
                             const transLines = Array.isArray(transResult) ? transResult : (transResult ? transResult.split('\n') : []);
 
                             lyrics = lyrics.map((line, idx) => {
-                                const originalText = line.text || '';
+                                const isKaraokeLine = Array.isArray(line.syllables)
+                                    || Array.isArray(line.vocals?.lead?.syllables);
+                                const originalText = isKaraokeLine && line.originalText
+                                    ? line.originalText
+                                    : (line.text || line.originalText || '');
                                 const pronText = pronLines[idx]?.trim() || null;
                                 const transText = transLines[idx]?.trim() || null;
 
@@ -3875,7 +3879,8 @@
                                 return {
                                     ...line,
                                     originalText: finalOriginal, // The original text before any phonetic/translation
-                                    text: pronText || originalText, // The primary displayed text (phonetic or original)
+                                    text: isKaraokeLine ? finalOriginal : (pronText || originalText), // Keep karaoke timing text original.
+                                    phoneticText: pronText || line.phoneticText || null,
                                     text2: transText, // The secondary displayed text (translation)
                                     translation: transText, // For compatibility
                                     translationText: transText // For compatibility

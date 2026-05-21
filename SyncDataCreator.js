@@ -8,6 +8,20 @@ const SYNC_CREATOR_JAPANESE_KANA_REGEX = /[\u3040-\u30ff\uff66-\uff9f]/u;
 const SYNC_CREATOR_KANJI_REGEX = /[\u3400-\u4dbf\u4e00-\u9fff]/u;
 const SYNC_CREATOR_JAPANESE_ATTACH_KANA_REGEX = /^[\u3041\u3043\u3045\u3047\u3049\u3063\u3083\u3085\u3087\u308e\u3093\u3095\u3096\u30a1\u30a3\u30a5\u30a7\u30a9\u30c3\u30e3\u30e5\u30e7\u30ee\u30f3\u30f5\u30f6\u30fc\uff67-\uff70\uff9d]$/u;
 const SYNC_CREATOR_HANGUL_JAMO_ONLY_REGEX = /^[\u3131-\u3163\u1100-\u11ff]+$/u;
+const SYNC_CREATOR_SPEAKER_OPTIONS = [
+	...Array.from({ length: 5 }, (_, index) => `MALE ${index + 1}`),
+	...Array.from({ length: 5 }, (_, index) => `FEMALE ${index + 1}`),
+	...Array.from({ length: 5 }, (_, index) => `DUET ${index + 1}`)
+];
+const SYNC_CREATOR_DEFAULT_SPEAKER = 'MALE 1';
+const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
+const SYNC_CREATOR_KIND_OPTIONS = [
+	['vocal', '보컬'],
+	['effect', '효과음'],
+	['adlib', '애드립']
+];
+const SYNC_CREATOR_KIND_LABELS = new Map(SYNC_CREATOR_KIND_OPTIONS);
+const SYNC_CREATOR_PARALLEL_HINT_REGEX = /[()（）\/|／｜]/u;
 const SYNC_CREATOR_HANGUL_CODA_BY_JAMO = new Map([
 	['ㄱ', 1], ['ㄲ', 2], ['ㄳ', 3], ['ㄴ', 4], ['ㄵ', 5], ['ㄶ', 6], ['ㄷ', 7], ['ㄹ', 8],
 	['ㄺ', 9], ['ㄻ', 10], ['ㄼ', 11], ['ㄽ', 12], ['ㄾ', 13], ['ㄿ', 14], ['ㅀ', 15], ['ㅁ', 16],
@@ -55,6 +69,35 @@ const getSyncCreatorTextDirection = (text) => {
 	}
 
 	return rtlCount > ltrCount ? 'rtl' : 'ltr';
+};
+
+const normalizeSyncCreatorSpeaker = (value) => {
+	const raw = String(value || '').trim();
+	if (!raw) return '';
+	const normalized = raw
+		.replace(/[_-]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.toUpperCase();
+	return SYNC_CREATOR_SPEAKER_OPTIONS.includes(normalized) ? normalized : '';
+};
+
+const isSyncCreatorDuetSpeaker = (value) => (
+	String(value || '').trim().toUpperCase().startsWith('DUET ')
+);
+
+const normalizeSyncCreatorKind = (value) => (
+	SYNC_CREATOR_KIND_LABELS.has(value) ? value : ''
+);
+
+const detectSyncCreatorParallelVocalHints = (text) => {
+	const normalized = String(text || '');
+	if (!normalized.trim()) return false;
+	return normalized
+		.split('\n')
+		.some(line => {
+			const trimmed = line.trim();
+			return trimmed.length > 1 && SYNC_CREATOR_PARALLEL_HINT_REGEX.test(trimmed);
+		});
 };
 
 const hasSyncCreatorRtlText = (text) => {
@@ -559,8 +602,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const buildPart = (index, ranges, role = index === 0 ? 'lead' : 'background') => ({
 			id: speakerLabels[index]?.toLowerCase() || `p${index + 1}`,
 			role,
-			speaker: speakerLabels[index] || `P${index + 1}`,
-			kind: 'vocal',
+			speaker: SYNC_CREATOR_DEFAULT_SPEAKER,
+			kind: SYNC_CREATOR_DEFAULT_KIND,
 			ranges,
 			join: ranges.length > 1 ? new Array(ranges.length - 1).fill(1) : []
 		});
@@ -605,10 +648,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 			for (let index = 0; index < chars.length; index++) {
 				const char = chars[index] || '';
-				if (char === '(') depth++;
-				if (char === ')') depth = Math.max(0, depth - 1);
+				if (char === '(' || char === '（') depth++;
+				if (char === ')' || char === '）') depth = Math.max(0, depth - 1);
 
-				if ((char === '/' || char === '|') && depth === 0) {
+				if ((char === '/' || char === '|' || char === '／' || char === '｜') && depth === 0) {
 					flushRun(index - 1);
 					pushHidden(index);
 					partIndex++;
@@ -670,8 +713,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		for (let index = 0; index < chars.length; index++) {
 			const char = chars[index] || '';
-			const isOpen = char === '(';
-			const isClose = char === ')';
+			const isOpen = char === '(' || char === '（';
+			const isClose = char === ')' || char === '）';
 			const isHidden = isOpen || isClose || /\s/u.test(char);
 
 			if (isOpen || isClose) {
@@ -722,8 +765,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				return {
 						...part,
 						role: existing?.role || part.role,
-						speaker: existing?.speaker || part.speaker,
-						kind: existing?.kind || part.kind,
+						speaker: normalizeSyncCreatorSpeaker(existing?.speaker || part.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER,
+						kind: normalizeSyncCreatorKind(existing?.kind || part.kind) || SYNC_CREATOR_DEFAULT_KIND,
 						chars: Array.isArray(existing?.chars) ? existing.chars : undefined
 					};
 				})
@@ -741,6 +784,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [activeParallelPartId, setActiveParallelPartId] = useState('full');
 	const [parallelPartMetaDrafts, setParallelPartMetaDrafts] = useState({});
 	const [lineMetaDrafts, setLineMetaDrafts] = useState({});
+	const [multiVocalMode, setMultiVocalMode] = useState(false);
+	const [pendingMultiVocalDecision, setPendingMultiVocalDecision] = useState(null);
 	const [syncData, setSyncData] = useState(null);
 	const [furiganaRevision, setFuriganaRevision] = useState(0);
 	const [characterPronunciations, setCharacterPronunciations] = useState(null);
@@ -863,6 +908,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const applyLoadedLyricsResult = useCallback(async (result, usedProvider) => {
 		let finalProvider = result.provider || usedProvider;
+		let loadedSyncBody = null;
 
 		if ((finalProvider === 'Spotify' || finalProvider === 'spotify') && result.spotifyLyricsProvider) {
 			finalProvider = `spotify-${result.spotifyLyricsProvider}`;
@@ -877,7 +923,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				const existingSyncData = await window.SyncDataService.getSyncData(trackId, finalProvider);
 				if (existingSyncData && existingSyncData.syncData && existingSyncData.syncData.lines) {
 					window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
-					setSyncData(existingSyncData.syncData);
+					loadedSyncBody = existingSyncData.syncData;
+					setSyncData(loadedSyncBody);
 					Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || '기존 싱크 데이터를 불러왔습니다');
 				}
 			} catch (e) {
@@ -887,12 +934,37 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		const text = extractLyricsText(result.synced || result.unsynced);
 		if (text.trim().length > 0) {
+			const existingHasParallel = Array.isArray(loadedSyncBody?.lines)
+				&& loadedSyncBody.lines.some(line => Array.isArray(line?.parallel?.parts) && line.parallel.parts.length > 1);
+			const detectedParallel = detectSyncCreatorParallelVocalHints(text);
+			if (!existingHasParallel && detectedParallel) {
+				setPendingMultiVocalDecision({
+					text,
+					preview: text.split('\n').find(line => SYNC_CREATOR_PARALLEL_HINT_REGEX.test(line.trim())) || ''
+				});
+				setError(null);
+				return;
+			}
+			const shouldUseMultiVocalMode = existingHasParallel;
+			setMultiVocalMode(shouldUseMultiVocalMode);
+			setActiveParallelPartId(shouldUseMultiVocalMode ? '' : 'full');
 			setLyricsText(text);
 			setError(null);
 		} else {
+			setPendingMultiVocalDecision(null);
+			setMultiVocalMode(false);
 			setError(I18n.t('syncCreator.noLyrics'));
 		}
 	}, [extractLyricsText, trackId]);
+
+	const resolveMultiVocalDecision = useCallback((useMultiVocalMode) => {
+		if (!pendingMultiVocalDecision) return;
+		setPendingMultiVocalDecision(null);
+		setMultiVocalMode(useMultiVocalMode);
+		setActiveParallelPartId(useMultiVocalMode ? '' : 'full');
+		setLyricsText(pendingMultiVocalDecision.text);
+		setError(null);
+	}, [pendingMultiVocalDecision]);
 
 	const previewLrclibCandidate = useMemo(() => {
 		if (!lrclibCandidates.length) return null;
@@ -912,6 +984,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setLyricsText('');
 		setSyncData(null);
 		setCurrentLineIndex(0);
+		setMultiVocalMode(false);
+		setPendingMultiVocalDecision(null);
+		setActiveParallelPartId('full');
 		setMode('idle');
 
 		try {
@@ -943,10 +1018,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setIsGeneratingCharacterPronunciations(false);
 	}, [lyricsText]);
 
-	useEffect(() => {
-		setActiveParallelPartId('full');
-	}, [currentLineIndex, lyricsText]);
-
 	const totalChars = useMemo(() => {
 		// NFC 정규화된 lyricsLines를 사용하므로 Array.from()이 정확한 문자 수를 반환
 		return lyricsLines.reduce((sum, line) => sum + Array.from(line).length, 0);
@@ -977,12 +1048,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return syncData.lines.find(line => line.start === currentLineStart) || null;
 	}, [syncData, currentLineStart]);
 	const currentLineMeta = useMemo(() => ({
-		speaker: lineMetaDrafts[currentLineStart]?.speaker || currentExistingLineData?.speaker || 'A',
-		kind: lineMetaDrafts[currentLineStart]?.kind || currentExistingLineData?.kind || 'vocal'
+		speaker: normalizeSyncCreatorSpeaker(lineMetaDrafts[currentLineStart]?.speaker || currentExistingLineData?.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER,
+		kind: normalizeSyncCreatorKind(lineMetaDrafts[currentLineStart]?.kind || currentExistingLineData?.kind) || SYNC_CREATOR_DEFAULT_KIND
 	}), [lineMetaDrafts, currentLineStart, currentExistingLineData]);
 	const currentParallelTemplate = useMemo(
-		() => buildParentheticalParallelTemplate(currentFullLineChars, currentLineStart),
-		[currentFullLineChars, currentLineStart]
+		() => multiVocalMode ? buildParentheticalParallelTemplate(currentFullLineChars, currentLineStart) : null,
+		[multiVocalMode, currentFullLineChars, currentLineStart]
 	);
 	const currentParallelData = useMemo(() => {
 		const merged = mergeSyncCreatorParallelTemplate(currentParallelTemplate, currentExistingLineData?.parallel);
@@ -993,17 +1064,69 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				const draft = parallelPartMetaDrafts[`${currentLineStart}:${part.id}`] || {};
 				return {
 					...part,
-					speaker: draft.speaker || part.speaker,
-					kind: draft.kind || part.kind
+					speaker: normalizeSyncCreatorSpeaker(draft.speaker || part.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER,
+					kind: normalizeSyncCreatorKind(draft.kind || part.kind) || SYNC_CREATOR_DEFAULT_KIND
 				};
 			})
 		};
 	}, [currentParallelTemplate, currentExistingLineData, parallelPartMetaDrafts, currentLineStart]);
 	const currentParallelParts = currentParallelData?.parts || [];
 	const hasCurrentParallelParts = currentParallelParts.length > 1;
-	const activeParallelPart = hasCurrentParallelParts && activeParallelPartId !== 'full'
-		? currentParallelParts.find(part => part.id === activeParallelPartId) || null
+	const activeParallelPart = hasCurrentParallelParts
+		? currentParallelParts.find(part => part.id === activeParallelPartId) || currentParallelParts[0] || null
 		: null;
+	const activeParallelTargetId = activeParallelPart?.id || (hasCurrentParallelParts ? currentParallelParts[0]?.id || 'full' : 'full');
+	useEffect(() => {
+		if (multiVocalMode && hasCurrentParallelParts) {
+			const hasActivePart = currentParallelParts.some(part => part.id === activeParallelPartId);
+			if (!hasActivePart) {
+				setActiveParallelPartId(currentParallelParts[0]?.id || 'full');
+			}
+			return;
+		}
+		setActiveParallelPartId('full');
+	}, [multiVocalMode, hasCurrentParallelParts, currentParallelParts, activeParallelPartId, currentLineIndex, lyricsText]);
+	const getIncompleteParallelPartId = useCallback((lineData) => {
+		if (!multiVocalMode || !currentParallelData || currentParallelParts.length <= 1) return null;
+		const existingParts = Array.isArray(lineData?.parallel?.parts) ? lineData.parallel.parts : [];
+		for (const part of currentParallelParts) {
+			const existingPart = existingParts.find(item => item.id === part.id);
+			const expectedChars = countRangeChars(part.ranges);
+			if (!existingPart || !Array.isArray(existingPart.chars) || existingPart.chars.length !== expectedChars) {
+				return part.id;
+			}
+			if (!(normalizeSyncCreatorSpeaker(existingPart.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) || !(normalizeSyncCreatorKind(existingPart.kind) || SYNC_CREATOR_DEFAULT_KIND)) {
+				return part.id;
+			}
+		}
+		return null;
+	}, [multiVocalMode, currentParallelData, currentParallelParts]);
+	const isCurrentSyncTargetMetaComplete = useMemo(() => {
+		if (!multiVocalMode) return true;
+		if (hasCurrentParallelParts) {
+			const targetPart = activeParallelPart || currentParallelParts[0] || null;
+			return !!(normalizeSyncCreatorSpeaker(targetPart?.speaker) && normalizeSyncCreatorKind(targetPart?.kind));
+		}
+		return !!(normalizeSyncCreatorSpeaker(currentLineMeta.speaker) && normalizeSyncCreatorKind(currentLineMeta.kind));
+	}, [multiVocalMode, hasCurrentParallelParts, activeParallelPart, currentParallelParts, currentLineMeta]);
+	const showMissingMetaToast = useCallback(() => {
+		Toast.error('여러 보컬 모드에서는 현재 보컬의 SPEAKER와 TYPE을 먼저 선택해야 합니다.');
+	}, []);
+	const advanceAfterCompletedTarget = useCallback((lineData) => {
+		const nextPartId = getIncompleteParallelPartId(lineData);
+		if (nextPartId) {
+			setActiveParallelPartId(nextPartId);
+			setRecordingCharIndex(-1);
+			charTimesRef.current = [];
+			if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+			return;
+		}
+
+		if (currentLineIndex < lyricsLines.length - 1) {
+			setCurrentLineIndex(prev => prev + 1);
+			if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+		}
+	}, [getIncompleteParallelPartId, currentLineIndex, lyricsLines.length]);
 	const currentLineCharRefs = useMemo(() => {
 		if (activeParallelPart) {
 			return rangesToCharRefs(activeParallelPart.ranges, currentFullLineChars, currentLineStart);
@@ -1085,8 +1208,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [shouldShowSyncCreatorFurigana, furiganaRevision]);
 	const currentLineFuriganaMap = useMemo(
-		() => activeParallelPart ? new Map() : getSyncCreatorFuriganaMap(currentLineText),
-		[getSyncCreatorFuriganaMap, currentLineText, activeParallelPart]
+		() => getSyncCreatorFuriganaMap(currentLineText),
+		[getSyncCreatorFuriganaMap, currentLineText]
 	);
 	const hasCurrentLineFurigana = currentLineFuriganaMap.size > 0;
 	const currentLineCharacterPronunciationData = useMemo(() => {
@@ -1163,8 +1286,30 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const completedLines = useMemo(() => {
 		if (!syncData || !syncData.lines) return 0;
+		if (multiVocalMode) {
+			const linesByStart = new Map(syncData.lines.map(line => [line.start, line]));
+			return lyricsLines.reduce((count, lineText, index) => {
+				const lineStart = lineCharOffsets[index];
+				const lineData = linesByStart.get(lineStart);
+				if (!lineData) return count;
+				const template = buildParentheticalParallelTemplate(Array.from(lineText || ''), lineStart);
+				if (template?.parts?.length > 1) {
+					const existingParts = Array.isArray(lineData.parallel?.parts) ? lineData.parallel.parts : [];
+					const isComplete = template.parts.every(part => {
+						const existingPart = existingParts.find(item => item.id === part.id);
+						return existingPart
+							&& Array.isArray(existingPart.chars)
+							&& existingPart.chars.length === countRangeChars(part.ranges)
+							&& (normalizeSyncCreatorSpeaker(existingPart.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER)
+							&& (normalizeSyncCreatorKind(existingPart.kind) || SYNC_CREATOR_DEFAULT_KIND);
+					});
+					return count + (isComplete ? 1 : 0);
+				}
+				return count + ((normalizeSyncCreatorSpeaker(lineData.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) && (normalizeSyncCreatorKind(lineData.kind) || SYNC_CREATOR_DEFAULT_KIND) ? 1 : 0);
+			}, 0);
+		}
 		return syncData.lines.length;
-	}, [syncData]);
+	}, [syncData, multiVocalMode, lyricsLines, lineCharOffsets]);
 
 	// 현재 줄이 싱크되어 있는지
 	const isCurrentLineSynced = useMemo(() => {
@@ -1353,6 +1498,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setLyricsText('');
 		setSyncData(null);
 		setCurrentLineIndex(0);
+		setMultiVocalMode(false);
+		setPendingMultiVocalDecision(null);
+		setActiveParallelPartId('full');
 		setMode('idle');
 		clearLrclibCandidateState();
 
@@ -1751,6 +1899,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const commitCurrentLineSync = useCallback((rawChars) => {
+		if (multiVocalMode && !isCurrentSyncTargetMetaComplete) {
+			showMissingMetaToast();
+			return null;
+		}
+		if (multiVocalMode && hasCurrentParallelParts && !activeParallelPart) {
+			setActiveParallelPartId(currentParallelParts[0]?.id || 'full');
+			Toast.error('싱크할 보컬 파트를 먼저 선택해야 합니다.');
+			return null;
+		}
 		const lineStart = currentLineStart;
 		const lineEnd = lineStart + currentFullLineChars.length - 1;
 		const fullCharCount = currentFullLineChars.length;
@@ -1813,10 +1970,34 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				...(existingLine || {}),
 				start: lineStart,
 				end: lineEnd,
-				chars: fullLineChars.map((time) => roundSyncTime(time)),
-				speaker: currentLineMeta.speaker || existingLine?.speaker || 'A',
-				kind: currentLineMeta.kind || existingLine?.kind || 'vocal'
+				chars: fullLineChars.map((time) => roundSyncTime(time))
 			};
+		const leadMetaPart = currentParallelData?.parts?.find(part => part.role === 'lead') || currentParallelData?.parts?.[0] || activeParallelPart;
+		const lineMetaDraft = lineMetaDrafts[lineStart] || {};
+		const hasLineSpeakerDraft = Object.prototype.hasOwnProperty.call(lineMetaDraft, 'speaker');
+		const hasLineKindDraft = Object.prototype.hasOwnProperty.call(lineMetaDraft, 'kind');
+		const draftLineSpeaker = normalizeSyncCreatorSpeaker(lineMetaDraft.speaker);
+		const draftLineKind = normalizeSyncCreatorKind(lineMetaDraft.kind);
+		const existingLineSpeaker = normalizeSyncCreatorSpeaker(existingLine?.speaker);
+		const existingLineKind = normalizeSyncCreatorKind(existingLine?.kind);
+		const lineSpeaker = hasLineSpeakerDraft
+			? draftLineSpeaker || SYNC_CREATOR_DEFAULT_SPEAKER
+			: currentLineMeta.speaker || existingLineSpeaker || leadMetaPart?.speaker || SYNC_CREATOR_DEFAULT_SPEAKER;
+		const lineKind = hasLineKindDraft
+			? draftLineKind || SYNC_CREATOR_DEFAULT_KIND
+			: currentLineMeta.kind || existingLineKind || leadMetaPart?.kind || SYNC_CREATOR_DEFAULT_KIND;
+		const shouldPersistLineSpeaker = multiVocalMode || lineSpeaker !== SYNC_CREATOR_DEFAULT_SPEAKER;
+		const shouldPersistLineKind = multiVocalMode || lineKind !== SYNC_CREATOR_DEFAULT_KIND;
+		if (lineSpeaker && shouldPersistLineSpeaker) {
+			lineData.speaker = lineSpeaker;
+		} else {
+			delete lineData.speaker;
+		}
+		if (lineKind && shouldPersistLineKind) {
+			lineData.kind = lineKind;
+		} else {
+			delete lineData.kind;
+		}
 
 		if (activeParallelPart && currentParallelData) {
 			const existingParts = Array.isArray(existingLine?.parallel?.parts) ? existingLine.parallel.parts : [];
@@ -1833,8 +2014,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					return {
 							id: part.id,
 							role: part.role,
-							speaker: part.speaker || (part.id === 'b' ? 'B' : 'A'),
-							kind: part.kind || 'vocal',
+							speaker: part.speaker,
+							kind: part.kind,
 							ranges: part.ranges,
 							join: part.join || [],
 							chars
@@ -1885,8 +2066,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		currentFullLineChars.length,
 		currentLineCharRefs,
 		activeParallelPart,
+		hasCurrentParallelParts,
 		currentParallelData,
+		currentParallelParts,
 		currentLineMeta,
+		lineMetaDrafts,
+		multiVocalMode,
+		isCurrentSyncTargetMetaComplete,
+		showMissingMetaToast,
 		normalizeCommittedLineChars
 	]);
 
@@ -1932,12 +2119,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			chars.push(Math.round(time * 1000) / 1000);
 		}
 
-		commitCurrentLineSync(chars);
+		const committedLine = commitCurrentLineSync(chars);
+		if (!committedLine) {
+			setDragStartTime(null);
+			setDragStartCharIndex(-1);
+			setRecordingCharIndex(-1);
+			setIsDragging(false);
+			charTimesRef.current = [];
+			return;
+		}
 
 		const isComplete = endCharIndex >= charCount - 1;
-		if (isComplete && currentLineIndex < lyricsLines.length - 1) {
-			setCurrentLineIndex(prev => prev + 1);
-			if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+		if (isComplete) {
+			advanceAfterCompletedTarget(committedLine);
 		}
 
 		setDragStartTime(null);
@@ -1945,7 +2139,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setRecordingCharIndex(-1);
 		setIsDragging(false);
 		charTimesRef.current = [];
-	}, [mode, isDragging, dragStartTime, recordingCharIndex, currentLineIndex, currentLineChars, lyricsLines.length, dragStartCharIndex, commitCurrentLineSync]);
+	}, [mode, isDragging, dragStartTime, recordingCharIndex, currentLineIndex, currentLineChars, lyricsLines.length, dragStartCharIndex, commitCurrentLineSync, advanceAfterCompletedTarget]);
 
 	// 키보드 싱크 상태 ref (isDragging과 별개로 키보드용)
 	const isKeyboardSyncingRef = useRef(false);
@@ -1957,6 +2151,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	// 이전 라인 인덱스 추적 (라인 변경 감지용)
 	const prevLineIndexRef = useRef(currentLineIndex);
+	const prevKeyboardTargetRef = useRef(activeParallelTargetId);
 
 	// 동적 보간 모드를 위한 ref
 	// pendingWordSync: 이전 단어의 시작 시간과 인덱스 범위를 저장
@@ -1968,6 +2163,32 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	// 단어 내 보간 활성화 여부
 	const interpolationEnabledRef = useRef(true);
 
+	const resetCurrentSyncInput = useCallback(() => {
+		isKeyboardSyncingRef.current = false;
+		keyboardCharIndexRef.current = -1;
+		charTimesRef.current = [];
+		pendingWordSyncRef.current = null;
+		pendingSyllableSyncRef.current = null;
+		setDragStartTime(null);
+		setDragStartCharIndex(-1);
+		setRecordingCharIndex(-1);
+		setIsDragging(false);
+		if (keyboardDragIntervalRef.current) {
+			clearInterval(keyboardDragIntervalRef.current);
+			keyboardDragIntervalRef.current = null;
+		}
+		isKeyboardDraggingRef.current = false;
+	}, []);
+
+	const selectParallelPart = useCallback((partId) => {
+		if (!partId) return;
+		if (activeParallelTargetId !== partId) {
+			resetCurrentSyncInput();
+		}
+		setActiveParallelPartId(partId);
+		if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+	}, [activeParallelTargetId, resetCurrentSyncInput]);
+
 	// 키보드 이벤트 리스너 등록
 	useEffect(() => {
 		// 라인이 변경되었는지 확인
@@ -1975,11 +2196,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (lineChanged) {
 			prevLineIndexRef.current = currentLineIndex;
 		}
+		const targetChanged = prevKeyboardTargetRef.current !== activeParallelTargetId;
+		if (targetChanged) {
+			prevKeyboardTargetRef.current = activeParallelTargetId;
+		}
 
 		// record 모드가 아니거나 라인이 변경되면 키보드 싱크 상태 초기화
-		const shouldReset = mode !== 'record' || lineChanged;
+		const shouldReset = mode !== 'record' || lineChanged || targetChanged;
 		if (shouldReset && (isKeyboardSyncingRef.current || isKeyboardDraggingRef.current)) {
-			window.__ivLyricsDebugLog?.('[SyncDataCreator] Resetting keyboard sync state, mode:', mode, 'lineChanged:', lineChanged);
+			window.__ivLyricsDebugLog?.('[SyncDataCreator] Resetting keyboard sync state, mode:', mode, 'lineChanged:', lineChanged, 'targetChanged:', targetChanged);
 			// 진행 중인 키보드 싱크 초기화
 			isKeyboardSyncingRef.current = false;
 			keyboardCharIndexRef.current = -1;
@@ -2022,12 +2247,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				chars.push(Math.round(time * 1000) / 1000);
 			}
 
-			commitCurrentLineSync(chars);
+			const committedLine = commitCurrentLineSync(chars);
 
 			// 다음 라인으로 이동
-			if (currentLineIndex < lyricsLines.length - 1) {
-				setCurrentLineIndex(prev => prev + 1);
-				if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+			if (committedLine) {
+				advanceAfterCompletedTarget(committedLine);
 			}
 
 			// 키보드 싱크 상태 초기화
@@ -2050,6 +2274,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 			// record 모드가 아니면 처리하지 않음
 			if (mode !== 'record') return;
+			if (!isCurrentSyncTargetMetaComplete) {
+				showMissingMetaToast();
+				return;
+			}
 
 			window.__ivLyricsDebugLog?.('[SyncDataCreator] KeyDown:', e.key, 'normalized:', normalizedHotkey, 'mode:', mode, 'lineIndex:', currentLineIndex);
 
@@ -2598,14 +2826,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 			isKeyboardDraggingRef.current = false;
 		};
-	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars, currentLineEffectiveSyllableSegments, lineCharOffsets, autoScroll, commitCurrentLineSync]);
+	}, [mode, currentLineIndex, activeParallelTargetId, lyricsLines.length, currentLineChars, currentLineEffectiveSyllableSegments, lineCharOffsets, autoScroll, commitCurrentLineSync, advanceAfterCompletedTarget, isCurrentSyncTargetMetaComplete, showMissingMetaToast]);
 
 	const handleContainerMouseDown = useCallback((e) => {
 		if (mode !== 'record' || currentLineIndex >= lyricsLines.length) return;
+		if (!isCurrentSyncTargetMetaComplete) {
+			showMissingMetaToast();
+			return;
+		}
 		const touch = e.touches ? e.touches[0] : e;
 		const charIndex = getCharIndexFromPoint(touch.clientX, touch.clientY);
 		if (charIndex >= 0) handleDragStart(charIndex, e);
-	}, [mode, currentLineIndex, lyricsLines.length, getCharIndexFromPoint, handleDragStart]);
+	}, [mode, currentLineIndex, lyricsLines.length, getCharIndexFromPoint, handleDragStart, isCurrentSyncTargetMetaComplete, showMissingMetaToast]);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -2646,7 +2878,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, [syncData, lineCharOffsets, currentLineIndex]);
 
 	const updateParallelPartMeta = useCallback((partId, field, value) => {
-		const safeValue = String(value || '').trim();
+		const safeValue = field === 'speaker'
+			? normalizeSyncCreatorSpeaker(value)
+			: field === 'kind'
+				? normalizeSyncCreatorKind(value)
+				: String(value || '').trim();
 		if (!partId || !field || !safeValue) return;
 		const lineStart = lineCharOffsets[currentLineIndex];
 		const draftKey = `${lineStart}:${partId}`;
@@ -2679,9 +2915,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, [lineCharOffsets, currentLineIndex]);
 
 	const updateCurrentLineMeta = useCallback((field, value) => {
-		const safeValue = String(value || '').trim();
+		const safeValue = field === 'speaker'
+			? normalizeSyncCreatorSpeaker(value)
+			: field === 'kind'
+				? normalizeSyncCreatorKind(value)
+				: String(value || '').trim();
 		if (!field || !safeValue) return;
 		const lineStart = lineCharOffsets[currentLineIndex];
+		const shouldOmitDefaultValue = !multiVocalMode && (
+			(field === 'speaker' && safeValue === SYNC_CREATOR_DEFAULT_SPEAKER)
+			|| (field === 'kind' && safeValue === SYNC_CREATOR_DEFAULT_KIND)
+		);
 		setLineMetaDrafts(prev => ({
 			...prev,
 			[lineStart]: {
@@ -2694,22 +2938,32 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			if (!prev || !Array.isArray(prev.lines)) return prev;
 			return {
 				...prev,
-				lines: prev.lines.map(line => line.start === lineStart
-					? { ...line, [field]: safeValue }
-					: line)
+				lines: prev.lines.map(line => {
+					if (line.start !== lineStart) return line;
+					if (!shouldOmitDefaultValue) {
+						return { ...line, [field]: safeValue };
+					}
+					const nextLine = { ...line };
+					delete nextLine[field];
+					return nextLine;
+				})
 			};
 		});
-	}, [lineCharOffsets, currentLineIndex]);
+	}, [lineCharOffsets, currentLineIndex, multiVocalMode]);
 
 	const toggleMode = useCallback((newMode) => {
 		if (mode === newMode) {
 			setMode('idle');
 		} else {
+			if (newMode === 'record' && !isCurrentSyncTargetMetaComplete) {
+				showMissingMetaToast();
+				return;
+			}
 			setMode(newMode);
 			if (newMode === 'preview') Spicetify.Player.seek(0);
 			if (!Spicetify.Player.isPlaying()) Spicetify.Player.play();
 		}
-	}, [mode]);
+	}, [mode, isCurrentSyncTargetMetaComplete, showMissingMetaToast]);
 
 	const adjustGlobalOffset = useCallback((deltaMs) => {
 		const deltaSec = deltaMs / 1000;
@@ -2784,9 +3038,76 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return;
 		}
 
+		if (multiVocalMode) {
+			const linesByStart = new Map(syncData.lines.map(line => [line.start, line]));
+			for (let index = 0; index < lyricsLines.length; index++) {
+				const lineText = lyricsLines[index] || '';
+				const lineStart = lineCharOffsets[index];
+				const lineData = linesByStart.get(lineStart);
+				if (!lineData) {
+					Toast.error(`${index + 1}번째 줄의 싱크가 아직 없습니다.`);
+					return;
+				}
+
+				const lineChars = Array.from(lineText);
+				const template = buildParentheticalParallelTemplate(lineChars, lineStart);
+				if (template?.parts?.length > 1) {
+					const existingParts = Array.isArray(lineData.parallel?.parts) ? lineData.parallel.parts : [];
+					for (const part of template.parts) {
+						const existingPart = existingParts.find(item => item.id === part.id);
+						const expectedChars = countRangeChars(part.ranges);
+						if (!existingPart || !Array.isArray(existingPart.chars) || existingPart.chars.length !== expectedChars) {
+							Toast.error(`${index + 1}번째 줄의 모든 보컬 파트를 싱크해야 합니다.`);
+							return;
+						}
+						if (!(normalizeSyncCreatorSpeaker(existingPart.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) || !(normalizeSyncCreatorKind(existingPart.kind) || SYNC_CREATOR_DEFAULT_KIND)) {
+							Toast.error(`${index + 1}번째 줄의 모든 보컬 파트에 SPEAKER와 TYPE을 선택해야 합니다.`);
+							return;
+						}
+					}
+				} else if (!(normalizeSyncCreatorSpeaker(lineData.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) || !(normalizeSyncCreatorKind(lineData.kind) || SYNC_CREATOR_DEFAULT_KIND)) {
+					Toast.error(`${index + 1}번째 줄의 SPEAKER와 TYPE을 선택해야 합니다.`);
+					return;
+				}
+			}
+		}
+
 		if (syncData.lines.length < lyricsLines.length) {
 			if (!confirm(I18n.t('syncCreator.incompleteConfirm'))) return;
 		}
+
+		const syncDataToSubmit = {
+			...syncData,
+			lines: syncData.lines.map(line => {
+				const speaker = normalizeSyncCreatorSpeaker(line.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER;
+				const kind = normalizeSyncCreatorKind(line.kind) || SYNC_CREATOR_DEFAULT_KIND;
+				const nextLine = {
+					...line,
+					parallel: line.parallel ? {
+						...line.parallel,
+						parts: Array.isArray(line.parallel.parts)
+							? line.parallel.parts.map(part => ({
+								...part,
+								speaker: normalizeSyncCreatorSpeaker(part.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER,
+								kind: normalizeSyncCreatorKind(part.kind) || SYNC_CREATOR_DEFAULT_KIND
+							}))
+							: line.parallel.parts
+					} : line.parallel
+				};
+
+				if (multiVocalMode || speaker !== SYNC_CREATOR_DEFAULT_SPEAKER) {
+					nextLine.speaker = speaker;
+				} else {
+					delete nextLine.speaker;
+				}
+				if (multiVocalMode || kind !== SYNC_CREATOR_DEFAULT_KIND) {
+					nextLine.kind = kind;
+				} else {
+					delete nextLine.kind;
+				}
+				return nextLine;
+			})
+		};
 
 		setIsSubmitting(true);
 
@@ -2796,7 +3117,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				artist: artistName
 			};
 			if (typeof SyncDataService !== 'undefined' && SyncDataService.submitSyncData) {
-				const result = await SyncDataService.submitSyncData(trackId, provider, syncData, submitMetadata);
+				const result = await SyncDataService.submitSyncData(trackId, provider, syncDataToSubmit, submitMetadata);
 				if (result) {
 					Toast.success(I18n.t('syncCreator.submitSuccess'));
 					// 캐시 무효화
@@ -2843,7 +3164,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		setIsSubmitting(false);
-	}, [syncData, lyricsLines.length, trackId, provider, trackName, artistName, onClose]);
+	}, [syncData, lyricsLines, lineCharOffsets, multiVocalMode, trackId, provider, trackName, artistName, onClose]);
 
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
 	const exportSyncData = useCallback(() => {
@@ -3397,6 +3718,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		lineInfo: { textAlign: 'center', minWidth: '120px' },
 		lineCount: { fontSize: '22px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' },
 		lineStatus: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '2px', fontWeight: '500' },
+		multiVocalBanner: {
+			alignSelf: 'center',
+			margin: '-6px 0 12px',
+			padding: '7px 12px',
+			borderRadius: '999px',
+			background: 'rgba(var(--spice-rgb-button), 0.12)',
+			border: '1px solid rgba(var(--spice-rgb-button), 0.28)',
+			color: 'var(--spice-text)',
+			fontSize: '11px',
+			fontWeight: '700',
+			letterSpacing: '-0.005em'
+		},
 		parallelPartRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
 		parallelPartBtn: {
 			background: 'rgba(255,255,255,0.05)', color: 'var(--spice-text)',
@@ -3418,6 +3751,66 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			padding: '6px 10px', borderRadius: '8px',
 			fontSize: '11px', fontWeight: '700', outline: 'none'
 		},
+		parallelMetaSelectDuet: {
+			color: '#d9c7ff',
+			background: 'rgba(156, 92, 255, 0.10)',
+			borderColor: 'rgba(190, 150, 255, 0.38)'
+		},
+		parallelMetaOptionDuet: { color: '#c9a7ff', background: '#1b1424' },
+		parallelStack: { width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'stretch' },
+		parallelStackLine: {
+			width: '100%',
+			background: 'rgba(255,255,255,0.025)',
+			color: 'var(--spice-text)',
+			border: '1px solid rgba(255,255,255,0.07)',
+			borderRadius: '12px',
+			padding: '12px 14px 10px',
+			display: 'flex',
+			flexDirection: 'column',
+			alignItems: 'center',
+			gap: '7px',
+			textAlign: 'center',
+			cursor: mode === 'record' ? 'pointer' : 'default',
+			boxSizing: 'border-box'
+		},
+		parallelStackLineActive: {
+			background: 'rgba(var(--spice-rgb-button), 0.11)',
+			borderColor: 'rgba(var(--spice-rgb-button), 0.48)',
+			boxShadow: 'inset 0 0 0 1px rgba(var(--spice-rgb-button), 0.10)'
+		},
+		parallelStackLineDuet: {
+			background: 'rgba(156, 92, 255, 0.055)',
+			borderColor: 'rgba(190, 150, 255, 0.20)'
+		},
+		parallelStackLineDuetActive: {
+			background: 'rgba(156, 92, 255, 0.13)',
+			borderColor: 'rgba(200, 168, 255, 0.52)'
+		},
+		parallelStackMeta: {
+			color: 'var(--spice-subtext)',
+			fontSize: '10px',
+			fontWeight: '800',
+			letterSpacing: '0.04em',
+			textTransform: 'uppercase',
+			fontVariantNumeric: 'tabular-nums',
+			lineHeight: 1
+		},
+		parallelStackMetaDuet: { color: '#d9c7ff' },
+		parallelStackText: { display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'stretch', gap: '0px', maxWidth: '100%' },
+		parallelStackChar: {
+			padding: '6px 1px',
+			borderRadius: '4px',
+			fontSize: '28px',
+			fontWeight: '600',
+			minWidth: '6px',
+			boxSizing: 'border-box',
+			textAlign: 'center',
+			flexShrink: 0,
+			color: 'var(--spice-text)',
+			letterSpacing: 0,
+			lineHeight: 1.15
+		},
+		parallelStackCharSynced: { background: 'rgba(var(--spice-rgb-button), 0.18)' },
 		lyricsBox: {
 			background: 'linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)',
 			border: '1px solid rgba(255,255,255,0.06)',
@@ -3513,6 +3906,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		},
 		lrcLibTitle: { fontSize: '18px', fontWeight: '700', color: 'var(--spice-text)', margin: 0, letterSpacing: '-0.015em' },
 		lrcLibDesc: { fontSize: '13px', color: 'var(--spice-subtext)', lineHeight: 1.55 },
+		multiVocalDecisionPreview: {
+			fontSize: '13px',
+			lineHeight: 1.55,
+			color: 'var(--spice-text)',
+			padding: '12px 14px',
+			background: 'rgba(255,255,255,0.045)',
+			border: '1px solid rgba(255,255,255,0.08)',
+			borderRadius: '12px',
+			whiteSpace: 'nowrap',
+			overflow: 'hidden',
+			textOverflow: 'ellipsis'
+		},
 		lrcLibTextarea: {
 			width: '100%', height: '300px',
 			background: 'rgba(0,0,0,0.28)',
@@ -3677,6 +4082,88 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		},
 			react.createElement('span', { style: s.charWordOriginalRow }, wordChars),
 			react.createElement('span', { style: pronunciationStyle }, unit.pronunciation)
+		);
+	};
+	const renderCurrentLineCharacters = () => {
+		if (useCurrentLineTextRun) {
+			return react.createElement('span', {
+				ref: rtlTextRunRef,
+				style: rtlTextRunStyle,
+				dir: currentLineDirection,
+				'data-rtl-text-run': 'true'
+			}, currentLineText);
+		}
+
+		return currentLineChars.map((char, i) => {
+			const pronunciationUnit = currentLineRenderedPronunciationUnitByStart.get(i);
+			if (pronunciationUnit) {
+				return renderPronunciationUnit(pronunciationUnit);
+			}
+			if (currentLineRenderedPronunciationCoveredIndexes.has(i)) {
+				return null;
+			}
+			if (currentLineRenderedPronunciationUnits.length > 0 && /\s/u.test(char)) {
+				return renderCharacterSpan(char, i, {
+					key: `word-space-${i}`,
+					hidePronunciation: true,
+					hideTime: true,
+					suppressPrimaryPronunciation: true,
+					wordSpacer: true
+				});
+			}
+			return renderCharacterSpan(char, i);
+		});
+	};
+	const renderParallelPartLine = (part, index) => {
+		const isActive = activeParallelTargetId === part.id;
+		const partCharRefs = rangesToCharRefs(part.ranges, currentFullLineChars, currentLineStart);
+		const partChars = partCharRefs.map(ref => ref.char);
+		const savedPart = currentLineData?.parallel?.parts?.find(item => item.id === part.id);
+		const syncedCount = Array.isArray(savedPart?.chars) ? Math.min(savedPart.chars.length, partChars.length) : 0;
+		const speakerLabel = part.speaker || SYNC_CREATOR_DEFAULT_SPEAKER;
+		const isDuetSpeaker = isSyncCreatorDuetSpeaker(speakerLabel);
+		const kindLabel = SYNC_CREATOR_KIND_LABELS.get(part.kind) || part.kind || SYNC_CREATOR_DEFAULT_KIND;
+		const handlePartPointerDown = (e) => {
+			if (isActive) {
+				handleContainerMouseDown(e);
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			selectParallelPart(part.id);
+		};
+
+		return react.createElement('button', {
+			key: part.id,
+			type: 'button',
+			style: {
+				...s.parallelStackLine,
+				...(isDuetSpeaker ? s.parallelStackLineDuet : null),
+				...(isActive ? s.parallelStackLineActive : null),
+				...(isDuetSpeaker && isActive ? s.parallelStackLineDuetActive : null)
+			},
+			onMouseDown: handlePartPointerDown,
+			onTouchStart: handlePartPointerDown,
+			onClick: () => {
+				if (!isActive) selectParallelPart(part.id);
+			}
+		},
+			react.createElement('div', { style: { ...s.parallelStackMeta, ...(isDuetSpeaker ? s.parallelStackMetaDuet : null) } },
+				`${index + 1} | ${speakerLabel} | ${kindLabel} | ${partChars.length}`
+			),
+			isActive
+				? react.createElement('div', { style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection, paddingLeft: 0, paddingRight: 0 } : s.parallelStackText },
+					renderCurrentLineCharacters()
+				)
+				: react.createElement('div', { style: s.parallelStackText },
+					partChars.map((char, charIndex) => react.createElement('span', {
+						key: `${part.id}-${charIndex}`,
+						style: {
+							...s.parallelStackChar,
+							...(charIndex < syncedCount ? s.parallelStackCharSynced : null)
+						}
+					}, char === ' ' ? '\u00A0' : char))
+				)
 		);
 	};
 
@@ -3923,7 +4410,98 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					react.createElement('button', { style: { ...s.navBtn, opacity: currentLineIndex >= lyricsLines.length - 1 ? 0.3 : 1 }, onClick: goToNextLine, disabled: currentLineIndex >= lyricsLines.length - 1 }, '▶')
 				),
 
-				hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
+				multiVocalMode && react.createElement('div', { style: s.multiVocalBanner },
+					hasCurrentParallelParts
+						? '여러 보컬 모드: 각 보컬 파트를 따로 싱크하세요.'
+						: '여러 보컬 모드: 이 줄의 SPEAKER와 TYPE을 선택하세요.'
+				),
+
+				false && hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
+					currentParallelParts.map((part, index) => {
+						const speakerLabel = part.speaker || `VOCAL ${index + 1}`;
+						const kindLabel = SYNC_CREATOR_KIND_LABELS.get(part.kind) || 'TYPE 미선택';
+						return react.createElement('button', {
+							key: part.id,
+							type: 'button',
+							style: {
+								...s.parallelPartBtn,
+								...(activeParallelPartId === part.id ? s.parallelPartBtnActive : null)
+							},
+							onClick: () => {
+								setActiveParallelPartId(part.id);
+								setRecordingCharIndex(-1);
+								charTimesRef.current = [];
+								if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+							}
+						}, `${speakerLabel} · ${kindLabel} · ${countRangeChars(part.ranges)}`);
+					})
+				),
+
+				activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
+					react.createElement('span', { style: s.parallelMetaLabel }, 'SPEAKER'),
+					react.createElement('select', {
+						style: {
+							...s.parallelMetaSelect,
+							...(isSyncCreatorDuetSpeaker(activeParallelPart.speaker) ? s.parallelMetaSelectDuet : null)
+						},
+						value: activeParallelPart.speaker || '',
+						onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'speaker', e.target.value)
+					},
+						react.createElement('option', { value: '', disabled: true }, '선택'),
+						SYNC_CREATOR_SPEAKER_OPTIONS.map(value =>
+							react.createElement('option', {
+								key: value,
+								value,
+								style: isSyncCreatorDuetSpeaker(value) ? s.parallelMetaOptionDuet : undefined
+							}, value)
+						)
+					),
+					react.createElement('span', { style: s.parallelMetaLabel }, 'TYPE'),
+					react.createElement('select', {
+						style: s.parallelMetaSelect,
+						value: activeParallelPart.kind || '',
+						onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'kind', e.target.value)
+					},
+						react.createElement('option', { value: '', disabled: true }, '선택'),
+						SYNC_CREATOR_KIND_OPTIONS.map(([value, label]) =>
+							react.createElement('option', { key: value, value }, label)
+						)
+					)
+				),
+
+				!hasCurrentParallelParts && react.createElement('div', { style: s.parallelMetaRow },
+					react.createElement('span', { style: s.parallelMetaLabel }, 'SPEAKER'),
+					react.createElement('select', {
+						style: {
+							...s.parallelMetaSelect,
+							...(isSyncCreatorDuetSpeaker(currentLineMeta.speaker) ? s.parallelMetaSelectDuet : null)
+						},
+						value: currentLineMeta.speaker || '',
+						onChange: (e) => updateCurrentLineMeta('speaker', e.target.value)
+					},
+						react.createElement('option', { value: '', disabled: true }, '선택'),
+						SYNC_CREATOR_SPEAKER_OPTIONS.map(value =>
+							react.createElement('option', {
+								key: value,
+								value,
+								style: isSyncCreatorDuetSpeaker(value) ? s.parallelMetaOptionDuet : undefined
+							}, value)
+						)
+					),
+					react.createElement('span', { style: s.parallelMetaLabel }, 'TYPE'),
+					react.createElement('select', {
+						style: s.parallelMetaSelect,
+						value: currentLineMeta.kind || '',
+						onChange: (e) => updateCurrentLineMeta('kind', e.target.value)
+					},
+						react.createElement('option', { value: '', disabled: true }, '선택'),
+						SYNC_CREATOR_KIND_OPTIONS.map(([value, label]) =>
+							react.createElement('option', { key: value, value }, label)
+						)
+					)
+				),
+
+				false && hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
 					[
 							{ id: 'full', label: '전체 줄', count: currentFullLineChars.length },
 							...currentParallelParts.map(part => ({
@@ -3947,7 +4525,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						}, `${part.label} · ${part.count}`))
 					),
 
-					activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
+					false && activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
 						react.createElement('span', { style: s.parallelMetaLabel }, 'Speaker'),
 						react.createElement('select', {
 							style: s.parallelMetaSelect,
@@ -3970,7 +4548,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						))
 					),
 
-					!activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
+					false && !activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
 						react.createElement('span', { style: s.parallelMetaLabel }, 'Speaker'),
 						react.createElement('select', {
 							style: s.parallelMetaSelect,
@@ -3994,35 +4572,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					),
 
 					// Lyrics Box
-				react.createElement('div', { style: s.lyricsBox, onMouseDown: handleContainerMouseDown, onTouchStart: handleContainerMouseDown, ref: lyricsScrollRef },
-					react.createElement('div', { style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection } : s.lyricsLine },
-						useCurrentLineTextRun
-							? react.createElement('span', {
-								ref: rtlTextRunRef,
-								style: rtlTextRunStyle,
-								dir: currentLineDirection,
-								'data-rtl-text-run': 'true'
-							}, currentLineText)
-							: currentLineChars.map((char, i) => {
-							const pronunciationUnit = currentLineRenderedPronunciationUnitByStart.get(i);
-							if (pronunciationUnit) {
-								return renderPronunciationUnit(pronunciationUnit);
-							}
-							if (currentLineRenderedPronunciationCoveredIndexes.has(i)) {
-								return null;
-							}
-							if (currentLineRenderedPronunciationUnits.length > 0 && /\s/u.test(char)) {
-								return renderCharacterSpan(char, i, {
-									key: `word-space-${i}`,
-									hidePronunciation: true,
-									hideTime: true,
-									suppressPrimaryPronunciation: true,
-									wordSpacer: true
-								});
-							}
-							return renderCharacterSpan(char, i);
-						})
-					)
+				react.createElement('div', {
+					style: s.lyricsBox,
+					onMouseDown: hasCurrentParallelParts ? undefined : handleContainerMouseDown,
+					onTouchStart: hasCurrentParallelParts ? undefined : handleContainerMouseDown,
+					ref: lyricsScrollRef
+				},
+					hasCurrentParallelParts
+						? react.createElement('div', { style: s.parallelStack },
+							currentParallelParts.map((part, index) => renderParallelPartLine(part, index))
+						)
+						: react.createElement('div', { style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection } : s.lyricsLine },
+							renderCurrentLineCharacters()
+						)
 				),
 
 				// Next Line
@@ -4155,6 +4717,29 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			// 현재 줄 삭제
 			isCurrentLineSynced && react.createElement('button', { style: s.deleteBtn, onClick: deleteCurrentLineSync },
 				I18n.t('syncCreator.deleteLine')
+			)
+		),
+
+		pendingMultiVocalDecision && react.createElement('div', { style: s.lrcLibModal },
+			react.createElement('div', { style: { ...s.lrcLibContent, maxWidth: '560px' } },
+				react.createElement('h3', { style: s.lrcLibTitle }, '여러 보컬이 감지되었습니다'),
+				react.createElement('p', { style: s.lrcLibDesc },
+					'괄호나 구분 기호가 포함된 줄이 있어 여러 보컬 파트로 나누어 싱크할 수 있습니다. 이 곡을 어떤 방식으로 작업할지 선택해 주세요.'
+				),
+				pendingMultiVocalDecision.preview && react.createElement('div', {
+					style: s.multiVocalDecisionPreview,
+					title: pendingMultiVocalDecision.preview
+				}, pendingMultiVocalDecision.preview),
+				react.createElement('div', { style: s.lrcLibBtnRow },
+					react.createElement('button', {
+						style: s.lrcLibBtnCancel,
+						onClick: () => resolveMultiVocalDecision(false)
+					}, '일반 모드로 진행'),
+					react.createElement('button', {
+						style: s.lrcLibBtn,
+						onClick: () => resolveMultiVocalDecision(true)
+					}, '여러 보컬 모드로 진행')
+				)
 			)
 		),
 

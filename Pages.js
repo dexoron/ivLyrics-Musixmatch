@@ -1038,9 +1038,13 @@ const getLyricsDisplayMode = (isKara, line, text, originalText, text2) => {
 
 	if (isKara) {
 		// For karaoke mode, safely handle the line object
+		const karaokePhoneticText = line?.phoneticText
+			|| line?.phonetic
+			|| (line?.originalText && text && text !== line.originalText ? text : null);
+		const karaokeTranslationText = line?.translationText || line?.translation || text2;
 		mainText = line; // Keep as object for KaraokeLine component
-		subText = text ? safeRenderText(text) : null;
-		subText2 = safeRenderText(text2);
+		subText = karaokePhoneticText ? safeRenderText(karaokePhoneticText) : null;
+		subText2 = safeRenderText(karaokeTranslationText);
 	} else {
 		// Default: show original text
 		// originalText is the actual original lyrics
@@ -1246,6 +1250,8 @@ const renderLyricMainContent = ({
 	isActive,
 	globalCharOffset = 0,
 	activeGlobalCharIndex = -1,
+	subText = null,
+	subText2 = null,
 }) => {
 	if (isKara) {
 		return react.createElement(KaraokeLine, {
@@ -1258,6 +1264,8 @@ const renderLyricMainContent = ({
 			isActive,
 			globalCharOffset,
 			activeGlobalCharIndex,
+			phonetic: subText,
+			translation: subText2,
 		});
 	}
 
@@ -1549,6 +1557,128 @@ const getTimedSyllablesFromLine = (line) => {
 	return syllables;
 };
 
+const normalizeKaraokeSpeakerClass = (speaker) => String(speaker || "")
+	.trim()
+	.toLowerCase()
+	.replace(/[_\s]+/g, "-")
+	.replace(/[^a-z0-9-]/g, "");
+
+const getKaraokeLineMetaClass = (line) => {
+	const classes = [];
+	const speakerClass = normalizeKaraokeSpeakerClass(line?.speaker);
+	if (speakerClass) classes.push(`speaker-${speakerClass}`);
+	if (line?.kind) classes.push(String(line.kind).trim().toLowerCase());
+	return classes.join(" ");
+};
+
+const splitRenderableKaraokeSyllables = (syllables) => {
+	if (!Array.isArray(syllables) || syllables.length === 0) {
+		return [];
+	}
+
+	return syllables.flatMap((syllable) => {
+		const text = syllable?.text || "";
+		if (!text || !/\s/.test(text) || text.trim() === "") {
+			return syllable;
+		}
+
+		return text
+			.split(/(\s+)/)
+			.filter((part) => part !== "")
+			.map((part) => ({
+				...syllable,
+				text: part,
+			}));
+	});
+};
+
+const getKaraokeSyllableCharCount = (syllables) => (
+	Array.isArray(syllables)
+		? syllables.reduce((count, syllable) => count + Array.from(syllable?.text || "").length, 0)
+		: 0
+);
+
+const getKaraokeVocalRows = (line) => {
+	if (!Array.isArray(line?.vocals?.lead?.syllables) || line.vocals.lead.syllables.length === 0) {
+		return null;
+	}
+
+	const rows = [{
+		key: line.vocals.lead.id || "lead",
+		role: line.vocals.lead.role || "lead",
+		speaker: line.vocals.lead.speaker || "",
+		kind: line.vocals.lead.kind || "vocal",
+		speakerClass: normalizeKaraokeSpeakerClass(line.vocals.lead.speaker),
+		phonetic: line.vocals.lead.phonetic || "",
+		translation: line.vocals.lead.translation || "",
+		text: line.vocals.lead.text || "",
+		syllables: splitRenderableKaraokeSyllables(line.vocals.lead.syllables),
+	}];
+
+	if (Array.isArray(line.vocals.background)) {
+		line.vocals.background.forEach((part, index) => {
+			if (!Array.isArray(part?.syllables) || part.syllables.length === 0) {
+				return;
+			}
+
+			rows.push({
+				key: part.id || `background-${index}`,
+				role: part.role || "background",
+				speaker: part.speaker || "",
+				kind: part.kind || "vocal",
+				speakerClass: normalizeKaraokeSpeakerClass(part.speaker),
+				phonetic: part.phonetic || "",
+				translation: part.translation || "",
+				text: part.text || "",
+				syllables: splitRenderableKaraokeSyllables(part.syllables),
+			});
+		});
+	}
+
+	return rows.length > 1 ? rows : null;
+};
+
+const hasKaraokeVocalRows = (line) => Array.isArray(getKaraokeVocalRows(line));
+
+const splitLineByParallelShape = (text, rowCount) => {
+	const value = typeof text === "string" ? text.trim() : "";
+	if (!value || rowCount <= 1) {
+		return [];
+	}
+
+	const separatorParts = value.split(/\s*[\/|／｜]\s*/).filter(Boolean);
+	if (separatorParts.length === rowCount) {
+		return separatorParts;
+	}
+
+	const chars = Array.from(value);
+	const lead = [];
+	const background = [];
+	let depth = 0;
+
+	chars.forEach((char) => {
+		if (char === "(" || char === "（") {
+			depth++;
+			return;
+		}
+		if (char === ")" || char === "）") {
+			depth = Math.max(0, depth - 1);
+			return;
+		}
+		if (depth > 0) {
+			background.push(char);
+		} else {
+			lead.push(char);
+		}
+	});
+
+	if (rowCount === 2 && background.join("").trim()) {
+		return [lead.join("").trim(), background.join("").trim()];
+	}
+
+	return [];
+};
+
 const getLastSyllableEndTime = (line) => {
 	let lastEndTime = null;
 	const lineEndTime = toFiniteTime(line?.endTime);
@@ -1799,11 +1929,12 @@ const buildGlobalCharState = (lyrics, position) => {
 		const line = lyrics[i];
 		offsets.push(totalChars);
 
-		if (!line?.syllables || !Array.isArray(line.syllables)) {
+		const syllables = getTimedSyllablesFromLine(line);
+		if (!Array.isArray(syllables) || syllables.length === 0) {
 			continue;
 		}
 
-		for (const syllable of line.syllables) {
+		for (const syllable of syllables) {
 			if (!syllable || !syllable.text) continue;
 
 			const charArray = Array.from(syllable.text || "");
@@ -2180,6 +2311,7 @@ const LyricsLineBlock = react.memo(({
 		originalText,
 		text2: subText2,
 	});
+	const hasParallelKaraokeRows = isKara && hasKaraokeVocalRows(mainLine);
 	const interludeInfo = mainLine?.interludeInfo || getInterludeInfo(mainLine);
 	const shouldRenderInterlude = interludeInfo.isInterlude;
 	const shouldShowInterlude = shouldRenderInterlude && isCurrentLine;
@@ -2234,16 +2366,18 @@ const LyricsLineBlock = react.memo(({
 					isActive,
 					globalCharOffset,
 					activeGlobalCharIndex,
+					subText,
+					subText2,
 				})
 		),
-		!shouldRenderInterlude && renderLyricSubLine(
+		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-phonetic",
 			subText,
 			subCopyText
 				? createCopyHandler(subCopyText, subCopySuccessKey, subCopyFailureKey)
 				: null
 		),
-		!shouldRenderInterlude && renderLyricSubLine(
+		!shouldRenderInterlude && !hasParallelKaraokeRows && renderLyricSubLine(
 			"lyrics-lyricsContainer-LyricsLine-translation",
 			subText2,
 			subText2CopyText
@@ -2337,7 +2471,7 @@ const SyncedLyricsScrollView = react.memo(({
 			const isOriginalActiveLine = isActiveLine && !trailingInterludeLine;
 			const lineNode = react.createElement(LyricsLineBlock, {
 				key: `scroll-line-${startTime ?? index}-${index}`,
-				className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isOriginalActiveLine ? " lyrics-lyricsContainer-LyricsLine-active lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
+						className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView ${getKaraokeLineMetaClass(line)}${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isOriginalActiveLine ? " lyrics-lyricsContainer-LyricsLine-active lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
 				style: {
 					cursor: Number.isFinite(startTime) ? "pointer" : "default",
 				},
@@ -2577,7 +2711,7 @@ const useSyncedLyricsEngine = ({
 					const item = {
 						type: "line",
 						key: `scroll-inline-${startTime ?? index}-${index}`,
-						className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isOriginalActiveLine ? " lyrics-lyricsContainer-LyricsLine-active lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
+						className: `lyrics-lyricsContainer-LyricsLine lyrics-lyricsContainer-LyricsLine-scrollView ${getKaraokeLineMetaClass(line)}${hasSubLine ? " lyrics-lyricsContainer-LyricsLine-hasSubLine" : ""}${isOriginalActiveLine ? " lyrics-lyricsContainer-LyricsLine-active lyrics-lyricsContainer-LyricsLine-scrollCurrent" : ""}`,
 						style: {
 							cursor: Number.isFinite(startTime) ? "pointer" : "default",
 						},
@@ -2672,7 +2806,7 @@ const useSyncedLyricsEngine = ({
 			if (activeTrailingInterludeLine && lineNumber <= activeLineIndex) {
 				animationIndex -= 1;
 			}
-			let className = "lyrics-lyricsContainer-LyricsLine";
+			let className = `lyrics-lyricsContainer-LyricsLine ${getKaraokeLineMetaClass(line)}`;
 			const isCurrentRenderedLine = isActiveLine && !activeTrailingInterludeLine;
 			if (isCurrentRenderedLine) {
 				className += " lyrics-lyricsContainer-LyricsLine-active";
@@ -2938,7 +3072,8 @@ const useTrackPosition = (callback) => {
 };
 
 const getKaraokeLineBounds = (line) => {
-	if (!line?.syllables || !Array.isArray(line.syllables) || line.syllables.length === 0) {
+	const syllables = getTimedSyllablesFromLine(line);
+	if (syllables.length === 0) {
 		const startTime = Number.isFinite(line?.startTime) ? line.startTime : 0;
 		const endTime = Number.isFinite(line?.endTime) ? line.endTime : startTime;
 		return { startTime, endTime };
@@ -2947,7 +3082,7 @@ const getKaraokeLineBounds = (line) => {
 	let startTime = Infinity;
 	let endTime = -Infinity;
 
-	for (const syllable of line.syllables) {
+	for (const syllable of syllables) {
 		if (!syllable) continue;
 		const syllableStart = Number.isFinite(syllable.startTime) ? syllable.startTime : null;
 		const syllableEnd = Number.isFinite(syllable.endTime) ? syllable.endTime : syllableStart;
@@ -3011,9 +3146,10 @@ const buildKaraokeFuriganaMap = (processedText) => {
 
 const buildKaraokeTimedChars = (line) => {
 	const timedChars = [];
+	const sourceSyllables = getTimedSyllablesFromLine(line);
 
-	if (line?.syllables && Array.isArray(line.syllables) && line.syllables.length > 0) {
-		line.syllables.forEach((syllable) => {
+	if (sourceSyllables.length > 0) {
+		sourceSyllables.forEach((syllable) => {
 			if (!syllable || !syllable.text) return;
 
 			const charArray = Array.from(syllable.text || "");
@@ -3168,9 +3304,67 @@ const getKaraokeBounceValues = (position, isActive, startTime, endTime, attenuat
 	};
 };
 
-const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0, activeGlobalCharIndex = -1 }) => {
+const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0, activeGlobalCharIndex = -1, phonetic = null, translation = null }) => {
 	if (!line) {
 		return "";
+	}
+
+	const vocalRows = getKaraokeVocalRows(line);
+	if (vocalRows) {
+		const rowPhonetics = splitLineByParallelShape(phonetic, vocalRows.length);
+		const rowTranslations = splitLineByParallelShape(translation, vocalRows.length);
+		let rowGlobalCharOffset = globalCharOffset;
+
+		return react.createElement(
+			"span",
+			{ className: "lyrics-karaoke-stack" },
+			vocalRows.map((row, rowIndex) => {
+				const rowLine = {
+					...line,
+					text: row.text,
+					originalText: row.text,
+					syllables: row.syllables,
+					vocals: undefined,
+					speaker: row.speaker,
+					kind: row.kind,
+				};
+				const classParts = [
+					"lyrics-karaoke-part",
+					row.role === "background" ? "background" : "lead",
+					row.kind || "vocal",
+					row.speakerClass ? `speaker-${row.speakerClass}` : "",
+				].filter(Boolean);
+				const currentOffset = rowGlobalCharOffset;
+				rowGlobalCharOffset += getKaraokeSyllableCharCount(row.syllables);
+				const rowPhonetic = row.phonetic || rowPhonetics[rowIndex] || "";
+				const rowTranslation = row.translation || rowTranslations[rowIndex] || "";
+
+				return react.createElement(
+					"span",
+					{
+						key: row.key || rowIndex,
+						className: classParts.join(" "),
+					},
+					react.createElement(KaraokeLine, {
+						line: rowLine,
+						position,
+						isActive,
+						globalCharOffset: currentOffset,
+						activeGlobalCharIndex,
+					}),
+					rowPhonetic && react.createElement(
+						"span",
+						{ className: "lyrics-lyricsContainer-LyricsLine-phonetic lyrics-karaoke-part-subline" },
+						rowPhonetic
+					),
+					rowTranslation && react.createElement(
+						"span",
+						{ className: "lyrics-lyricsContainer-LyricsLine-translation lyrics-karaoke-part-subline" },
+						rowTranslation
+					)
+				);
+			})
+		);
 	}
 
 	const furiganaEnabled = CONFIG?.visual?.["furigana-enabled"] === true;
@@ -3178,7 +3372,10 @@ const KaraokeLine = react.memo(({ line, position, isActive, globalCharOffset = 0
 	const detectedLanguage = Utils.getDetectedLanguage?.() || null;
 
 	const { furiganaMap, timedChars, endTime, wrapByWord, textDirection, useTextRun } = useMemo(() => {
-		const rawLineText = line.syllables?.map((syllable) => syllable?.text || "").join("")
+		const sourceSyllables = Array.isArray(line.syllables) && line.syllables.length > 0
+			? line.syllables
+			: getTimedSyllablesFromLine(line);
+		const rawLineText = sourceSyllables.map((syllable) => syllable?.text || "").join("")
 			|| getCopyableText(line.text)
 			|| "";
 		const processedText = Utils.applyFuriganaIfEnabled(rawLineText);

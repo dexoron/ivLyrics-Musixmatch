@@ -526,6 +526,74 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   color: #9ff2c5 !important;
 }
 
+.ivlyrics-panel-line-karaoke-row.speaker-male-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-1.active .ivlyrics-panel-line-text { color: #e6f2ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-male-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-2.active .ivlyrics-panel-line-text { color: #d7ecff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-male-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-3.active .ivlyrics-panel-line-text { color: #edf7ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-male-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-4.active .ivlyrics-panel-line-text { color: #dbe7ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-male-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-male-5.active .ivlyrics-panel-line-text { color: #e2f8ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-female-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-1.active .ivlyrics-panel-line-text { color: #ffe7ef !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-female-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-2.active .ivlyrics-panel-line-text { color: #ffe0e8 !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-female-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-3.active .ivlyrics-panel-line-text { color: #fff0f5 !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-female-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-4.active .ivlyrics-panel-line-text { color: #ffdfe0 !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-female-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-female-5.active .ivlyrics-panel-line-text { color: #fbe5ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-duet-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-1 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-1.active .ivlyrics-panel-line-text { color: #eadfff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-duet-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-2 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-2.active .ivlyrics-panel-line-text { color: #e2d2ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-duet-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-3 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-3.active .ivlyrics-panel-line-text { color: #f0e8ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-duet-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-4 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-4.active .ivlyrics-panel-line-text { color: #dec9ff !important; }
+.ivlyrics-panel-line-karaoke-row.speaker-duet-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-5 .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line.speaker-duet-5.active .ivlyrics-panel-line-text { color: #e9dcff !important; }
+
+@keyframes ivlyrics-panel-effect-tremble {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -0.5px 0.25px; }
+  50% { translate: 0.45px -0.25px; }
+  75% { translate: -0.25px -0.35px; }
+}
+
+@keyframes ivlyrics-panel-adlib-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -1.5px; }
+}
+
+.ivlyrics-panel-line.active .ivlyrics-panel-line-karaoke-row.effect,
+.ivlyrics-panel-line.effect.active .ivlyrics-panel-line-text {
+  animation: ivlyrics-panel-effect-tremble 180ms steps(2, end) infinite !important;
+}
+
+.ivlyrics-panel-line.active .ivlyrics-panel-line-karaoke-row.adlib,
+.ivlyrics-panel-line.adlib.active .ivlyrics-panel-line-text {
+  animation: ivlyrics-panel-adlib-float 1.05s ease-in-out infinite !important;
+}
+
 .ivlyrics-panel-karaoke-space {
   margin-right: 5px !important;
 }
@@ -865,7 +933,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const normalizeSpeakerClass = (speaker) => String(speaker || '')
             .trim()
             .toLowerCase()
-            .replace(/[^a-z0-9_-]/g, '');
+            .replace(/[_\s]+/g, '-')
+            .replace(/[^a-z0-9-]/g, '');
         const rows = [{
             key: 'lead',
             role: line.vocals.lead.role || 'lead',
@@ -901,7 +970,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const value = typeof text === 'string' ? text.trim() : '';
         if (!value || rowCount <= 1) return [];
 
-        const separatorParts = value.split(/\s*[\/|]\s*/).filter(Boolean);
+        const separatorParts = value.split(/\s*[\/|／｜]\s*/).filter(Boolean);
         if (separatorParts.length === rowCount) {
             return separatorParts;
         }
@@ -1363,7 +1432,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const speakerClass = String(line?.speaker || '')
             .trim()
             .toLowerCase()
-            .replace(/[^a-z0-9_-]/g, '');
+            .replace(/[_\s]+/g, '-')
+            .replace(/[^a-z0-9-]/g, '');
         const lineClass = `ivlyrics-panel-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${isFuture ? 'future' : ''} ${isPlaceholder ? 'placeholder' : ''} ${line?.kind || ''} ${speakerClass ? `speaker-${speakerClass}` : ''}`;
         const interludeInfo = isPlaceholder ? { isInterlude: false, durationMs: 0 } : (line?.interludeInfo || getInterludeInfo(line, lineIndex, lineCount));
 
@@ -1706,12 +1776,22 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
 
                 // 결과 병합
                 if (phoneticLines.length > 0 || translationLines.length > 0) {
-                    const updatedLyrics = lyricsData.map((line, idx) => ({
-                        ...line,
-                        originalText: line.text || line.originalText || '',
-                        text: phoneticLines[idx] || line.text || '',
-                        text2: translationLines[idx] || line.text2 || ''
-                    }));
+                    const updatedLyrics = lyricsData.map((line, idx) => {
+                        const isKaraokeLine = Array.isArray(line?.syllables)
+                            || Array.isArray(line?.vocals?.lead?.syllables);
+                        const originalText = isKaraokeLine && line?.originalText
+                            ? line.originalText
+                            : (line?.text || line?.originalText || '');
+                        const phoneticText = phoneticLines[idx] || line?.phoneticText || '';
+
+                        return {
+                            ...line,
+                            originalText,
+                            text: isKaraokeLine ? originalText : (phoneticText || line?.text || ''),
+                            phoneticText,
+                            text2: translationLines[idx] || line?.text2 || ''
+                        };
+                    });
 
                     panelDebug("[PanelLyrics] Applied translation:", phoneticLines.length, "phonetic,", translationLines.length, "translation");
                     setLyrics(updatedLyrics);
@@ -2171,7 +2251,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                     const isVirtualTrailingInterlude = entry.isVirtualTrailingInterlude === true;
                     // originalText = 원어, text = 발음, text2 = 번역
                     const originalText = line?.originalText || line?.text || '';
-                    const phonetic = (line?.originalText && line?.text !== line?.originalText) ? line?.text : '';
+                    const phonetic = line?.phoneticText || ((line?.originalText && line?.text !== line?.originalText) ? line?.text : '');
                     const translation = line?.text2 || '';
 
                     lines.push({

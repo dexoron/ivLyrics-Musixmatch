@@ -996,6 +996,175 @@ div.lyrics-tabBar-headerItemLink {
   overflow-wrap: normal;
 }
 
+.lyrics-karaoke-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18em;
+  width: 100%;
+}
+
+.lyrics-karaoke-part {
+  display: block;
+  width: 100%;
+}
+
+.lyrics-karaoke-part.background {
+  font-size: 0.92em;
+  opacity: 0.9;
+}
+
+.lyrics-karaoke-part.effect,
+.lyrics-karaoke-part.speaker-sfx {
+  font-style: italic;
+}
+
+.lyrics-karaoke-part-subline {
+  display: block;
+  width: 100%;
+  margin-top: 0.12em;
+}
+
+.lyrics-lyricsContainer-LyricsLine-active .lyrics-karaoke-part-subline {
+  transform: none;
+}
+
+.lyrics-karaoke-part.speaker-b {
+  --lyrics-color-active: #8bd3ff;
+  --lyrics-color-inactive: rgba(139, 211, 255, 0.46);
+}
+
+.lyrics-karaoke-part.speaker-c {
+  --lyrics-color-active: #ffd166;
+  --lyrics-color-inactive: rgba(255, 209, 102, 0.48);
+}
+
+.lyrics-karaoke-part.speaker-d {
+  --lyrics-color-active: #c4a7ff;
+  --lyrics-color-inactive: rgba(196, 167, 255, 0.48);
+}
+
+.lyrics-karaoke-part.speaker-sfx {
+  --lyrics-color-active: #f4a6c8;
+  --lyrics-color-inactive: rgba(244, 166, 200, 0.46);
+}
+
+.lyrics-karaoke-part.speaker-male-1,
+.lyrics-lyricsContainer-LyricsLine.speaker-male-1 {
+  --lyrics-color-active: #e6f2ff;
+  --lyrics-color-inactive: rgba(210, 232, 255, 0.52);
+}
+
+.lyrics-karaoke-part.speaker-male-2,
+.lyrics-lyricsContainer-LyricsLine.speaker-male-2 {
+  --lyrics-color-active: #d7ecff;
+  --lyrics-color-inactive: rgba(190, 222, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-male-3,
+.lyrics-lyricsContainer-LyricsLine.speaker-male-3 {
+  --lyrics-color-active: #edf7ff;
+  --lyrics-color-inactive: rgba(220, 242, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-male-4,
+.lyrics-lyricsContainer-LyricsLine.speaker-male-4 {
+  --lyrics-color-active: #dbe7ff;
+  --lyrics-color-inactive: rgba(198, 214, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-male-5,
+.lyrics-lyricsContainer-LyricsLine.speaker-male-5 {
+  --lyrics-color-active: #e2f8ff;
+  --lyrics-color-inactive: rgba(198, 240, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-female-1,
+.lyrics-lyricsContainer-LyricsLine.speaker-female-1 {
+  --lyrics-color-active: #ffe7ef;
+  --lyrics-color-inactive: rgba(255, 205, 222, 0.52);
+}
+
+.lyrics-karaoke-part.speaker-female-2,
+.lyrics-lyricsContainer-LyricsLine.speaker-female-2 {
+  --lyrics-color-active: #ffe0e8;
+  --lyrics-color-inactive: rgba(255, 192, 214, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-female-3,
+.lyrics-lyricsContainer-LyricsLine.speaker-female-3 {
+  --lyrics-color-active: #fff0f5;
+  --lyrics-color-inactive: rgba(255, 220, 232, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-female-4,
+.lyrics-lyricsContainer-LyricsLine.speaker-female-4 {
+  --lyrics-color-active: #ffdfe0;
+  --lyrics-color-inactive: rgba(255, 196, 198, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-female-5,
+.lyrics-lyricsContainer-LyricsLine.speaker-female-5 {
+  --lyrics-color-active: #fbe5ff;
+  --lyrics-color-inactive: rgba(242, 204, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-duet-1,
+.lyrics-lyricsContainer-LyricsLine.speaker-duet-1 {
+  --lyrics-color-active: #eadfff;
+  --lyrics-color-inactive: rgba(212, 186, 255, 0.52);
+}
+
+.lyrics-karaoke-part.speaker-duet-2,
+.lyrics-lyricsContainer-LyricsLine.speaker-duet-2 {
+  --lyrics-color-active: #e2d2ff;
+  --lyrics-color-inactive: rgba(202, 172, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-duet-3,
+.lyrics-lyricsContainer-LyricsLine.speaker-duet-3 {
+  --lyrics-color-active: #f0e8ff;
+  --lyrics-color-inactive: rgba(224, 204, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-duet-4,
+.lyrics-lyricsContainer-LyricsLine.speaker-duet-4 {
+  --lyrics-color-active: #dec9ff;
+  --lyrics-color-inactive: rgba(194, 158, 255, 0.5);
+}
+
+.lyrics-karaoke-part.speaker-duet-5,
+.lyrics-lyricsContainer-LyricsLine.speaker-duet-5 {
+  --lyrics-color-active: #e9dcff;
+  --lyrics-color-inactive: rgba(210, 184, 255, 0.5);
+}
+
+@keyframes ivlyrics-kind-effect-tremble {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -0.5px 0.25px; }
+  50% { translate: 0.45px -0.25px; }
+  75% { translate: -0.25px -0.35px; }
+}
+
+@keyframes ivlyrics-kind-adlib-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -1.5px; }
+}
+
+.lyrics-karaoke-part.effect .lyrics-karaoke-line.is-active,
+.lyrics-lyricsContainer-LyricsLine.effect.lyrics-lyricsContainer-LyricsLine-active .lyrics-karaoke-line,
+.lyrics-lyricsContainer-LyricsLine.effect.lyrics-lyricsContainer-LyricsLine-active > p {
+  animation: ivlyrics-kind-effect-tremble 180ms steps(2, end) infinite;
+  will-change: translate;
+}
+
+.lyrics-karaoke-part.adlib .lyrics-karaoke-line.is-active,
+.lyrics-lyricsContainer-LyricsLine.adlib.lyrics-lyricsContainer-LyricsLine-active .lyrics-karaoke-line,
+.lyrics-lyricsContainer-LyricsLine.adlib.lyrics-lyricsContainer-LyricsLine-active > p {
+  animation: ivlyrics-kind-adlib-float 1.05s ease-in-out infinite;
+  will-change: translate;
+}
+
 .lyrics-karaoke-word {
   display: inline-block;
   white-space: nowrap;
