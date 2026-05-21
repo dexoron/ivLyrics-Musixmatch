@@ -141,12 +141,62 @@ const stripSyncCreatorStandaloneParentheticalLine = (line) => {
 	return changed ? value : String(line || '').normalize('NFC');
 };
 
+const stripSyncCreatorLeadingParenthesis = (line) => {
+	const value = String(line || '').normalize('NFC');
+	const chars = Array.from(value);
+	const index = chars.findIndex(char => !/\s/u.test(char));
+	if (index < 0 || !getSyncCreatorParenthesisClose(chars[index])) return value;
+	return chars.slice(0, index).join('') + chars.slice(index + 1).join('');
+};
+
+const stripSyncCreatorTrailingParenthesis = (line, closeChar) => {
+	const value = String(line || '').normalize('NFC');
+	const chars = Array.from(value);
+	for (let index = chars.length - 1; index >= 0; index--) {
+		if (/\s/u.test(chars[index])) continue;
+		if (chars[index] !== closeChar) return value;
+		return chars.slice(0, index).join('') + chars.slice(index + 1).join('');
+	}
+	return value;
+};
+
+const normalizeSyncCreatorStandaloneParentheticalBlocks = (lines) => {
+	const normalizedLines = Array.isArray(lines) ? [...lines] : [];
+
+	for (let index = 0; index < normalizedLines.length; index++) {
+		const trimmed = String(normalizedLines[index] || '').trim();
+		if (!trimmed) continue;
+
+		const openChar = Array.from(trimmed)[0] || '';
+		const closeChar = getSyncCreatorParenthesisClose(openChar);
+		if (!closeChar || trimmed.includes(closeChar)) continue;
+
+		let closeLineIndex = -1;
+		for (let candidate = index + 1; candidate < normalizedLines.length; candidate++) {
+			const candidateTrimmed = String(normalizedLines[candidate] || '').trim();
+			if (!candidateTrimmed) continue;
+			if (candidateTrimmed.endsWith(closeChar)) {
+				closeLineIndex = candidate;
+				break;
+			}
+		}
+
+		if (closeLineIndex < 0) continue;
+
+		normalizedLines[index] = stripSyncCreatorLeadingParenthesis(normalizedLines[index]).trim();
+		normalizedLines[closeLineIndex] = stripSyncCreatorTrailingParenthesis(normalizedLines[closeLineIndex], closeChar).trim();
+	}
+
+	return normalizedLines;
+};
+
 const normalizeSyncCreatorStandaloneParentheticalLines = (text) => (
-	String(text || '')
-		.normalize('NFC')
-		.split('\n')
-		.map(line => stripSyncCreatorStandaloneParentheticalLine(line))
-		.join('\n')
+	normalizeSyncCreatorStandaloneParentheticalBlocks(
+		String(text || '')
+			.normalize('NFC')
+			.split('\n')
+			.map(line => stripSyncCreatorStandaloneParentheticalLine(line))
+	).join('\n')
 );
 
 const detectSyncCreatorParallelVocalHints = (text) => {
@@ -3286,6 +3336,86 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		});
 	}, [lineCharOffsets, currentLineIndex, multiVocalMode]);
 
+	const applySongVocalSpeaker = useCallback((value) => {
+		const speaker = normalizeSyncCreatorSpeaker(value);
+		if (!speaker || !lyricsLines.length) return;
+
+		const syncLinesByStart = new Map((Array.isArray(syncData?.lines) ? syncData.lines : []).map(line => [line.start, line]));
+		const nextLineMetaDrafts = {};
+		const nextParallelPartMetaDrafts = {};
+
+		lyricsLines.forEach((lineText, index) => {
+			const lineStart = lineCharOffsets[index];
+			if (!Number.isInteger(lineStart)) return;
+			nextLineMetaDrafts[lineStart] = {
+				...(lineMetaDrafts[lineStart] || {}),
+				speaker
+			};
+
+			if (isLineCoveredByMergedPrevious(index, syncLinesByStart)) {
+				return;
+			}
+
+			const lineData = syncLinesByStart.get(lineStart);
+			const nextLineStart = lineCharOffsets[index + 1];
+			const nextLineChars = Array.from(lyricsLines[index + 1] || '');
+			const isMergedWithNext = index < lyricsLines.length - 1
+				&& (mergedLineDrafts[lineStart] === nextLineStart
+					|| (lineData && Number.isInteger(nextLineStart) && lineData.end >= nextLineStart + nextLineChars.length - 1));
+			const templateChars = isMergedWithNext
+				? [...Array.from(lineText || ''), ...nextLineChars]
+				: Array.from(lineText || '');
+			const template = getParallelTemplateForLine(templateChars, lineStart) || (isMergedWithNext ? lineData?.parallel : null);
+			if (Array.isArray(template?.parts)) {
+				template.parts.forEach(part => {
+					if (!part?.id) return;
+					nextParallelPartMetaDrafts[`${lineStart}:${part.id}`] = {
+						...(parallelPartMetaDrafts[`${lineStart}:${part.id}`] || {}),
+						speaker
+					};
+				});
+			}
+		});
+
+		setLineMetaDrafts(prev => ({
+			...prev,
+			...nextLineMetaDrafts
+		}));
+		setParallelPartMetaDrafts(prev => ({
+			...prev,
+			...nextParallelPartMetaDrafts
+		}));
+		setSyncData(prev => {
+			if (!prev || !Array.isArray(prev.lines)) return prev;
+			return {
+				...prev,
+				lines: prev.lines.map(line => ({
+					...line,
+					speaker,
+					parallel: line.parallel ? {
+						...line.parallel,
+						parts: Array.isArray(line.parallel.parts)
+							? line.parallel.parts.map(part => ({
+								...part,
+								speaker
+							}))
+							: line.parallel.parts
+					} : line.parallel
+				}))
+			};
+		});
+		Toast.success(I18n.t('syncCreator.bulkVocalApplied') || 'Applied the vocal speaker to the whole song.');
+	}, [
+		lyricsLines,
+		lineCharOffsets,
+		syncData,
+		lineMetaDrafts,
+		parallelPartMetaDrafts,
+		isLineCoveredByMergedPrevious,
+		mergedLineDrafts,
+		getParallelTemplateForLine
+	]);
+
 	const currentManualSplitPoints = useMemo(() => {
 		const splitPoints = manualParallelSplitDrafts[currentLineStart];
 		return Array.isArray(splitPoints)
@@ -3982,6 +4112,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		trackName: { fontSize: '14px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 		artistName: { fontSize: '12px', color: 'var(--spice-subtext)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 		providerRow: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' },
+		bulkVocalControl: {
+			display: 'inline-flex',
+			alignItems: 'center',
+			gap: '6px',
+			padding: '4px 6px',
+			borderRadius: '10px',
+			background: 'rgba(255,255,255,0.025)',
+			border: '1px solid rgba(255,255,255,0.06)'
+		},
+		bulkVocalLabel: { fontSize: '10.5px', color: 'var(--spice-subtext)', fontWeight: '800', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' },
 		virtualKaraokeBadge: {
 			background: 'rgba(29, 185, 84, 0.14)', color: '#1db954',
 			border: '1px solid rgba(29, 185, 84, 0.32)',
@@ -4759,6 +4899,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					onClick: () => setIsCharacterPronunciationPrimary(value => !value),
 					title: I18n.t('syncCreator.characterPronunciationPrimaryDesc') || '생성된 발음을 크게, 원어 가사를 작게 표시합니다.'
 				}, I18n.t('syncCreator.characterPronunciationPrimary') || '발음 크게'),
+				lyricsLines.length > 0 && react.createElement('label', { style: s.bulkVocalControl },
+					react.createElement('span', { style: s.bulkVocalLabel }, I18n.t('syncCreator.bulkVocalLabel') || 'All vocals'),
+					react.createElement('select', {
+						style: s.select,
+						value: '',
+						onChange: (e) => applySongVocalSpeaker(e.target.value)
+					},
+						[
+							react.createElement('option', { key: 'placeholder', value: '', disabled: true }, I18n.t('syncCreator.bulkVocalPlaceholder') || 'Set speaker...'),
+							...SYNC_CREATOR_SPEAKER_OPTIONS.map(value =>
+								react.createElement('option', { key: value, value }, value)
+							)
+						]
+					)
+				),
 				isVirtualKaraokeSource && react.createElement('span', { style: s.virtualKaraokeBadge },
 					I18n.t('syncCreator.virtualKaraoke') || '가상 노래방 데이터'
 				)
