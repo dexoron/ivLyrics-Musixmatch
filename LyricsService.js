@@ -1521,22 +1521,22 @@
 
                     if (data) {
                         // 결과 구조 정규화 - API 응답 구조: data.syncData.lines
-                        let lines = null;
+                        let syncDataBody = null;
 
                         if (Array.isArray(data)) {
-                            lines = data;
+                            syncDataBody = { lines: data };
                         } else if (Array.isArray(data.lines)) {
-                            lines = data.lines;
+                            syncDataBody = data;
                         } else if (data.syncData && Array.isArray(data.syncData.lines)) {
-                            lines = data.syncData.lines;
+                            syncDataBody = data.syncData;
                         }
 
-                        if (!lines) return null;
+                        if (!syncDataBody?.lines) return null;
 
                         const syncData = {
                             trackId,
                             provider,
-                            syncData: { lines },
+                            syncData: syncDataBody,
                             contributors: data.contributors || [],
                             createdAt: data.createdAt || null,
                             updatedAt: data.updatedAt || null
@@ -1729,6 +1729,92 @@
                         startTime: charStartTime,
                         endTime: charEndTime
                     });
+                }
+
+                const buildParallelPart = (part) => {
+                    if (!part || !Array.isArray(part.ranges) || !Array.isArray(part.chars)) return null;
+                    const partSyllables = [];
+                    let partCharIndex = 0;
+                    let text = '';
+
+                    part.ranges.forEach((range, rangeIndex) => {
+                        if (rangeIndex > 0) {
+                            const joinMode = Array.isArray(part.join) ? Number(part.join[rangeIndex - 1]) : 1;
+                            if (joinMode === 1 || joinMode === 2) {
+                                text += ' ';
+                                const previousTime = partSyllables[partSyllables.length - 1]?.endTime
+                                    ?? Math.round((part.chars[Math.max(0, partCharIndex - 1)] || lineData.chars[0]) * 1000);
+                                partSyllables.push({
+                                    text: ' ',
+                                    startTime: previousTime,
+                                    endTime: previousTime
+                                });
+                            }
+                        }
+
+                        for (let sourceIndex = range.start; sourceIndex <= range.end; sourceIndex++) {
+                            const char = fullTextChars[sourceIndex] || '';
+                            const charStart = Math.round((part.chars[partCharIndex] ?? lineData.chars[0]) * 1000);
+                            const nextPartTime = part.chars[partCharIndex + 1];
+                            const charEnd = nextPartTime !== undefined
+                                ? Math.round(nextPartTime * 1000)
+                                : Math.min(lineEndTime, charStart + Math.round(lastCharMaxDuration * 1000));
+
+                            text += char;
+                            partSyllables.push({
+                                text: char,
+                                startTime: charStart,
+                                endTime: charEnd
+                            });
+                            partCharIndex++;
+                        }
+                    });
+
+                    if (!partSyllables.length) return null;
+	                    return {
+	                        id: part.id || '',
+	                        role: part.role || '',
+	                        speaker: part.speaker || '',
+	                        kind: part.kind || 'vocal',
+	                        text,
+	                        syllables: partSyllables,
+	                        startTime: partSyllables[0].startTime,
+                        endTime: partSyllables[partSyllables.length - 1].endTime
+                    };
+                };
+
+                const parallelParts = Array.isArray(lineData.parallel?.parts)
+                    ? lineData.parallel.parts.map(buildParallelPart).filter(Boolean)
+                    : [];
+
+                if (parallelParts.length > 1) {
+                    const leadPart = parallelParts.find(part => part.role === 'lead') || parallelParts[0];
+                    const backgroundParts = parallelParts.filter(part => part !== leadPart);
+                    const allPartTimes = parallelParts.flatMap(part => [part.startTime, part.endTime]).filter(Number.isFinite);
+                    result.push({
+                        startTime: Math.min(...allPartTimes, lineStartTime),
+                        endTime: Math.max(...allPartTimes, lineEndTime),
+                        text: lineText,
+	                        vocals: {
+	                            lead: {
+	                                id: leadPart.id,
+	                                role: leadPart.role,
+	                                speaker: leadPart.speaker,
+	                                kind: leadPart.kind,
+	                                text: leadPart.text,
+	                                syllables: leadPart.syllables
+	                            },
+	                            background: backgroundParts.map(part => ({
+	                                id: part.id,
+	                                role: part.role,
+	                                speaker: part.speaker,
+	                                kind: part.kind,
+	                                text: part.text,
+	                                syllables: part.syllables
+	                            }))
+                        }
+                    });
+                    continue;
                 }
 
                 result.push({

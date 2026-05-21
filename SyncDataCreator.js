@@ -526,6 +526,122 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return segments;
 	};
 
+	const rangesToCharRefs = (ranges, lineChars, lineStart = 0) => {
+		if (!Array.isArray(ranges) || !Array.isArray(lineChars)) return [];
+		const refs = [];
+		ranges.forEach((range) => {
+			const start = Math.max(lineStart, Number(range?.start));
+			const end = Math.min(lineStart + lineChars.length - 1, Number(range?.end));
+			if (!Number.isInteger(start) || !Number.isInteger(end) || start > end) return;
+			for (let index = start; index <= end; index++) {
+				refs.push({ absoluteIndex: index, localIndex: index - lineStart, char: lineChars[index - lineStart] || '' });
+			}
+		});
+		return refs;
+	};
+
+	const countRangeChars = (ranges) => (Array.isArray(ranges) ? ranges : []).reduce((sum, range) => {
+		const start = Number(range?.start);
+		const end = Number(range?.end);
+		return Number.isInteger(start) && Number.isInteger(end) && end >= start ? sum + end - start + 1 : sum;
+	}, 0);
+
+	const pushSyncCreatorRange = (ranges, start, end, lineStart) => {
+		if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) return;
+		ranges.push({ start: lineStart + start, end: lineStart + end });
+	};
+
+	const buildParentheticalParallelTemplate = (lineChars, lineStart = 0) => {
+		const chars = Array.isArray(lineChars) ? lineChars : [];
+		if (!chars.length) return null;
+
+		const leadRanges = [];
+		const backgroundRanges = [];
+		const hiddenRanges = [];
+		let depth = 0;
+		let runStart = null;
+		let runPart = null;
+
+		const flushRun = (endIndex) => {
+			if (runStart !== null && endIndex >= runStart) {
+				pushSyncCreatorRange(runPart === 'background' ? backgroundRanges : leadRanges, runStart, endIndex, lineStart);
+			}
+			runStart = null;
+			runPart = null;
+		};
+
+		const pushHidden = (index) => {
+			const previous = hiddenRanges[hiddenRanges.length - 1];
+			const absoluteIndex = lineStart + index;
+			if (previous && previous.end + 1 === absoluteIndex) {
+				previous.end = absoluteIndex;
+			} else {
+				hiddenRanges.push({ start: absoluteIndex, end: absoluteIndex });
+			}
+		};
+
+		for (let index = 0; index < chars.length; index++) {
+			const char = chars[index] || '';
+			const isOpen = char === '(';
+			const isClose = char === ')';
+			const isHidden = isOpen || isClose || /\s/u.test(char);
+
+			if (isOpen || isClose) {
+				flushRun(index - 1);
+				pushHidden(index);
+				depth = isOpen ? depth + 1 : Math.max(0, depth - 1);
+				continue;
+			}
+
+			if (isHidden) {
+				flushRun(index - 1);
+				pushHidden(index);
+				continue;
+			}
+
+			const part = depth > 0 ? 'background' : 'lead';
+			if (runStart === null) {
+				runStart = index;
+				runPart = part;
+			} else if (runPart !== part) {
+				flushRun(index - 1);
+				runStart = index;
+				runPart = part;
+			}
+		}
+		flushRun(chars.length - 1);
+
+		if (!leadRanges.length || !backgroundRanges.length) return null;
+
+		return {
+			layout: 'stack',
+				parts: [
+					{ id: 'a', role: 'lead', speaker: 'A', kind: 'vocal', ranges: leadRanges, join: leadRanges.length > 1 ? new Array(leadRanges.length - 1).fill(1) : [] },
+					{ id: 'b', role: 'background', speaker: 'B', kind: 'vocal', ranges: backgroundRanges, join: backgroundRanges.length > 1 ? new Array(backgroundRanges.length - 1).fill(1) : [] }
+				],
+				hiddenRanges
+			};
+	};
+
+	const mergeSyncCreatorParallelTemplate = (template, existingParallel) => {
+		if (!template) return null;
+		const existingParts = Array.isArray(existingParallel?.parts) ? existingParallel.parts : [];
+		return {
+			layout: existingParallel?.layout || template.layout || 'stack',
+			hiddenRanges: Array.isArray(existingParallel?.hiddenRanges) ? existingParallel.hiddenRanges : template.hiddenRanges,
+			parts: template.parts.map((part) => {
+				const existing = existingParts.find(item => item?.id === part.id);
+				return {
+						...part,
+						role: existing?.role || part.role,
+						speaker: existing?.speaker || part.speaker,
+						kind: existing?.kind || part.kind,
+						chars: Array.isArray(existing?.chars) ? existing.chars : undefined
+					};
+				})
+		};
+	};
+
 	// 상태 관리
 	const [provider, setProvider] = useState('');   // 상세 provider (sync-data 매칭용, 예: spotify-MusixMatch)
 	const [addonId, setAddonId] = useState('');     // 실제 addon ID (가사 로드용, 예: spotify)
@@ -534,6 +650,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState(null);
 	const [currentLineIndex, setCurrentLineIndex] = useState(0);
+	const [activeParallelPartId, setActiveParallelPartId] = useState('full');
+	const [parallelPartMetaDrafts, setParallelPartMetaDrafts] = useState({});
 	const [syncData, setSyncData] = useState(null);
 	const [furiganaRevision, setFuriganaRevision] = useState(0);
 	const [characterPronunciations, setCharacterPronunciations] = useState(null);
@@ -736,6 +854,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setIsGeneratingCharacterPronunciations(false);
 	}, [lyricsText]);
 
+	useEffect(() => {
+		setActiveParallelPartId('full');
+	}, [currentLineIndex, lyricsText]);
+
 	const totalChars = useMemo(() => {
 		// NFC 정규화된 lyricsLines를 사용하므로 Array.from()이 정확한 문자 수를 반환
 		return lyricsLines.reduce((sum, line) => sum + Array.from(line).length, 0);
@@ -756,13 +878,54 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return offsets;
 	}, [lyricsLines]);
 
-	const currentLineChars = useMemo(() => {
+	const currentFullLineChars = useMemo(() => {
 		if (currentLineIndex < 0 || currentLineIndex >= lyricsLines.length) return [];
 		return Array.from(lyricsLines[currentLineIndex]);
 	}, [lyricsLines, currentLineIndex]);
-	const currentLineText = currentLineIndex >= 0 && currentLineIndex < lyricsLines.length
-		? lyricsLines[currentLineIndex]
-		: '';
+	const currentLineStart = lineCharOffsets[currentLineIndex] ?? 0;
+	const currentExistingLineData = useMemo(() => {
+		if (!Array.isArray(syncData?.lines)) return null;
+		return syncData.lines.find(line => line.start === currentLineStart) || null;
+	}, [syncData, currentLineStart]);
+	const currentParallelTemplate = useMemo(
+		() => buildParentheticalParallelTemplate(currentFullLineChars, currentLineStart),
+		[currentFullLineChars, currentLineStart]
+	);
+	const currentParallelData = useMemo(() => {
+		const merged = mergeSyncCreatorParallelTemplate(currentParallelTemplate, currentExistingLineData?.parallel);
+		if (!merged) return null;
+		return {
+			...merged,
+			parts: merged.parts.map((part) => {
+				const draft = parallelPartMetaDrafts[`${currentLineStart}:${part.id}`] || {};
+				return {
+					...part,
+					speaker: draft.speaker || part.speaker,
+					kind: draft.kind || part.kind
+				};
+			})
+		};
+	}, [currentParallelTemplate, currentExistingLineData, parallelPartMetaDrafts, currentLineStart]);
+	const currentParallelParts = currentParallelData?.parts || [];
+	const hasCurrentParallelParts = currentParallelParts.length > 1;
+	const activeParallelPart = hasCurrentParallelParts && activeParallelPartId !== 'full'
+		? currentParallelParts.find(part => part.id === activeParallelPartId) || null
+		: null;
+	const currentLineCharRefs = useMemo(() => {
+		if (activeParallelPart) {
+			return rangesToCharRefs(activeParallelPart.ranges, currentFullLineChars, currentLineStart);
+		}
+		return currentFullLineChars.map((char, index) => ({
+			absoluteIndex: currentLineStart + index,
+			localIndex: index,
+			char
+		}));
+	}, [activeParallelPart, currentFullLineChars, currentLineStart]);
+	const currentLineChars = useMemo(
+		() => currentLineCharRefs.map(ref => ref.char),
+		[currentLineCharRefs]
+	);
+	const currentLineText = currentLineChars.join('');
 	const currentLineDirection = useMemo(
 		() => getSyncCreatorTextDirection(currentLineText),
 		[currentLineText]
@@ -829,19 +992,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [shouldShowSyncCreatorFurigana, furiganaRevision]);
 	const currentLineFuriganaMap = useMemo(
-		() => getSyncCreatorFuriganaMap(currentLineText),
-		[getSyncCreatorFuriganaMap, currentLineText]
+		() => activeParallelPart ? new Map() : getSyncCreatorFuriganaMap(currentLineText),
+		[getSyncCreatorFuriganaMap, currentLineText, activeParallelPart]
 	);
 	const hasCurrentLineFurigana = currentLineFuriganaMap.size > 0;
 	const currentLineCharacterPronunciationData = useMemo(() => {
-		if (!showCharacterPronunciations || !Array.isArray(characterPronunciations?.lines)) {
+		if (activeParallelPart || !showCharacterPronunciations || !Array.isArray(characterPronunciations?.lines)) {
 			return null;
 		}
 
 		return characterPronunciations.lines.find(line => Number(line?.index) === currentLineIndex)
 			|| characterPronunciations.lines[currentLineIndex]
 			|| null;
-	}, [showCharacterPronunciations, characterPronunciations, currentLineIndex]);
+	}, [activeParallelPart, showCharacterPronunciations, characterPronunciations, currentLineIndex]);
 	const currentLinePronunciationUnits = useMemo(
 		() => normalizeSyncCreatorPronunciationUnits(currentLineCharacterPronunciationData, currentLineChars),
 		[currentLineCharacterPronunciationData, currentLineChars]
@@ -914,8 +1077,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const isCurrentLineSynced = useMemo(() => {
 		if (!syncData || !syncData.lines) return false;
 		const lineStart = lineCharOffsets[currentLineIndex];
-		return syncData.lines.some(l => l.start === lineStart);
-	}, [syncData, lineCharOffsets, currentLineIndex]);
+		const line = syncData.lines.find(l => l.start === lineStart);
+		if (!line) return false;
+		if (activeParallelPart) {
+			const part = line.parallel?.parts?.find(item => item.id === activeParallelPart.id);
+			return !!(part?.chars?.length === currentLineChars.length);
+		}
+		return true;
+	}, [syncData, lineCharOffsets, currentLineIndex, activeParallelPart, currentLineChars.length]);
 
 	// Visibility tracking for robust lock handling
 	const isVisibleRef = useRef(false);
@@ -1489,20 +1658,105 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, []);
 
 	const commitCurrentLineSync = useCallback((rawChars) => {
-		const lineStart = lineCharOffsets[currentLineIndex];
-		const lineEnd = lineStart + currentLineChars.length - 1;
+		const lineStart = currentLineStart;
+		const lineEnd = lineStart + currentFullLineChars.length - 1;
+		const fullCharCount = currentFullLineChars.length;
 		const nextLines = syncData?.lines
 			? syncData.lines.map((line) => ({
 				...line,
-				chars: Array.isArray(line.chars) ? [...line.chars] : []
+				chars: Array.isArray(line.chars) ? [...line.chars] : [],
+				parallel: line.parallel ? {
+					...line.parallel,
+					hiddenRanges: Array.isArray(line.parallel.hiddenRanges) ? [...line.parallel.hiddenRanges] : [],
+					parts: Array.isArray(line.parallel.parts)
+						? line.parallel.parts.map(part => ({
+							...part,
+							ranges: Array.isArray(part.ranges) ? part.ranges.map(range => ({ ...range })) : [],
+							join: Array.isArray(part.join) ? [...part.join] : [],
+							chars: Array.isArray(part.chars) ? [...part.chars] : undefined
+						}))
+						: []
+				} : undefined
 			}))
 			: [];
 		const existingIndex = nextLines.findIndex((line) => line.start === lineStart);
+		const existingLine = existingIndex >= 0 ? nextLines[existingIndex] : null;
+		const previousLine = nextLines.reduce((best, line) => {
+			if (line.start >= lineStart) return best;
+			if (!best || line.start > best.start) return line;
+			return best;
+		}, null);
+		const previousLineEndTime = previousLine?.chars?.[previousLine.chars.length - 1] ?? -1;
+		const normalizedRawChars = normalizeCommittedLineChars(rawChars, previousLineEndTime);
+
+		const buildFullLineChars = () => {
+			if (!activeParallelPart) {
+				return normalizeCommittedLineChars(rawChars, previousLineEndTime);
+			}
+
+			const fullChars = Array.isArray(existingLine?.chars) && existingLine.chars.length === fullCharCount
+				? [...existingLine.chars]
+				: new Array(fullCharCount).fill(null);
+
+			currentLineCharRefs.forEach((ref, index) => {
+				if (ref.localIndex >= 0 && ref.localIndex < fullChars.length) {
+					fullChars[ref.localIndex] = normalizedRawChars[index];
+				}
+			});
+
+			const firstKnown = fullChars.find(time => typeof time === 'number');
+			for (let index = 0; index < fullChars.length; index++) {
+				if (typeof fullChars[index] === 'number') continue;
+				const previous = index > 0 && typeof fullChars[index - 1] === 'number' ? fullChars[index - 1] : null;
+				const next = fullChars.slice(index + 1).find(time => typeof time === 'number');
+				fullChars[index] = previous ?? next ?? firstKnown ?? 0;
+			}
+
+			return normalizeCommittedLineChars(fullChars, previousLineEndTime);
+		};
+
+		const fullLineChars = buildFullLineChars();
 		const lineData = {
+			...(existingLine || {}),
 			start: lineStart,
 			end: lineEnd,
-			chars: rawChars.map((time) => roundSyncTime(time))
+			chars: fullLineChars.map((time) => roundSyncTime(time))
 		};
+
+		if (activeParallelPart && currentParallelData) {
+			const existingParts = Array.isArray(existingLine?.parallel?.parts) ? existingLine.parallel.parts : [];
+			const parts = currentParallelData.parts
+				.map((part) => {
+					const existingPart = existingParts.find(item => item.id === part.id);
+					const chars = part.id === activeParallelPart.id
+						? normalizedRawChars.map((time) => roundSyncTime(time))
+						: (Array.isArray(existingPart?.chars) ? existingPart.chars : undefined);
+					const expectedChars = countRangeChars(part.ranges);
+					if (!Array.isArray(chars) || chars.length !== expectedChars) {
+						return null;
+					}
+					return {
+							id: part.id,
+							role: part.role,
+							speaker: part.speaker || (part.id === 'b' ? 'B' : 'A'),
+							kind: part.kind || 'vocal',
+							ranges: part.ranges,
+							join: part.join || [],
+							chars
+					};
+				})
+				.filter(Boolean);
+
+			if (parts.length > 0) {
+				lineData.parallel = {
+					layout: currentParallelData.layout || 'stack',
+					hiddenRanges: currentParallelData.hiddenRanges || [],
+					parts
+				};
+			} else {
+				delete lineData.parallel;
+			}
+		}
 
 		if (existingIndex >= 0) {
 			nextLines[existingIndex] = lineData;
@@ -1513,11 +1767,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		nextLines.sort((a, b) => a.start - b.start);
 
 		const committedLineIndex = nextLines.findIndex((line) => line.start === lineStart);
-		const previousLine = committedLineIndex > 0 ? nextLines[committedLineIndex - 1] : null;
-		const previousLineEndTime = previousLine?.chars?.[previousLine.chars.length - 1] ?? -1;
+		const previousSortedLine = committedLineIndex > 0 ? nextLines[committedLineIndex - 1] : null;
+		const previousSortedLineEndTime = previousSortedLine?.chars?.[previousSortedLine.chars.length - 1] ?? -1;
 		const normalizedLineData = {
 			...lineData,
-			chars: normalizeCommittedLineChars(lineData.chars, previousLineEndTime)
+			chars: normalizeCommittedLineChars(lineData.chars, previousSortedLineEndTime)
 		};
 		const normalizedLastCharTime = normalizedLineData.chars[normalizedLineData.chars.length - 1];
 
@@ -1528,9 +1782,17 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			return !(line.chars && line.chars[0] < normalizedLastCharTime);
 		});
 
-		setSyncData(validLines.length > 0 ? { lines: validLines } : null);
+		setSyncData(validLines.length > 0 ? { version: validLines.some(line => line.parallel) ? 2 : (syncData?.version || 1), lines: validLines } : null);
 		return normalizedLineData;
-	}, [syncData, lineCharOffsets, currentLineIndex, currentLineChars.length, normalizeCommittedLineChars]);
+	}, [
+		syncData,
+		currentLineStart,
+		currentFullLineChars.length,
+		currentLineCharRefs,
+		activeParallelPart,
+		currentParallelData,
+		normalizeCommittedLineChars
+	]);
 
 	const handleDragEnd = useCallback((e) => {
 		if (mode !== 'record' || !isDragging || dragStartTime === null || recordingCharIndex === -1) {
@@ -2283,9 +2545,42 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		setSyncData(prev => {
 			const newLines = prev.lines.filter(l => l.start !== lineStart);
-			return newLines.length > 0 ? { lines: newLines } : null;
+			return newLines.length > 0 ? { ...prev, lines: newLines } : null;
 		});
 	}, [syncData, lineCharOffsets, currentLineIndex]);
+
+	const updateParallelPartMeta = useCallback((partId, field, value) => {
+		const safeValue = String(value || '').trim();
+		if (!partId || !field || !safeValue) return;
+		const lineStart = lineCharOffsets[currentLineIndex];
+		const draftKey = `${lineStart}:${partId}`;
+		setParallelPartMetaDrafts(prev => ({
+			...prev,
+			[draftKey]: {
+				...(prev[draftKey] || {}),
+				[field]: safeValue
+			}
+		}));
+
+		setSyncData(prev => {
+			if (!prev || !Array.isArray(prev.lines)) return prev;
+			return {
+				...prev,
+				lines: prev.lines.map(line => {
+					if (line.start !== lineStart || !Array.isArray(line.parallel?.parts)) return line;
+					return {
+						...line,
+						parallel: {
+							...line.parallel,
+							parts: line.parallel.parts.map(part => part.id === partId
+								? { ...part, [field]: safeValue }
+								: part)
+						}
+					};
+				})
+			};
+		});
+	}, [lineCharOffsets, currentLineIndex]);
 
 	const toggleMode = useCallback((newMode) => {
 		if (mode === newMode) {
@@ -2303,9 +2598,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSyncData(prev => {
 			if (!prev || !prev.lines) return prev;
 			return {
+				...prev,
 				lines: prev.lines.map(line => ({
 					...line,
-					chars: line.chars.map(t => Math.round((t + deltaSec) * 1000) / 1000)
+					chars: line.chars.map(t => Math.round((t + deltaSec) * 1000) / 1000),
+					parallel: line.parallel ? {
+						...line.parallel,
+						parts: Array.isArray(line.parallel.parts)
+							? line.parallel.parts.map(part => ({
+								...part,
+								chars: Array.isArray(part.chars)
+									? part.chars.map(t => Math.round((t + deltaSec) * 1000) / 1000)
+									: part.chars
+							}))
+							: line.parallel.parts
+					} : line.parallel
 				}))
 			};
 		});
@@ -2712,29 +3019,40 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (!syncLinesByStart) return false;
 		const lineStart = lineCharOffsets[lineIndex];
 		const lineData = syncLinesByStart.get(lineStart);
+		if (activeParallelPart) {
+			const part = lineData?.parallel?.parts?.find(item => item.id === activeParallelPart.id);
+			return !!(part && part.chars && part.chars.length > charIndex);
+		}
 		return lineData && lineData.chars && lineData.chars.length > charIndex;
-	}, [syncLinesByStart, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets, activeParallelPart]);
 
 	const getCharSyncTime = useCallback((lineIndex, charIndex) => {
 		if (!syncLinesByStart) return null;
 		const lineStart = lineCharOffsets[lineIndex];
 		const lineData = syncLinesByStart.get(lineStart);
+		if (activeParallelPart) {
+			const part = lineData?.parallel?.parts?.find(item => item.id === activeParallelPart.id);
+			return part?.chars?.[charIndex] ?? null;
+		}
 		return lineData?.chars?.[charIndex] ?? null;
-	}, [syncLinesByStart, lineCharOffsets]);
+	}, [syncLinesByStart, lineCharOffsets, activeParallelPart]);
 
 	const getPreviewCharIndex = useCallback((lineIndex) => {
 		if (!syncLinesByStart) return -1;
 		const currentTimeSec = position / 1000;
 		const lineStart = lineCharOffsets[lineIndex];
 		const lineData = syncLinesByStart.get(lineStart);
-		if (!lineData || !lineData.chars) return -1;
-		for (let i = lineData.chars.length - 1; i >= 0; i--) {
-			if (currentTimeSec >= lineData.chars[i]) return i;
+		const chars = activeParallelPart
+			? lineData?.parallel?.parts?.find(item => item.id === activeParallelPart.id)?.chars
+			: lineData?.chars;
+		if (!lineData || !chars) return -1;
+		for (let i = chars.length - 1; i >= 0; i--) {
+			if (currentTimeSec >= chars[i]) return i;
 		}
 		return -1;
-	}, [syncLinesByStart, position, lineCharOffsets]);
+	}, [syncLinesByStart, position, lineCharOffsets, activeParallelPart]);
 
-	useEffect(() => { charElementsRef.current = []; }, [currentLineIndex, lyricsText]);
+	useEffect(() => { charElementsRef.current = []; }, [currentLineIndex, lyricsText, activeParallelPartId]);
 
 	const getModeStyle = () => {
 		if (mode === 'record') return { background: 'rgba(229, 57, 53, 0.16)', color: '#ff7a72', borderColor: 'rgba(229, 57, 53, 0.45)' };
@@ -2960,6 +3278,27 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		lineInfo: { textAlign: 'center', minWidth: '120px' },
 		lineCount: { fontSize: '22px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' },
 		lineStatus: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '2px', fontWeight: '500' },
+		parallelPartRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
+		parallelPartBtn: {
+			background: 'rgba(255,255,255,0.05)', color: 'var(--spice-text)',
+			border: '1px solid rgba(255,255,255,0.08)',
+			padding: '7px 12px', borderRadius: '999px',
+			fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+			fontVariantNumeric: 'tabular-nums'
+		},
+		parallelPartBtnActive: {
+			background: 'rgba(var(--spice-rgb-button), 0.22)',
+			borderColor: 'rgba(var(--spice-rgb-button), 0.48)',
+			color: 'var(--spice-text)'
+		},
+		parallelMetaRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', margin: '-4px 0 12px', flexWrap: 'wrap' },
+		parallelMetaLabel: { fontSize: '11px', color: 'var(--spice-subtext)', fontWeight: '700', letterSpacing: '0.02em', textTransform: 'uppercase' },
+		parallelMetaSelect: {
+			background: 'rgba(255,255,255,0.05)', color: 'var(--spice-text)',
+			border: '1px solid rgba(255,255,255,0.08)',
+			padding: '6px 10px', borderRadius: '8px',
+			fontSize: '11px', fontWeight: '700', outline: 'none'
+		},
 		lyricsBox: {
 			background: 'linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.015) 100%)',
 			border: '1px solid rgba(255,255,255,0.06)',
@@ -3125,8 +3464,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	};
 
 	const currentLineData = syncLinesByStart?.get(lineCharOffsets[currentLineIndex]);
+	const currentLineActivePartData = activeParallelPart
+		? currentLineData?.parallel?.parts?.find(part => part.id === activeParallelPart.id)
+		: null;
 	const currentLinePreviewIndex = currentLineText ? getPreviewCharIndex(currentLineIndex) : -1;
-	const currentLineSyncedIndex = (currentLineData?.chars?.length || 0) - 1;
+	const currentLineSyncedIndex = ((currentLineActivePartData || currentLineData)?.chars?.length || 0) - 1;
 	const currentLineProgressIndex = mode === 'preview'
 		? currentLinePreviewIndex
 		: mode === 'record' && recordingCharIndex >= 0
@@ -3462,7 +3804,54 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					react.createElement('button', { style: { ...s.navBtn, opacity: currentLineIndex >= lyricsLines.length - 1 ? 0.3 : 1 }, onClick: goToNextLine, disabled: currentLineIndex >= lyricsLines.length - 1 }, '▶')
 				),
 
-				// Lyrics Box
+				hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
+					[
+							{ id: 'full', label: '전체 줄', count: currentFullLineChars.length },
+							...currentParallelParts.map(part => ({
+								id: part.id,
+								label: `${part.speaker || (part.role === 'background' ? 'B' : 'A')} ${part.kind === 'effect' ? '효과음' : '보컬'}`,
+								count: countRangeChars(part.ranges)
+							}))
+					].map(part => react.createElement('button', {
+						key: part.id,
+						type: 'button',
+						style: {
+							...s.parallelPartBtn,
+							...(activeParallelPartId === part.id ? s.parallelPartBtnActive : null)
+						},
+						onClick: () => {
+							setActiveParallelPartId(part.id);
+							setRecordingCharIndex(-1);
+							charTimesRef.current = [];
+							if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+							}
+						}, `${part.label} · ${part.count}`))
+					),
+
+					activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
+						react.createElement('span', { style: s.parallelMetaLabel }, 'Speaker'),
+						react.createElement('select', {
+							style: s.parallelMetaSelect,
+							value: activeParallelPart.speaker || 'A',
+							onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'speaker', e.target.value)
+						}, ['A', 'B', 'C', 'D', 'SFX'].map(value =>
+							react.createElement('option', { key: value, value }, value)
+						)),
+						react.createElement('span', { style: s.parallelMetaLabel }, 'Type'),
+						react.createElement('select', {
+							style: s.parallelMetaSelect,
+							value: activeParallelPart.kind || 'vocal',
+							onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'kind', e.target.value)
+						}, [
+							['vocal', '보컬'],
+							['effect', '효과음'],
+							['adlib', '애드립']
+						].map(([value, label]) =>
+							react.createElement('option', { key: value, value }, label)
+						))
+					),
+
+					// Lyrics Box
 				react.createElement('div', { style: s.lyricsBox, onMouseDown: handleContainerMouseDown, onTouchStart: handleContainerMouseDown, ref: lyricsScrollRef },
 					react.createElement('div', { style: useCurrentLineTextRun ? { ...s.rtlLyricsLine, direction: currentLineDirection } : s.lyricsLine },
 						useCurrentLineTextRun

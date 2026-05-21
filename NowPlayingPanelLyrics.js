@@ -456,6 +456,48 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   font-family: var(--ivlyrics-panel-original-font) !important;
 }
 
+.ivlyrics-panel-line-karaoke-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.ivlyrics-panel-line-karaoke-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0px !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.background {
+  opacity: 0.78 !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.effect {
+  font-style: italic !important;
+  opacity: 0.72 !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.speaker-a .ivlyrics-panel-karaoke-word.sung {
+  color: #ffffff !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.speaker-b .ivlyrics-panel-karaoke-word.sung {
+  color: #9fd8ff !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.speaker-c .ivlyrics-panel-karaoke-word.sung {
+  color: #ffd18a !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.speaker-d .ivlyrics-panel-karaoke-word.sung {
+  color: #d7b8ff !important;
+}
+
+.ivlyrics-panel-line-karaoke-row.speaker-sfx .ivlyrics-panel-karaoke-word.sung,
+.ivlyrics-panel-line-karaoke-row.effect .ivlyrics-panel-karaoke-word.sung {
+  color: #9ff2c5 !important;
+}
+
 .ivlyrics-panel-karaoke-space {
   margin-right: 5px !important;
 }
@@ -790,6 +832,39 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         return [];
     };
 
+    const getVocalRowsFromLine = (line) => {
+        if (!line?.vocals?.lead?.syllables) return null;
+        const normalizeSpeakerClass = (speaker) => String(speaker || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '');
+        const rows = [{
+            key: 'lead',
+            role: line.vocals.lead.role || 'lead',
+            speaker: line.vocals.lead.speaker || '',
+            kind: line.vocals.lead.kind || 'vocal',
+            speakerClass: normalizeSpeakerClass(line.vocals.lead.speaker),
+            syllables: splitRenderableSyllables(line.vocals.lead.syllables)
+        }];
+
+        if (Array.isArray(line.vocals.background)) {
+            line.vocals.background.forEach((part, index) => {
+                if (Array.isArray(part?.syllables) && part.syllables.length > 0) {
+                    rows.push({
+                        key: part.id || `background-${index}`,
+                        role: 'background',
+                        speaker: part.speaker || '',
+                        kind: part.kind || 'vocal',
+                        speakerClass: normalizeSpeakerClass(part.speaker),
+                        syllables: splitRenderableSyllables(part.syllables)
+                    });
+                }
+            });
+        }
+
+        return rows.length > 1 ? rows : null;
+    };
+
     const INTERLUDE_MIN_DURATION_MS = 500;
     const KARAOKE_TRAILING_INTERLUDE_DELAY_MS = 2500;
     const INTERLUDE_MARKER_REGEX = /^[\s\u00A0\u200B-\u200D\uFEFF\u2669-\u266C]+$/;
@@ -1053,10 +1128,26 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
     // ============================================
     // 노래방 라인 컴포넌트 (syllables 포함)
     // ============================================
-    const KaraokeLine = memo(({ syllables, isActive, isPast, phonetic, translation, lineClass }) => {
-        return react.createElement("div", { className: lineClass },
-            // 노래방 가사 (글자별 타이밍)
-            react.createElement("div", { className: "ivlyrics-panel-line-karaoke" },
+    const KaraokeLine = memo(({ syllables, vocalRows, isActive, isPast, phonetic, translation, lineClass }) => {
+        const karaokeContent = Array.isArray(vocalRows) && vocalRows.length > 1
+            ? react.createElement("div", { className: "ivlyrics-panel-line-karaoke ivlyrics-panel-line-karaoke-stack" },
+                vocalRows.map((row) =>
+	                    react.createElement("div", {
+	                        key: row.key,
+	                        className: `ivlyrics-panel-line-karaoke-row ${row.role || ''} ${row.kind || ''} ${row.speakerClass ? `speaker-${row.speakerClass}` : ''}`
+	                    },
+                        row.syllables.map((syllable, idx) =>
+                            react.createElement(KaraokeWord, {
+                                key: `${row.key}-${idx}`,
+                                syllable,
+                                idx,
+                                isLinePast: isPast
+                            })
+                        )
+                    )
+                )
+            )
+            : react.createElement("div", { className: "ivlyrics-panel-line-karaoke" },
                 syllables.map((syllable, idx) =>
                     react.createElement(KaraokeWord, {
                         key: idx,
@@ -1065,7 +1156,11 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                         isLinePast: isPast
                     })
                 )
-            ),
+            );
+
+        return react.createElement("div", { className: lineClass },
+            // 노래방 가사 (글자별 타이밍)
+            karaokeContent,
             // 발음
             phonetic && react.createElement("div", {
                 className: "ivlyrics-panel-line-phonetic"
@@ -1081,7 +1176,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
             prevProps.isPast === nextProps.isPast &&
             prevProps.lineClass === nextProps.lineClass &&
             prevProps.phonetic === nextProps.phonetic &&
-            prevProps.translation === nextProps.translation;
+            prevProps.translation === nextProps.translation &&
+            prevProps.vocalRows === nextProps.vocalRows;
     });
 
     const createBreakIconChildren = (icon) => {
@@ -1188,7 +1284,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const interludeInfo = isPlaceholder ? { isInterlude: false, durationMs: 0 } : (line?.interludeInfo || getInterludeInfo(line, lineIndex, lineCount));
 
         // 노래방 가사인지 확인
-        const syllables = useMemo(() => getSyllablesFromLine(line), [line]);
+        const vocalRows = useMemo(() => getVocalRowsFromLine(line), [line]);
+        const syllables = useMemo(() => vocalRows?.[0]?.syllables || getSyllablesFromLine(line), [line, vocalRows]);
         const isKaraoke = syllables.length > 0;
         const displayText = line.originalText || line.text || '';
 
@@ -1212,6 +1309,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         if (isKaraoke) {
             return react.createElement(KaraokeLine, {
                 syllables,
+                vocalRows,
                 isActive,
                 isPast,
                 phonetic,
