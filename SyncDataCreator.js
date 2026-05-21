@@ -94,8 +94,63 @@ const normalizeSyncCreatorKind = (value) => (
 	SYNC_CREATOR_KIND_LABELS.has(value) ? value : ''
 );
 
+const getSyncCreatorParenthesisClose = (char) => {
+	if (char === '(') return ')';
+	if (char === '\uFF08') return '\uFF09';
+	return '';
+};
+
+const isSyncCreatorParenthesisClose = (char) => char === ')' || char === '\uFF09';
+
+const isSyncCreatorStandaloneParentheticalLine = (line) => {
+	const chars = Array.from(String(line || '').trim());
+	if (chars.length < 2 || !getSyncCreatorParenthesisClose(chars[0])) return false;
+
+	const expectedStack = [];
+	for (let index = 0; index < chars.length; index++) {
+		const char = chars[index];
+		const expectedClose = getSyncCreatorParenthesisClose(char);
+		if (expectedClose) {
+			expectedStack.push(expectedClose);
+			continue;
+		}
+		if (isSyncCreatorParenthesisClose(char)) {
+			if (!expectedStack.length || expectedStack[expectedStack.length - 1] !== char) {
+				return false;
+			}
+			expectedStack.pop();
+			if (expectedStack.length === 0 && index < chars.length - 1) {
+				return false;
+			}
+		}
+	}
+
+	return expectedStack.length === 0;
+};
+
+const stripSyncCreatorStandaloneParentheticalLine = (line) => {
+	let value = String(line || '').normalize('NFC').trim();
+	let changed = false;
+
+	while (isSyncCreatorStandaloneParentheticalLine(value)) {
+		const chars = Array.from(value);
+		value = chars.slice(1, -1).join('').trim();
+		changed = true;
+	}
+
+	return changed ? value : String(line || '').normalize('NFC');
+};
+
+const normalizeSyncCreatorStandaloneParentheticalLines = (text) => (
+	String(text || '')
+		.normalize('NFC')
+		.split('\n')
+		.map(line => stripSyncCreatorStandaloneParentheticalLine(line))
+		.join('\n')
+);
+
 const detectSyncCreatorParallelVocalHints = (text) => {
-	const normalized = String(text || '');
+	const normalized = normalizeSyncCreatorStandaloneParentheticalLines(text);
 	if (!normalized.trim()) return false;
 	return normalized
 		.split('\n')
@@ -700,6 +755,19 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		const flushRun = (endIndex) => {
 			if (runStart !== null && endIndex >= runStart) {
+				while (runStart <= endIndex && /\s/u.test(chars[runStart] || '')) {
+					pushHidden(runStart);
+					runStart++;
+				}
+				const originalEndIndex = endIndex;
+				while (endIndex >= runStart && /\s/u.test(chars[endIndex] || '')) {
+					endIndex--;
+				}
+				for (let index = endIndex + 1; index <= originalEndIndex; index++) {
+					pushHidden(index);
+				}
+			}
+			if (runStart !== null && endIndex >= runStart) {
 				pushSyncCreatorRange(runPart === 'background' ? backgroundRanges : leadRanges, runStart, endIndex, lineStart);
 			}
 			runStart = null;
@@ -748,13 +816,77 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		flushRun(chars.length - 1);
 
 		if (!leadRanges.length || !backgroundRanges.length) return null;
+		const orderedRangeGroups = [
+			{ ranges: leadRanges },
+			{ ranges: backgroundRanges }
+		]
+			.filter(group => group.ranges.length > 0)
+			.sort((a, b) => a.ranges[0].start - b.ranges[0].start);
 
 		return {
 			layout: 'stack',
-			parts: [
-				buildPart(0, leadRanges, 'lead'),
-				buildPart(1, backgroundRanges, 'background')
-			],
+			parts: orderedRangeGroups.map((group, index) =>
+				buildPart(index, group.ranges, index === 0 ? 'lead' : 'background')
+			),
+			hiddenRanges
+		};
+	};
+
+	const buildManualParallelTemplate = (lineChars, lineStart = 0, splitPoints = []) => {
+		const chars = Array.isArray(lineChars) ? lineChars : [];
+		if (chars.length < 2 || !Array.isArray(splitPoints) || splitPoints.length === 0) return null;
+
+		const normalizedSplitPoints = [...new Set(splitPoints
+			.map(value => Number(value))
+			.filter(value => Number.isInteger(value) && value > 0 && value < chars.length))]
+			.sort((a, b) => a - b);
+		if (normalizedSplitPoints.length === 0) return null;
+
+		const speakerLabels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+		const hiddenRanges = [];
+		const parts = [];
+
+		const pushHidden = (index) => {
+			const absoluteIndex = lineStart + index;
+			const previous = hiddenRanges[hiddenRanges.length - 1];
+			if (previous && previous.end + 1 === absoluteIndex) {
+				previous.end = absoluteIndex;
+			} else {
+				hiddenRanges.push({ start: absoluteIndex, end: absoluteIndex });
+			}
+		};
+
+		const boundaries = [0, ...normalizedSplitPoints, chars.length];
+		for (let boundaryIndex = 0; boundaryIndex < boundaries.length - 1; boundaryIndex++) {
+			let start = boundaries[boundaryIndex];
+			let end = boundaries[boundaryIndex + 1] - 1;
+
+			while (start <= end && /\s/u.test(chars[start] || '')) {
+				pushHidden(start);
+				start++;
+			}
+			const trailingHiddenIndexes = [];
+			while (end >= start && /\s/u.test(chars[end] || '')) {
+				trailingHiddenIndexes.push(end);
+				end--;
+			}
+			trailingHiddenIndexes.reverse().forEach(pushHidden);
+			if (start > end) continue;
+
+			parts.push({
+				id: speakerLabels[parts.length]?.toLowerCase() || `p${parts.length + 1}`,
+				role: parts.length === 0 ? 'lead' : 'background',
+				speaker: SYNC_CREATOR_DEFAULT_SPEAKER,
+				kind: SYNC_CREATOR_DEFAULT_KIND,
+				ranges: [{ start: lineStart + start, end: lineStart + end }],
+				join: []
+			});
+		}
+
+		if (parts.length < 2) return null;
+		return {
+			layout: 'stack',
+			parts,
 			hiddenRanges
 		};
 	};
@@ -788,6 +920,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const [currentLineIndex, setCurrentLineIndex] = useState(0);
 	const [activeParallelPartId, setActiveParallelPartId] = useState('full');
 	const [parallelPartMetaDrafts, setParallelPartMetaDrafts] = useState({});
+	const [manualParallelSplitDrafts, setManualParallelSplitDrafts] = useState({});
 	const [lineMetaDrafts, setLineMetaDrafts] = useState({});
 	const [multiVocalMode, setMultiVocalMode] = useState(false);
 	const [pendingMultiVocalDecision, setPendingMultiVocalDecision] = useState(null);
@@ -860,7 +993,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			text = lyricsSource;
 		}
 
-		return text ? text.normalize('NFC') : '';
+		return text ? normalizeSyncCreatorStandaloneParentheticalLines(text) : '';
 	}, []);
 
 	const buildLineObjectsFromText = useCallback((text) => {
@@ -883,15 +1016,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (!sourceText) return '';
 
 		if (usePlain || !candidate.syncedLyrics) {
-			return sourceText.normalize('NFC');
+			return normalizeSyncCreatorStandaloneParentheticalLines(sourceText);
 		}
 
-		return sourceText
+		return normalizeSyncCreatorStandaloneParentheticalLines(sourceText
 			.split('\n')
 			.map(line => stripLrclibTimestamp(line))
 			.filter(Boolean)
-			.join('\n')
-			.normalize('NFC');
+			.join('\n'));
 	}, [stripLrclibTimestamp]);
 
 	const buildSyntheticLrclibResult = useCallback((candidate) => {
@@ -915,6 +1047,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		let finalProvider = result.provider || usedProvider;
 		let loadedSyncBody = null;
 
+		setManualParallelSplitDrafts({});
 		if ((finalProvider === 'Spotify' || finalProvider === 'spotify') && result.spotifyLyricsProvider) {
 			finalProvider = `spotify-${result.spotifyLyricsProvider}`;
 		}
@@ -965,6 +1098,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const resolveMultiVocalDecision = useCallback((useMultiVocalMode) => {
 		if (!pendingMultiVocalDecision) return;
 		setPendingMultiVocalDecision(null);
+		setManualParallelSplitDrafts({});
 		setMultiVocalMode(useMultiVocalMode);
 		setActiveParallelPartId(useMultiVocalMode ? '' : 'full');
 		setLyricsText(pendingMultiVocalDecision.text);
@@ -990,6 +1124,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSyncData(null);
 		setCurrentLineIndex(0);
 		setMultiVocalMode(false);
+		setManualParallelSplitDrafts({});
 		setPendingMultiVocalDecision(null);
 		setActiveParallelPartId('full');
 		setMode('idle');
@@ -1056,9 +1191,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		speaker: normalizeSyncCreatorSpeaker(lineMetaDrafts[currentLineStart]?.speaker || currentExistingLineData?.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER,
 		kind: normalizeSyncCreatorKind(lineMetaDrafts[currentLineStart]?.kind || currentExistingLineData?.kind) || SYNC_CREATOR_DEFAULT_KIND
 	}), [lineMetaDrafts, currentLineStart, currentExistingLineData]);
+	const getParallelTemplateForLine = useCallback((lineChars, lineStart) => {
+		const manualTemplate = buildManualParallelTemplate(lineChars, lineStart, manualParallelSplitDrafts[lineStart]);
+		if (manualTemplate) return manualTemplate;
+		return buildParentheticalParallelTemplate(lineChars, lineStart);
+	}, [manualParallelSplitDrafts]);
 	const currentParallelTemplate = useMemo(
-		() => multiVocalMode ? buildParentheticalParallelTemplate(currentFullLineChars, currentLineStart) : null,
-		[multiVocalMode, currentFullLineChars, currentLineStart]
+		() => multiVocalMode ? getParallelTemplateForLine(currentFullLineChars, currentLineStart) : null,
+		[multiVocalMode, getParallelTemplateForLine, currentFullLineChars, currentLineStart]
 	);
 	const currentParallelData = useMemo(() => {
 		const merged = mergeSyncCreatorParallelTemplate(currentParallelTemplate, currentExistingLineData?.parallel);
@@ -1301,7 +1441,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				const lineStart = lineCharOffsets[index];
 				const lineData = linesByStart.get(lineStart);
 				if (!lineData) return count;
-				const template = buildParentheticalParallelTemplate(Array.from(lineText || ''), lineStart);
+				const template = getParallelTemplateForLine(Array.from(lineText || ''), lineStart);
 				if (template?.parts?.length > 1) {
 					const existingParts = Array.isArray(lineData.parallel?.parts) ? lineData.parallel.parts : [];
 					const isComplete = template.parts.every(part => {
@@ -1318,7 +1458,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}, 0);
 		}
 		return syncData.lines.length;
-	}, [syncData, multiVocalMode, lyricsLines, lineCharOffsets]);
+	}, [syncData, multiVocalMode, lyricsLines, lineCharOffsets, getParallelTemplateForLine]);
 
 	// 현재 줄이 싱크되어 있는지
 	const isCurrentLineSynced = useMemo(() => {
@@ -1508,6 +1648,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		setSyncData(null);
 		setCurrentLineIndex(0);
 		setMultiVocalMode(false);
+		setManualParallelSplitDrafts({});
 		setPendingMultiVocalDecision(null);
 		setActiveParallelPartId('full');
 		setMode('idle');
@@ -1665,7 +1806,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				}
 
 				// NFC 정규화 적용
-				text = text ? text.normalize('NFC') : '';
+				text = text ? normalizeSyncCreatorStandaloneParentheticalLines(text) : '';
 
 				if (text.trim().length > 0) {
 					setLyricsText(text);
@@ -2960,6 +3101,74 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		});
 	}, [lineCharOffsets, currentLineIndex, multiVocalMode]);
 
+	const currentManualSplitPoints = useMemo(() => {
+		const splitPoints = manualParallelSplitDrafts[currentLineStart];
+		return Array.isArray(splitPoints)
+			? [...new Set(splitPoints
+				.map(value => Number(value))
+				.filter(value => Number.isInteger(value) && value > 0 && value < currentFullLineChars.length))]
+				.sort((a, b) => a - b)
+			: [];
+	}, [manualParallelSplitDrafts, currentLineStart, currentFullLineChars.length]);
+	const currentManualSplitPointSet = useMemo(
+		() => new Set(currentManualSplitPoints),
+		[currentManualSplitPoints]
+	);
+	const hasManualParallelSplit = currentManualSplitPoints.length > 0;
+	const resetCurrentLineManualSplit = useCallback(() => {
+		const lineStart = lineCharOffsets[currentLineIndex];
+		setManualParallelSplitDrafts(prev => {
+			if (!Object.prototype.hasOwnProperty.call(prev, lineStart)) return prev;
+			const next = { ...prev };
+			delete next[lineStart];
+			return next;
+		});
+		setMode('idle');
+		setRecordingCharIndex(-1);
+		charTimesRef.current = [];
+		if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+	}, [lineCharOffsets, currentLineIndex]);
+	const toggleManualParallelSplitPoint = useCallback((splitPoint) => {
+		if (!multiVocalMode || currentFullLineChars.length < 2) return;
+		const normalizedSplitPoint = Number(splitPoint);
+		if (!Number.isInteger(normalizedSplitPoint) || normalizedSplitPoint <= 0 || normalizedSplitPoint >= currentFullLineChars.length) {
+			return;
+		}
+
+		const lineStart = lineCharOffsets[currentLineIndex];
+		setManualParallelSplitDrafts(prev => {
+			const current = new Set(Array.isArray(prev[lineStart]) ? prev[lineStart] : []);
+			if (current.has(normalizedSplitPoint)) {
+				current.delete(normalizedSplitPoint);
+			} else {
+				current.add(normalizedSplitPoint);
+			}
+
+			const nextSplitPoints = [...current]
+				.filter(value => Number.isInteger(value) && value > 0 && value < currentFullLineChars.length)
+				.sort((a, b) => a - b);
+			const next = { ...prev };
+			if (nextSplitPoints.length > 0) {
+				next[lineStart] = nextSplitPoints;
+			} else {
+				delete next[lineStart];
+			}
+			return next;
+		});
+		setMode('idle');
+		setRecordingCharIndex(-1);
+		charTimesRef.current = [];
+		if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+	}, [multiVocalMode, currentFullLineChars.length, lineCharOffsets, currentLineIndex]);
+	const enableManualMultiVocalMode = useCallback(() => {
+		setMultiVocalMode(true);
+		setActiveParallelPartId('');
+		setMode('idle');
+		setRecordingCharIndex(-1);
+		charTimesRef.current = [];
+		if (lyricsScrollRef.current) lyricsScrollRef.current.scrollLeft = 0;
+	}, []);
+
 	const toggleMode = useCallback((newMode) => {
 		if (mode === newMode) {
 			setMode('idle');
@@ -3059,7 +3268,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				}
 
 				const lineChars = Array.from(lineText);
-				const template = buildParentheticalParallelTemplate(lineChars, lineStart);
+				const template = getParallelTemplateForLine(lineChars, lineStart);
 				if (template?.parts?.length > 1) {
 					const existingParts = Array.isArray(lineData.parallel?.parts) ? lineData.parallel.parts : [];
 					for (const part of template.parts) {
@@ -3173,7 +3382,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		setIsSubmitting(false);
-	}, [syncData, lyricsLines, lineCharOffsets, multiVocalMode, trackId, provider, trackName, artistName, onClose]);
+	}, [syncData, lyricsLines, lineCharOffsets, multiVocalMode, trackId, provider, trackName, artistName, onClose, getParallelTemplateForLine]);
 
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
 	const exportSyncData = useCallback(() => {
@@ -3727,6 +3936,18 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		lineInfo: { textAlign: 'center', minWidth: '120px' },
 		lineCount: { fontSize: '22px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' },
 		lineStatus: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '2px', fontWeight: '500' },
+		multiVocalSwitchRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '-6px 0 12px' },
+		multiVocalSwitchBtn: {
+			background: 'rgba(var(--spice-rgb-button), 0.12)',
+			border: '1px solid rgba(var(--spice-rgb-button), 0.3)',
+			color: 'var(--spice-text)',
+			padding: '7px 13px',
+			borderRadius: '999px',
+			fontSize: '11px',
+			fontWeight: '800',
+			cursor: 'pointer',
+			letterSpacing: '-0.005em'
+		},
 		multiVocalBanner: {
 			alignSelf: 'center',
 			margin: '-6px 0 12px',
@@ -3738,6 +3959,70 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			fontSize: '11px',
 			fontWeight: '700',
 			letterSpacing: '-0.005em'
+		},
+		parallelSplitEditor: {
+			alignSelf: 'stretch',
+			maxWidth: '920px',
+			width: '100%',
+			margin: '-2px auto 12px',
+			padding: '10px 12px',
+			borderRadius: '14px',
+			background: 'rgba(255,255,255,0.025)',
+			border: '1px solid rgba(255,255,255,0.06)',
+			boxSizing: 'border-box'
+		},
+		parallelSplitHeader: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' },
+		parallelSplitTitle: { fontSize: '11px', color: 'var(--spice-subtext)', fontWeight: '800', letterSpacing: '0.04em', textTransform: 'uppercase' },
+		parallelSplitBadge: {
+			padding: '3px 8px',
+			borderRadius: '999px',
+			background: 'rgba(var(--spice-rgb-button), 0.14)',
+			border: '1px solid rgba(var(--spice-rgb-button), 0.25)',
+			color: 'var(--spice-text)',
+			fontSize: '10px',
+			fontWeight: '800',
+			fontVariantNumeric: 'tabular-nums'
+		},
+		parallelSplitResetBtn: {
+			background: 'rgba(255,255,255,0.055)',
+			border: '1px solid rgba(255,255,255,0.08)',
+			color: 'var(--spice-text)',
+			padding: '4px 9px',
+			borderRadius: '999px',
+			fontSize: '10px',
+			fontWeight: '800',
+			cursor: 'pointer'
+		},
+		parallelSplitTape: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'stretch', gap: '2px 0', lineHeight: 1.2 },
+		parallelSplitChar: {
+			display: 'inline-flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			minWidth: '12px',
+			padding: '5px 1px',
+			color: 'var(--spice-text)',
+			fontSize: '17px',
+			fontWeight: '700',
+			boxSizing: 'border-box'
+		},
+		parallelSplitBoundary: {
+			width: '12px',
+			minWidth: '12px',
+			margin: '0 -2px',
+			padding: 0,
+			border: 'none',
+			borderRadius: '999px',
+			background: 'transparent',
+			color: 'rgba(255,255,255,0.28)',
+			cursor: 'pointer',
+			fontSize: '14px',
+			fontWeight: '900',
+			lineHeight: 1
+		},
+		parallelSplitBoundaryActive: {
+			background: 'rgba(var(--spice-rgb-button), 0.24)',
+			color: 'var(--spice-text)',
+			boxShadow: '0 0 0 1px rgba(var(--spice-rgb-button), 0.35)'
 		},
 		parallelPartRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
 		parallelPartBtn: {
@@ -4419,10 +4704,48 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					react.createElement('button', { style: { ...s.navBtn, opacity: currentLineIndex >= lyricsLines.length - 1 ? 0.3 : 1 }, onClick: goToNextLine, disabled: currentLineIndex >= lyricsLines.length - 1 }, '▶')
 				),
 
+				!multiVocalMode && currentFullLineChars.length > 1 && react.createElement('div', { style: s.multiVocalSwitchRow },
+					react.createElement('button', {
+						type: 'button',
+						style: s.multiVocalSwitchBtn,
+						onClick: enableManualMultiVocalMode
+					}, I18n.t('syncCreator.enableMultiVocalMode') || 'Enable multiple vocal mode')
+				),
+
 				multiVocalMode && react.createElement('div', { style: s.multiVocalBanner },
 					hasCurrentParallelParts
 						? (I18n.t('syncCreator.multiVocalBannerParts') || 'Multiple vocal mode: sync each vocal part separately.')
 						: (I18n.t('syncCreator.multiVocalBannerLine') || 'Multiple vocal mode: choose SPEAKER and TYPE for this line.')
+				),
+
+				multiVocalMode && currentFullLineChars.length > 1 && react.createElement('div', { style: s.parallelSplitEditor },
+					react.createElement('div', { style: s.parallelSplitHeader },
+						react.createElement('span', { style: s.parallelSplitTitle }, I18n.t('syncCreator.manualSplit') || 'Manual split'),
+						hasManualParallelSplit && react.createElement('span', { style: s.parallelSplitBadge }, `${currentManualSplitPoints.length + 1} parts`),
+						hasManualParallelSplit && react.createElement('button', {
+							type: 'button',
+							style: s.parallelSplitResetBtn,
+							onClick: resetCurrentLineManualSplit
+						}, I18n.t('syncCreator.useAutoSplit') || 'Use auto')
+					),
+					react.createElement('div', { style: s.parallelSplitTape },
+						currentFullLineChars.map((char, index) => react.createElement(react.Fragment, { key: `manual-split-${currentLineStart}-${index}` },
+							index > 0 && react.createElement('button', {
+								type: 'button',
+								style: {
+									...s.parallelSplitBoundary,
+									...(currentManualSplitPointSet.has(index) ? s.parallelSplitBoundaryActive : null)
+								},
+								title: I18n.t('syncCreator.splitHere') || 'Split here',
+								onClick: (e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									toggleManualParallelSplitPoint(index);
+								}
+							}, currentManualSplitPointSet.has(index) ? '|' : '·'),
+							react.createElement('span', { style: s.parallelSplitChar }, char === ' ' ? '\u00A0' : char)
+						))
+					)
 				),
 
 				false && hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },

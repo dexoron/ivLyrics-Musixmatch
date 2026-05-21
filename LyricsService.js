@@ -1771,12 +1771,20 @@
                     });
 
                     if (!partSyllables.length) return null;
+                    while (partSyllables.length && /^\s+$/u.test(partSyllables[0]?.text || '')) {
+                        partSyllables.shift();
+                    }
+                    while (partSyllables.length && /^\s+$/u.test(partSyllables[partSyllables.length - 1]?.text || '')) {
+                        partSyllables.pop();
+                    }
+                    if (!partSyllables.length) return null;
+                    const normalizedText = partSyllables.map(syllable => syllable.text || '').join('');
 	                    return {
 	                        id: part.id || '',
 	                        role: part.role || '',
 	                        speaker: part.speaker || '',
 	                        kind: part.kind || 'vocal',
-	                        text,
+	                        text: normalizedText,
 	                        syllables: partSyllables,
 	                        startTime: partSyllables[0].startTime,
                         endTime: partSyllables[partSyllables.length - 1].endTime

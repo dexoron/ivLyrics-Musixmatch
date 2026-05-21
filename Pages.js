@@ -1655,8 +1655,10 @@ const splitLineByParallelShape = (text, rowCount) => {
 	const lead = [];
 	const background = [];
 	let depth = 0;
+	let firstLeadIndex = Number.POSITIVE_INFINITY;
+	let firstBackgroundIndex = Number.POSITIVE_INFINITY;
 
-	chars.forEach((char) => {
+	chars.forEach((char, index) => {
 		if (char === "(" || char === "（") {
 			depth++;
 			return;
@@ -1666,14 +1668,22 @@ const splitLineByParallelShape = (text, rowCount) => {
 			return;
 		}
 		if (depth > 0) {
+			firstBackgroundIndex = Math.min(firstBackgroundIndex, index);
 			background.push(char);
 		} else {
+			if (!/\s/u.test(char)) {
+				firstLeadIndex = Math.min(firstLeadIndex, index);
+			}
 			lead.push(char);
 		}
 	});
 
 	if (rowCount === 2 && background.join("").trim()) {
-		return [lead.join("").trim(), background.join("").trim()];
+		const leadText = lead.join("").trim();
+		const backgroundText = background.join("").trim();
+		return firstBackgroundIndex < firstLeadIndex
+			? [backgroundText, leadText]
+			: [leadText, backgroundText];
 	}
 
 	return [];

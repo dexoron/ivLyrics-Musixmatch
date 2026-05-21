@@ -974,6 +974,7 @@ div.lyrics-tabBar-headerItemLink {
   display: block;
   width: 100%;
   max-width: 100%;
+  --karaoke-glyph-bleed-x: 0.16em;
   letter-spacing: var(--lyrics-original-letter-spacing, 0);
   line-height: 1.38;
   color: var(--lyrics-color-inactive);
@@ -1185,11 +1186,15 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-karaoke-text-run-segment {
   display: inline-block;
   white-space: pre;
+  padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
   color: var(--lyrics-color-inactive);
   filter: none;
   text-shadow: none;
   vertical-align: baseline;
   unicode-bidi: isolate;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .lyrics-karaoke-text-run-segment.is-bouncing {
@@ -1233,11 +1238,15 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-karaoke-char {
   display: inline-block;
   white-space: pre-wrap;
+  padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
   color: var(--lyrics-color-inactive);
   filter: none;
   text-shadow: none;
   vertical-align: baseline;
   overflow: visible;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .lyrics-karaoke-char.is-bouncing {
@@ -1289,6 +1298,8 @@ div.lyrics-tabBar-headerItemLink {
 .lyrics-karaoke-ruby {
   ruby-position: over;
   overflow: visible;
+  padding-inline: var(--karaoke-glyph-bleed-x, 0.16em);
+  margin-inline: calc(var(--karaoke-glyph-bleed-x, 0.16em) * -1);
 }
 
 /* Keep pending rt on the same transparent + background-clip:text path the active
