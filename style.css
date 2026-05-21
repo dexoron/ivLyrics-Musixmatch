@@ -828,13 +828,10 @@ body.ivlyrics-page-active .main-topBar-container {
 }
 
 .lyrics-lyricsContainer-SyncedLyrics>.lyrics-lyricsContainer-LyricsLine-paddingLine {
-  opacity: 0;
-  filter: blur(6px);
+  opacity: 0 !important;
+  filter: none !important;
   pointer-events: none;
-}
-
-.lyrics-lyricsContainer-SyncedLyrics>.lyrics-lyricsContainer-LyricsLine-paddingAfter {
-  visibility: hidden;
+  visibility: hidden !important;
 }
 
 .lyrics-lyricsContainer-SyncedLyricsPage:not(.scrolling-active) .lyrics-lyricsContainer-SyncedLyrics>.lyrics-lyricsContainer-LyricsLine-paddingBefore {
