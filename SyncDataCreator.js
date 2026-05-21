@@ -16,9 +16,9 @@ const SYNC_CREATOR_SPEAKER_OPTIONS = [
 const SYNC_CREATOR_DEFAULT_SPEAKER = 'MALE 1';
 const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
 const SYNC_CREATOR_KIND_OPTIONS = [
-	['vocal', '보컬'],
-	['effect', '효과음'],
-	['adlib', '애드립']
+	['vocal', 'syncCreator.kindVocal'],
+	['effect', 'syncCreator.kindEffect'],
+	['adlib', 'syncCreator.kindAdlib']
 ];
 const SYNC_CREATOR_KIND_LABELS = new Map(SYNC_CREATOR_KIND_OPTIONS);
 const SYNC_CREATOR_PARALLEL_HINT_REGEX = /[()（）\/|／｜]/u;
@@ -84,6 +84,11 @@ const normalizeSyncCreatorSpeaker = (value) => {
 const isSyncCreatorDuetSpeaker = (value) => (
 	String(value || '').trim().toUpperCase().startsWith('DUET ')
 );
+
+const getSyncCreatorKindLabel = (value) => {
+	const labelKey = SYNC_CREATOR_KIND_LABELS.get(value);
+	return labelKey ? (I18n.t(labelKey) || value) : '';
+};
 
 const normalizeSyncCreatorKind = (value) => (
 	SYNC_CREATOR_KIND_LABELS.has(value) ? value : ''
@@ -925,7 +930,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
 					loadedSyncBody = existingSyncData.syncData;
 					setSyncData(loadedSyncBody);
-					Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || '기존 싱크 데이터를 불러왔습니다');
+					Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || 'Loaded existing sync data');
 				}
 			} catch (e) {
 				console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
@@ -1110,7 +1115,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		return !!(normalizeSyncCreatorSpeaker(currentLineMeta.speaker) && normalizeSyncCreatorKind(currentLineMeta.kind));
 	}, [multiVocalMode, hasCurrentParallelParts, activeParallelPart, currentParallelParts, currentLineMeta]);
 	const showMissingMetaToast = useCallback(() => {
-		Toast.error('여러 보컬 모드에서는 현재 보컬의 SPEAKER와 TYPE을 먼저 선택해야 합니다.');
+		Toast.error(I18n.t('syncCreator.multiVocalMetaRequired') || 'Select SPEAKER and TYPE for the current vocal first.');
 	}, []);
 	const advanceAfterCompletedTarget = useCallback((lineData) => {
 		const nextPartId = getIncompleteParallelPartId(lineData);
@@ -1349,7 +1354,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 
 		if (typeof window.AIAddonManager?.generateCharacterPronunciation !== 'function') {
-			Toast.error(I18n.t('syncCreator.characterPronunciationNoProvider') || '문자별 발음을 지원하는 AI 제공자가 없습니다.');
+			Toast.error(I18n.t('syncCreator.characterPronunciationNoProvider') || 'No AI provider supports character-level pronunciation.');
 			return;
 		}
 
@@ -1399,13 +1404,13 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			setShowCharacterPronunciations(true);
 
 			if (hasAnyPronunciation) {
-				Toast.success(I18n.t('syncCreator.characterPronunciationGenerated') || 'AI 글자별 발음을 생성했습니다.');
+				Toast.success(I18n.t('syncCreator.characterPronunciationGenerated') || 'Generated AI character pronunciation.');
 			} else {
-				Toast.warning(I18n.t('syncCreator.characterPronunciationEmpty') || '생성된 글자별 발음이 비어 있습니다.');
+				Toast.warning(I18n.t('syncCreator.characterPronunciationEmpty') || 'Generated character pronunciation is empty.');
 			}
 		} catch (e) {
 			console.error('[SyncDataCreator] Character pronunciation generation failed:', e);
-			Toast.error((I18n.t('syncCreator.characterPronunciationError') || '글자별 발음 생성 실패') + ': ' + (e?.message || e));
+			Toast.error((I18n.t('syncCreator.characterPronunciationError') || 'Failed to generate character pronunciation') + ': ' + (e?.message || e));
 		} finally {
 			setIsGeneratingCharacterPronunciations(false);
 			setCharacterPronunciationProgress(null);
@@ -1671,7 +1676,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						if (existingSyncData && existingSyncData.syncData && existingSyncData.syncData.lines) {
 							window.__ivLyricsDebugLog?.('[SyncDataCreator] Found matching existing sync data');
 							setSyncData(existingSyncData.syncData);
-							Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || '기존 싱크 데이터를 불러왔습니다');
+							Toast.success(I18n.t('syncCreator.loadedExistingSyncData') || 'Loaded existing sync data');
 						}
 					} catch (e) {
 						console.warn('[SyncDataCreator] Failed to load existing sync data:', e);
@@ -1905,7 +1910,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 		if (multiVocalMode && hasCurrentParallelParts && !activeParallelPart) {
 			setActiveParallelPartId(currentParallelParts[0]?.id || 'full');
-			Toast.error('싱크할 보컬 파트를 먼저 선택해야 합니다.');
+			Toast.error(I18n.t('syncCreator.selectVocalPartFirst') || 'Select the vocal part to sync first.');
 			return null;
 		}
 		const lineStart = currentLineStart;
@@ -3045,7 +3050,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				const lineStart = lineCharOffsets[index];
 				const lineData = linesByStart.get(lineStart);
 				if (!lineData) {
-					Toast.error(`${index + 1}번째 줄의 싱크가 아직 없습니다.`);
+					Toast.error(I18n.t('syncCreator.lineMissingSync', { line: index + 1 }) || `Line ${index + 1} has no sync yet.`);
 					return;
 				}
 
@@ -3057,16 +3062,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						const existingPart = existingParts.find(item => item.id === part.id);
 						const expectedChars = countRangeChars(part.ranges);
 						if (!existingPart || !Array.isArray(existingPart.chars) || existingPart.chars.length !== expectedChars) {
-							Toast.error(`${index + 1}번째 줄의 모든 보컬 파트를 싱크해야 합니다.`);
+							Toast.error(I18n.t('syncCreator.lineAllPartsMissingSync', { line: index + 1 }) || `Sync every vocal part on line ${index + 1}.`);
 							return;
 						}
 						if (!(normalizeSyncCreatorSpeaker(existingPart.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) || !(normalizeSyncCreatorKind(existingPart.kind) || SYNC_CREATOR_DEFAULT_KIND)) {
-							Toast.error(`${index + 1}번째 줄의 모든 보컬 파트에 SPEAKER와 TYPE을 선택해야 합니다.`);
+							Toast.error(I18n.t('syncCreator.linePartMetaRequired', { line: index + 1 }) || `Select SPEAKER and TYPE for every vocal part on line ${index + 1}.`);
 							return;
 						}
 					}
 				} else if (!(normalizeSyncCreatorSpeaker(lineData.speaker) || SYNC_CREATOR_DEFAULT_SPEAKER) || !(normalizeSyncCreatorKind(lineData.kind) || SYNC_CREATOR_DEFAULT_KIND)) {
-					Toast.error(`${index + 1}번째 줄의 SPEAKER와 TYPE을 선택해야 합니다.`);
+					Toast.error(I18n.t('syncCreator.lineMetaRequired', { line: index + 1 }) || `Select SPEAKER and TYPE for line ${index + 1}.`);
 					return;
 				}
 			}
@@ -3169,7 +3174,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
 	const exportSyncData = useCallback(() => {
 		if (!syncData || !syncData.lines || syncData.lines.length === 0) {
-			Toast.error(I18n.t('syncCreator.noSyncData') || '내보낼 싱크 데이터가 없습니다');
+			Toast.error(I18n.t('syncCreator.noSyncData') || 'No sync data to export');
 			return;
 		}
 
@@ -3183,7 +3188,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
 
-		Toast.success(I18n.t('syncCreator.exportSuccess') || '싱크 데이터를 내보냈습니다');
+		Toast.success(I18n.t('syncCreator.exportSuccess') || 'Exported sync data');
 	}, [syncData, trackId]);
 
 	// 싱크 데이터 불러오기 (JSON 파일에서)
@@ -3207,10 +3212,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				// 싱크 데이터 적용
 				setSyncData(importedData);
 
-				Toast.success(I18n.t('syncCreator.importSuccess') || '싱크 데이터를 불러왔습니다');
+				Toast.success(I18n.t('syncCreator.importSuccess') || 'Imported sync data');
 			} catch (err) {
 				console.error('[SyncDataCreator] Import error:', err);
-				Toast.error((I18n.t('syncCreator.importError') || '불러오기 실패') + ': ' + err.message);
+				Toast.error((I18n.t('syncCreator.importError') || 'Import failed') + ': ' + err.message);
 			}
 		};
 		input.click();
@@ -3219,16 +3224,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	// 가사 전체 복사
 	const copyAllLyrics = useCallback(async () => {
 		if (!lyricsText) {
-			Toast.error(I18n.t('syncCreator.noLyrics') || '복사할 가사가 없습니다');
+			Toast.error(I18n.t('syncCreator.noLyrics') || 'No lyrics to copy');
 			return;
 		}
 
 		try {
 			await navigator.clipboard.writeText(lyricsText);
-			Toast.success(I18n.t('syncCreator.lyricsCopied') || '가사를 클립보드에 복사했습니다');
+			Toast.success(I18n.t('syncCreator.lyricsCopied') || 'Copied lyrics to clipboard');
 		} catch (err) {
 			console.error('[SyncDataCreator] Copy error:', err);
-			Toast.error((I18n.t('syncCreator.copyError') || '복사 실패') + ': ' + err.message);
+			Toast.error((I18n.t('syncCreator.copyError') || 'Copy failed') + ': ' + err.message);
 		}
 	}, [lyricsText]);
 
@@ -3239,7 +3244,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		publishWorkersRef.current = [];
 		setIsPublishingToLrcLib(false);
 		setLrcLibPublishProgress('');
-		Toast.warning(I18n.t('syncCreator.lrclib.publishCancelled') || '등록이 취소되었습니다');
+		Toast.warning(I18n.t('syncCreator.lrclib.publishCancelled') || 'Registration was cancelled');
 	}, []);
 
 	// LRCLIB Proof-of-Work 솔버 (Web Worker 사용)
@@ -3410,7 +3415,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				setManualLyricsInput('');
 
 				// LRCLIB에 가사가 반영될 때까지 잠시 대기 후 자동 로드
-				setLrcLibPublishProgress(I18n.t('syncCreator.lrclib.loadingAfterPublish') || '가사를 불러오는 중...');
+				setLrcLibPublishProgress(I18n.t('syncCreator.lrclib.loadingAfterPublish') || 'Loading lyrics...');
 				setProvider('lrclib');
 
 				// 2초 후 가사 로드 (LRCLIB 서버 반영 대기)
@@ -4122,7 +4127,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		const syncedCount = Array.isArray(savedPart?.chars) ? Math.min(savedPart.chars.length, partChars.length) : 0;
 		const speakerLabel = part.speaker || SYNC_CREATOR_DEFAULT_SPEAKER;
 		const isDuetSpeaker = isSyncCreatorDuetSpeaker(speakerLabel);
-		const kindLabel = SYNC_CREATOR_KIND_LABELS.get(part.kind) || part.kind || SYNC_CREATOR_DEFAULT_KIND;
+		const kindLabel = getSyncCreatorKindLabel(part.kind) || part.kind || SYNC_CREATOR_DEFAULT_KIND;
 		const handlePartPointerDown = (e) => {
 			if (isActive) {
 				handleContainerMouseDown(e);
@@ -4288,7 +4293,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			),
 			showLrclibCandidates && react.createElement('div', { style: s.candidateList },
 				isLoading && lrclibCandidates.length === 0 && react.createElement('div', { style: s.candidateEmpty },
-					I18n.t('syncCreator.loadingLyrics') || '가사를 불러오는 중...'
+					I18n.t('syncCreator.loadingLyrics') || 'Loading lyrics...'
 				),
 				!isLoading && lrclibCandidates.length === 0 && react.createElement('div', { style: s.candidateEmpty },
 					lrclibSearchMeta?.error || (I18n.t('syncCreator.lrclibNoCandidates') || 'No LRCLIB candidates found')
@@ -4412,14 +4417,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 				multiVocalMode && react.createElement('div', { style: s.multiVocalBanner },
 					hasCurrentParallelParts
-						? '여러 보컬 모드: 각 보컬 파트를 따로 싱크하세요.'
-						: '여러 보컬 모드: 이 줄의 SPEAKER와 TYPE을 선택하세요.'
+						? (I18n.t('syncCreator.multiVocalBannerParts') || 'Multiple vocal mode: sync each vocal part separately.')
+						: (I18n.t('syncCreator.multiVocalBannerLine') || 'Multiple vocal mode: choose SPEAKER and TYPE for this line.')
 				),
 
 				false && hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
 					currentParallelParts.map((part, index) => {
 						const speakerLabel = part.speaker || `VOCAL ${index + 1}`;
-						const kindLabel = SYNC_CREATOR_KIND_LABELS.get(part.kind) || 'TYPE 미선택';
+						const kindLabel = getSyncCreatorKindLabel(part.kind) || I18n.t('syncCreator.unselectedType') || 'Type not selected';
 						return react.createElement('button', {
 							key: part.id,
 							type: 'button',
@@ -4438,7 +4443,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				),
 
 				activeParallelPart && react.createElement('div', { style: s.parallelMetaRow },
-					react.createElement('span', { style: s.parallelMetaLabel }, 'SPEAKER'),
+					react.createElement('span', { style: s.parallelMetaLabel }, I18n.t('syncCreator.speakerLabel') || 'SPEAKER'),
 					react.createElement('select', {
 						style: {
 							...s.parallelMetaSelect,
@@ -4447,7 +4452,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						value: activeParallelPart.speaker || '',
 						onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'speaker', e.target.value)
 					},
-						react.createElement('option', { value: '', disabled: true }, '선택'),
+						react.createElement('option', { value: '', disabled: true }, I18n.t('syncCreator.select') || 'Select'),
 						SYNC_CREATOR_SPEAKER_OPTIONS.map(value =>
 							react.createElement('option', {
 								key: value,
@@ -4456,21 +4461,21 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							}, value)
 						)
 					),
-					react.createElement('span', { style: s.parallelMetaLabel }, 'TYPE'),
+					react.createElement('span', { style: s.parallelMetaLabel }, I18n.t('syncCreator.typeLabel') || 'TYPE'),
 					react.createElement('select', {
 						style: s.parallelMetaSelect,
 						value: activeParallelPart.kind || '',
 						onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'kind', e.target.value)
 					},
-						react.createElement('option', { value: '', disabled: true }, '선택'),
-						SYNC_CREATOR_KIND_OPTIONS.map(([value, label]) =>
-							react.createElement('option', { key: value, value }, label)
+						react.createElement('option', { value: '', disabled: true }, I18n.t('syncCreator.select') || 'Select'),
+						SYNC_CREATOR_KIND_OPTIONS.map(([value, labelKey]) =>
+							react.createElement('option', { key: value, value }, I18n.t(labelKey) || value)
 						)
 					)
 				),
 
 				!hasCurrentParallelParts && react.createElement('div', { style: s.parallelMetaRow },
-					react.createElement('span', { style: s.parallelMetaLabel }, 'SPEAKER'),
+					react.createElement('span', { style: s.parallelMetaLabel }, I18n.t('syncCreator.speakerLabel') || 'SPEAKER'),
 					react.createElement('select', {
 						style: {
 							...s.parallelMetaSelect,
@@ -4479,7 +4484,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						value: currentLineMeta.speaker || '',
 						onChange: (e) => updateCurrentLineMeta('speaker', e.target.value)
 					},
-						react.createElement('option', { value: '', disabled: true }, '선택'),
+						react.createElement('option', { value: '', disabled: true }, I18n.t('syncCreator.select') || 'Select'),
 						SYNC_CREATOR_SPEAKER_OPTIONS.map(value =>
 							react.createElement('option', {
 								key: value,
@@ -4488,25 +4493,25 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							}, value)
 						)
 					),
-					react.createElement('span', { style: s.parallelMetaLabel }, 'TYPE'),
+					react.createElement('span', { style: s.parallelMetaLabel }, I18n.t('syncCreator.typeLabel') || 'TYPE'),
 					react.createElement('select', {
 						style: s.parallelMetaSelect,
 						value: currentLineMeta.kind || '',
 						onChange: (e) => updateCurrentLineMeta('kind', e.target.value)
 					},
-						react.createElement('option', { value: '', disabled: true }, '선택'),
-						SYNC_CREATOR_KIND_OPTIONS.map(([value, label]) =>
-							react.createElement('option', { key: value, value }, label)
+						react.createElement('option', { value: '', disabled: true }, I18n.t('syncCreator.select') || 'Select'),
+						SYNC_CREATOR_KIND_OPTIONS.map(([value, labelKey]) =>
+							react.createElement('option', { key: value, value }, I18n.t(labelKey) || value)
 						)
 					)
 				),
 
 				false && hasCurrentParallelParts && react.createElement('div', { style: s.parallelPartRow },
 					[
-							{ id: 'full', label: '전체 줄', count: currentFullLineChars.length },
+							{ id: 'full', label: I18n.t('syncCreator.allLine') || 'Full line', count: currentFullLineChars.length },
 							...currentParallelParts.map(part => ({
 								id: part.id,
-								label: `${part.speaker || (part.role === 'background' ? 'B' : 'A')} ${part.kind === 'effect' ? '효과음' : '보컬'}`,
+								label: `${part.speaker || (part.role === 'background' ? 'B' : 'A')} ${part.kind === 'effect' ? (I18n.t('syncCreator.kindEffect') || 'Sound effect') : (I18n.t('syncCreator.kindVocal') || 'Vocal')}`,
 								count: countRangeChars(part.ranges)
 							}))
 					].map(part => react.createElement('button', {
@@ -4539,12 +4544,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							style: s.parallelMetaSelect,
 							value: activeParallelPart.kind || 'vocal',
 							onChange: (e) => updateParallelPartMeta(activeParallelPart.id, 'kind', e.target.value)
-						}, [
-							['vocal', '보컬'],
-							['effect', '효과음'],
-							['adlib', '애드립']
-						].map(([value, label]) =>
-							react.createElement('option', { key: value, value }, label)
+						}, SYNC_CREATOR_KIND_OPTIONS.map(([value, labelKey]) =>
+							react.createElement('option', { key: value, value }, I18n.t(labelKey) || value)
 						))
 					),
 
@@ -4562,12 +4563,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							style: s.parallelMetaSelect,
 							value: currentLineMeta.kind || 'vocal',
 							onChange: (e) => updateCurrentLineMeta('kind', e.target.value)
-						}, [
-							['vocal', '보컬'],
-							['effect', '효과음'],
-							['adlib', '애드립']
-						].map(([value, label]) =>
-							react.createElement('option', { key: value, value }, label)
+						}, SYNC_CREATOR_KIND_OPTIONS.map(([value, labelKey]) =>
+							react.createElement('option', { key: value, value }, I18n.t(labelKey) || value)
 						))
 					),
 
@@ -4722,9 +4719,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		pendingMultiVocalDecision && react.createElement('div', { style: s.lrcLibModal },
 			react.createElement('div', { style: { ...s.lrcLibContent, maxWidth: '560px' } },
-				react.createElement('h3', { style: s.lrcLibTitle }, '여러 보컬이 감지되었습니다'),
+				react.createElement('h3', { style: s.lrcLibTitle }, I18n.t('syncCreator.multiVocalDetectedTitle') || 'Multiple vocals detected'),
 				react.createElement('p', { style: s.lrcLibDesc },
-					'괄호나 구분 기호가 포함된 줄이 있어 여러 보컬 파트로 나누어 싱크할 수 있습니다. 이 곡을 어떤 방식으로 작업할지 선택해 주세요.'
+					I18n.t('syncCreator.multiVocalDetectedBody') || 'This lyric contains lines with parentheses or separators, so it can be synced as separate vocal parts. Choose how to work on this song.'
 				),
 				pendingMultiVocalDecision.preview && react.createElement('div', {
 					style: s.multiVocalDecisionPreview,
@@ -4734,11 +4731,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					react.createElement('button', {
 						style: s.lrcLibBtnCancel,
 						onClick: () => resolveMultiVocalDecision(false)
-					}, '일반 모드로 진행'),
+					}, I18n.t('syncCreator.multiVocalDecisionNormal') || 'Continue in normal mode'),
 					react.createElement('button', {
 						style: s.lrcLibBtn,
 						onClick: () => resolveMultiVocalDecision(true)
-					}, '여러 보컬 모드로 진행')
+					}, I18n.t('syncCreator.multiVocalDecisionMulti') || 'Continue in multiple vocal mode')
 				)
 			)
 		),
