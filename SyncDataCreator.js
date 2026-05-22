@@ -406,6 +406,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		wordForward: { primary: 'sync-creator-word-forward-key', secondary: 'sync-creator-word-forward-alt-key', defaultPrimary: '.' },
 		wordBack: { primary: 'sync-creator-word-back-key', secondary: 'sync-creator-word-back-alt-key', defaultPrimary: ',' },
 		syllable: { primary: 'sync-creator-syllable-key', secondary: 'sync-creator-syllable-alt-key', defaultPrimary: ';' },
+		drag: { primary: 'sync-creator-drag-key', secondary: 'sync-creator-drag-alt-key', defaultPrimary: '/', defaultSecondary: 'numpaddivide' },
 	};
 	const normalizeHotkeyToken = (value) => {
 		if (value === null || value === undefined) return '';
@@ -422,8 +423,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			escape: 'esc',
 			return: 'enter',
 			del: 'delete',
-			divide: '/',
-			numpaddivide: '/',
+			slash: '/',
+			divide: 'numpaddivide',
+			'num /': 'numpaddivide',
+			'num/': 'numpaddivide',
 			control: 'ctrl',
 			command: 'meta',
 			cmd: 'meta',
@@ -443,7 +446,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	};
 	const getSyncCreatorShortcutBindings = () => Object.entries(SYNC_CREATOR_SHORTCUTS).reduce((acc, [action, config]) => {
 		const primary = readSyncCreatorShortcutSetting(config.primary, config.defaultPrimary);
-		const secondary = readSyncCreatorShortcutSetting(config.secondary, '');
+		const secondary = readSyncCreatorShortcutSetting(config.secondary, config.defaultSecondary || '');
 		acc[action] = [primary, secondary].filter(Boolean);
 		return acc;
 	}, {});
@@ -454,14 +457,16 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (event.shiftKey && normalizeHotkeyToken(event.key) !== 'shift') parts.push('shift');
 		if (event.metaKey) parts.push('meta');
 
-		const baseKey = normalizeHotkeyToken(event.key);
+		const baseKey = event.code === 'NumpadDivide'
+			? 'numpaddivide'
+			: normalizeHotkeyToken(event.key);
 		if (!['ctrl', 'alt', 'shift', 'meta'].includes(baseKey)) {
 			parts.push(baseKey);
 		}
 		return parts.join('+');
 	};
 	const isSyncCreatorDragHotkeyEvent = (event, normalizedHotkey = getNormalizedHotkeyFromEvent(event)) => {
-		if (normalizedHotkey === '/') return true;
+		if (normalizedHotkey === '/' || normalizedHotkey === 'numpaddivide') return true;
 		if (event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return false;
 		return event.code === 'Slash' || event.code === 'NumpadDivide';
 	};
@@ -480,6 +485,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			alt: 'Alt',
 			shift: 'Shift',
 			meta: 'Meta',
+			'/': 'Slash',
+			numpaddivide: 'Num /',
 		};
 		if (displayMap[token]) return displayMap[token];
 		return token.length === 1 ? token.toUpperCase() : token;
@@ -3445,8 +3452,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				return;
 			}
 
-			// / 키: 드래그 모드 시작 (누르고 있으면 연속으로 빠르게 진행)
-			if (isDragHotkey) {
+			const startKeyboardDrag = () => {
 				consumeKeyboardEvent();
 
 				// 이미 드래그 중이면 무시
@@ -3482,6 +3488,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						keyboardDragIntervalRef.current = null;
 					}
 				}, 30);
+			};
+
+			// 드래그 모드 시작 (누르고 있으면 연속으로 빠르게 진행)
+			if (shortcutAction === 'drag' || isDragHotkey) {
+				startKeyboardDrag();
 				return;
 			}
 
@@ -3550,10 +3561,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			}
 		};
 
+		const handleKeyPress = (e) => {
+			const normalizedHotkey = getNormalizedHotkeyFromEvent(e);
+			const shortcutBindings = getSyncCreatorShortcutBindings();
+			const isConfiguredDragHotkey = (shortcutBindings.drag || []).includes(normalizedHotkey);
+			if (!isConfiguredDragHotkey && !isSyncCreatorDragHotkeyEvent(e, normalizedHotkey)) return;
+
+			// 일부 WebView/IME 조합에서 첫 keydown을 놓치는 경우가 있어 문자 입력 단계에서도 즉시 시작한다.
+			handleKeyDown(e);
+		};
+
 		// / 키 keyup 이벤트 핸들러 (드래그 종료)
 		const handleKeyUp = (e) => {
 			const normalizedHotkey = getNormalizedHotkeyFromEvent(e);
-			if (isSyncCreatorDragHotkeyEvent(e, normalizedHotkey)) {
+			const shortcutBindings = getSyncCreatorShortcutBindings();
+			const isConfiguredDragHotkey = (shortcutBindings.drag || []).includes(normalizedHotkey);
+			if (isConfiguredDragHotkey || isSyncCreatorDragHotkeyEvent(e, normalizedHotkey)) {
 				e.preventDefault();
 				e.stopPropagation();
 				e.stopImmediatePropagation();
@@ -3568,10 +3591,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		window.__ivLyricsDebugLog?.('[SyncDataCreator] Registering keydown/keyup listeners, mode:', mode);
 		document.addEventListener('keydown', handleKeyDown, true); // capture phase
+		document.addEventListener('keypress', handleKeyPress, true); // fallback for IME/WebView first-press handling
 		document.addEventListener('keyup', handleKeyUp, true); // capture phase
 		return () => {
 			window.__ivLyricsDebugLog?.('[SyncDataCreator] Removing keydown/keyup listeners');
 			document.removeEventListener('keydown', handleKeyDown, true);
+			document.removeEventListener('keypress', handleKeyPress, true);
 			document.removeEventListener('keyup', handleKeyUp, true);
 			// 정리시 드래그 인터벌도 정리
 			if (keyboardDragIntervalRef.current) {
@@ -5529,7 +5554,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				[getSyncCreatorShortcutDisplay('wordForward'), I18n.t('syncCreator.shortcuts.wordForward') || '한 단어'],
 				[getSyncCreatorShortcutDisplay('wordBack'), I18n.t('syncCreator.shortcuts.wordBack') || '한 단어 취소'],
 				[getSyncCreatorShortcutDisplay('syllable'), I18n.t('syncCreator.shortcuts.syllable') || '음절'],
-				['/ / Num /', I18n.t('syncCreator.shortcuts.drag') || '누르면 드래그'],
+				[getSyncCreatorShortcutDisplay('drag'), I18n.t('syncCreator.shortcuts.drag') || '누르면 드래그'],
 				['Enter', I18n.t('syncCreator.shortcuts.finish') || '라인 완료'],
 				['Backspace', I18n.t('syncCreator.shortcuts.cancel') || '취소'],
 				['Space', I18n.t('syncCreator.shortcuts.playPause') || '재생/일시정지'],
@@ -6280,7 +6305,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					),
 					// 드래그
 					react.createElement('div', { style: s.shortcutItem },
-						react.createElement('span', { style: s.shortcutKey }, '/'),
+						react.createElement('span', { style: s.shortcutKey }, getSyncCreatorShortcutDisplay('drag')),
 						react.createElement('span', { style: s.shortcutDesc }, I18n.t('syncCreator.shortcuts.drag') || '누르고 있으면 드래그')
 					),
 					// 완료/취소

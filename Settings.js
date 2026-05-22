@@ -4375,7 +4375,7 @@ const ConfigModal = ({
       name: getSettingsText("settings.syncCreatorShortcuts.title", "Sync Creator Shortcuts"),
       desc: getSettingsText("settings.syncCreatorShortcuts.subtitle", "Configure primary and secondary recording keys for Sync Creator."),
       i18nKeys: ["tabs.behavior", "settings.syncCreatorShortcuts.title", "settings.syncCreatorShortcuts.subtitle"],
-      keywords: ["sync creator shortcuts hotkeys keybinds karaoke recording syllable word character"]
+      keywords: ["sync creator shortcuts hotkeys keybinds karaoke recording syllable word character drag slash"]
     },
     {
       section: I18n.t("tabs.behavior"),
@@ -11272,6 +11272,18 @@ const ConfigModal = ({
               key: "sync-creator-syllable-alt-key",
               type: ConfigHotkey,
               defaultValue: CONFIG.visual["sync-creator-syllable-alt-key"] ?? "",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.drag", "Hold to drag")} (${getSettingsText("settings.shortcuts.primary", "Primary")})`,
+              key: "sync-creator-drag-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-drag-key"] ?? "/",
+            },
+            {
+              desc: `${getSettingsText("syncCreator.shortcuts.drag", "Hold to drag")} (${getSettingsText("settings.shortcuts.secondary", "Secondary")})`,
+              key: "sync-creator-drag-alt-key",
+              type: ConfigHotkey,
+              defaultValue: CONFIG.visual["sync-creator-drag-alt-key"] ?? "numpaddivide",
             },
           ],
           onChange: (name, value) => {

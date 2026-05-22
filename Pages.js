@@ -6,6 +6,10 @@ function getCreatorProfileCopy() {
 		loading: I18n.t("creatorProfile.loading") || "Loading creator profile...",
 		loadFailed: I18n.t("creatorProfile.loadFailed") || "Failed to load creator profile.",
 		back: I18n.t("creatorProfile.back") || "Back",
+		themeDark: I18n.t("settingsUi.theme.darkShort") || "Dark",
+		themeLight: I18n.t("settingsUi.theme.lightShort") || "Light",
+		switchToDark: I18n.t("settingsUi.theme.dark") || "Switch to dark mode",
+		switchToLight: I18n.t("settingsUi.theme.light") || "Switch to light mode",
 		contributions: I18n.t("creatorProfile.contributions") || "Sync Contributions",
 		tracks: I18n.t("creatorProfile.tracks") || "Synced tracks",
 		totalViews: I18n.t("creatorProfile.totalViews") || "Total plays",
@@ -159,7 +163,12 @@ function formatContributorTimestamp(epochSeconds) {
 
 function getCreatorProfileUiTheme() {
 	try {
-		return localStorage.getItem("ivLyrics:settings-ui-theme") === "light"
+		const storedTheme = localStorage.getItem("ivLyrics:settings-ui-theme");
+		if (storedTheme === "light" || storedTheme === "dark") {
+			return storedTheme;
+		}
+
+		return window.matchMedia?.("(prefers-color-scheme: light)")?.matches
 			? "light"
 			: "dark";
 	} catch (error) {
@@ -400,7 +409,7 @@ const SyncCreatorProfileModal = react.memo(({
 	onArtistFilterChange
 }) => {
 	const copy = getCreatorProfileCopy();
-	const uiTheme = getCreatorProfileUiTheme();
+	const [uiTheme, setUiTheme] = react.useState(getCreatorProfileUiTheme);
 	const profileData = profile || {};
 	const contributions = Array.isArray(profileData.contributions) ? profileData.contributions : [];
 	const displayName = profileData.displayName || contributor?.name || copy.anonymous;
@@ -433,6 +442,9 @@ const SyncCreatorProfileModal = react.memo(({
 	const likeButtonTitle = !profileData.viewer?.authenticated && !isOwnProfile
 		? copy.likeLoginRequired
 		: copy.like;
+	const isDarkTheme = uiTheme !== "light";
+	const themeButtonTitle = isDarkTheme ? copy.switchToLight : copy.switchToDark;
+	const themeButtonLabel = isDarkTheme ? copy.themeLight : copy.themeDark;
 	const artistStats = Array.isArray(profileData.artistStats?.items) ? profileData.artistStats.items : [];
 	const sortMode = activeSortMode || profileData.filters?.sort || "recent";
 	const artistFilter = activeArtistFilter ?? profileData.filters?.artist ?? null;
@@ -468,6 +480,45 @@ const SyncCreatorProfileModal = react.memo(({
 		react.createElement("path", { d: "M3 3l10 10" }),
 		react.createElement("path", { d: "M13 3L3 13" })
 	);
+	const themeIcon = isDarkTheme
+		? react.createElement(
+			"svg",
+			{
+				width: 16,
+				height: 16,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": "true"
+			},
+			react.createElement("circle", { cx: 12, cy: 12, r: 4 }),
+			react.createElement("path", { d: "M12 2v2" }),
+			react.createElement("path", { d: "M12 20v2" }),
+			react.createElement("path", { d: "m4.93 4.93 1.41 1.41" }),
+			react.createElement("path", { d: "m17.66 17.66 1.41 1.41" }),
+			react.createElement("path", { d: "M2 12h2" }),
+			react.createElement("path", { d: "M20 12h2" }),
+			react.createElement("path", { d: "m6.34 17.66-1.41 1.41" }),
+			react.createElement("path", { d: "m19.07 4.93-1.41 1.41" })
+		)
+		: react.createElement(
+			"svg",
+			{
+				width: 16,
+				height: 16,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 2,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": "true"
+			},
+			react.createElement("path", { d: "M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8 8 0 1 0 11 11Z" })
+		);
 	const likeIcon = react.createElement(
 		"svg",
 		{
@@ -520,6 +571,14 @@ const SyncCreatorProfileModal = react.memo(({
 			setIsEditingGreeting(false);
 		}
 	}, [canEditGreeting, isEditingGreeting]);
+
+	react.useEffect(() => {
+		try {
+			localStorage.setItem("ivLyrics:settings-ui-theme", uiTheme === "light" ? "light" : "dark");
+		} catch (error) {
+			// Ignore storage failures in restricted runtimes.
+		}
+	}, [uiTheme]);
 
 	const content = react.createElement(
 		react.Fragment,
@@ -857,14 +916,30 @@ const SyncCreatorProfileModal = react.memo(({
 					react.createElement("h2", { className: "lyrics-creator-profile-header-title" }, copy.title)
 				),
 				react.createElement(
-					"button",
-					{
-						type: "button",
-						className: "lyrics-creator-profile-close",
-						onClick: onClose,
-						title: copy.back
-					},
-					closeIcon
+					"div",
+					{ className: "lyrics-creator-profile-header-actions" },
+					react.createElement(
+						"button",
+						{
+							type: "button",
+							className: "lyrics-creator-profile-theme-toggle",
+							onClick: () => setUiTheme((currentTheme) => currentTheme === "light" ? "dark" : "light"),
+							title: themeButtonTitle,
+							"aria-label": themeButtonTitle
+						},
+						themeIcon,
+						react.createElement("span", null, themeButtonLabel)
+					),
+					react.createElement(
+						"button",
+						{
+							type: "button",
+							className: "lyrics-creator-profile-close",
+							onClick: onClose,
+							title: copy.back
+						},
+						closeIcon
+					)
 				)
 			),
 			react.createElement(
