@@ -710,7 +710,7 @@ window.LANG_IT = {
   "creatorProfile": {
     "title": "Creatore sync",
     "anonymous": "Anonimo",
-    "openProfile": "Apri il profilo del creatore",
+    "openProfile": "Pagina profilo",
     "loading": "Caricamento del profilo del creatore...",
     "loadFailed": "Impossibile caricare il profilo del creatore.",
     "back": "Indietro",

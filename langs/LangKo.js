@@ -710,7 +710,7 @@ window.LANG_KO = {
   "creatorProfile": {
     "title": "싱크 제작자",
     "anonymous": "익명",
-    "openProfile": "제작자 프로필 열기",
+    "openProfile": "프로필 페이지",
     "loading": "제작자 프로필을 불러오는 중...",
     "loadFailed": "제작자 프로필을 불러오지 못했습니다.",
     "back": "뒤로",

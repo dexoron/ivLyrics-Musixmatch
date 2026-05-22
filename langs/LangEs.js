@@ -710,7 +710,7 @@ window.LANG_ES = {
   "creatorProfile": {
     "title": "Creador de sincronización",
     "anonymous": "Anónimo",
-    "openProfile": "Abrir perfil del creador",
+    "openProfile": "Página de perfil",
     "loading": "Cargando el perfil del creador...",
     "loadFailed": "No se pudo cargar el perfil del creador.",
     "back": "Volver",

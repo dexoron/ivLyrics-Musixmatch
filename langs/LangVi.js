@@ -710,7 +710,7 @@ window.LANG_VI = {
   "creatorProfile": {
     "title": "Người tạo đồng bộ",
     "anonymous": "Ẩn danh",
-    "openProfile": "Mở hồ sơ người tạo",
+    "openProfile": "Trang hồ sơ",
     "loading": "Đang tải hồ sơ người tạo...",
     "loadFailed": "Không thể tải hồ sơ người tạo.",
     "back": "Quay lại",

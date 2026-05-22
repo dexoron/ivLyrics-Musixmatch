@@ -710,7 +710,7 @@ window.LANG_ZH_TW = {
   "creatorProfile": {
     "title": "同步製作者",
     "anonymous": "匿名",
-    "openProfile": "開啟製作者資料",
+    "openProfile": "個人資料頁",
     "loading": "正在載入製作者資料...",
     "loadFailed": "無法載入製作者資料。",
     "back": "返回",

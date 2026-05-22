@@ -710,7 +710,7 @@ window.LANG_ID = {
   "creatorProfile": {
     "title": "Pembuat Sinkronisasi",
     "anonymous": "Anonim",
-    "openProfile": "Buka profil pembuat",
+    "openProfile": "Halaman profil",
     "loading": "Memuat profil pembuat...",
     "loadFailed": "Gagal memuat profil pembuat.",
     "back": "Kembali",

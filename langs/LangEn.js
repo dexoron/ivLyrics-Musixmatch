@@ -710,7 +710,7 @@ window.LANG_EN = {
   "creatorProfile": {
     "title": "Sync Creator",
     "anonymous": "Anonymous",
-    "openProfile": "Open creator profile",
+    "openProfile": "Profile page",
     "loading": "Loading creator profile...",
     "loadFailed": "Failed to load creator profile.",
     "back": "Back",

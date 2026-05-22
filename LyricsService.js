@@ -1519,6 +1519,7 @@
         const _inflightRequests = new Map(); // 진행 중인 요청 추적
         const _fullyLoadedTracks = new Set(); // 전체 목록이 로드된 트랙 ID
         const _usageReportCache = new Set(); // 세션 내 중복 사용량 보고 방지
+        let _spotifyProfilePromise = null;
 
         /**
          * 사용 가능한 sync-data provider 목록 조회
@@ -1685,6 +1686,64 @@
             }
         }
 
+        function normalizeSpotifyProfile(profile) {
+            if (!profile || typeof profile !== 'object') return null;
+
+            const uriUserId = typeof profile.uri === 'string' && profile.uri.startsWith('spotify:user:')
+                ? profile.uri.split(':').pop()
+                : '';
+            const id = profile.id || profile.username || profile.userId || uriUserId;
+            if (typeof id !== 'string' || !id.trim()) return null;
+
+            return {
+                id: id.trim(),
+                displayName: (
+                    profile.display_name ||
+                    profile.displayName ||
+                    profile.name ||
+                    profile.username ||
+                    ''
+                ).trim()
+            };
+        }
+
+        async function getCurrentSpotifyProfile() {
+            if (_spotifyProfilePromise) {
+                return _spotifyProfilePromise;
+            }
+
+            _spotifyProfilePromise = (async () => {
+                const timeout = new Promise(resolve => setTimeout(() => resolve(null), 1200));
+                const load = (async () => {
+                    try {
+                        if (Spicetify?.Platform?.UserAPI?.getUser) {
+                            const platformProfile = await Spicetify.Platform.UserAPI.getUser();
+                            const normalized = normalizeSpotifyProfile(platformProfile);
+                            if (normalized) return normalized;
+                        }
+                    } catch (error) {
+                        console.warn('[SyncDataService] Failed to read Spotify profile from Platform.UserAPI', error);
+                    }
+
+                    try {
+                        if (Spicetify?.CosmosAsync?.get) {
+                            const cosmosProfile = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me');
+                            const normalized = normalizeSpotifyProfile(cosmosProfile);
+                            if (normalized) return normalized;
+                        }
+                    } catch (error) {
+                        console.warn('[SyncDataService] Failed to read Spotify profile from CosmosAsync', error);
+                    }
+
+                    return null;
+                })();
+
+                return await Promise.race([load, timeout]);
+            })();
+
+            return _spotifyProfilePromise;
+        }
+
         /**
          * 싱크 데이터 제출
          * @param {string} trackId - Spotify Track ID
@@ -1698,8 +1757,9 @@
 		            const authToken = typeof Utils !== "undefined" && Utils.getAuthToken
 		                ? Utils.getAuthToken()
 		                : Spicetify.LocalStorage.get("ivLyrics:auth-token");
-		                const title = typeof metadata?.title === "string" ? metadata.title.trim() : "";
-		                const artist = typeof metadata?.artist === "string" ? metadata.artist.trim() : "";
+	                const title = typeof metadata?.title === "string" ? metadata.title.trim() : "";
+	                const artist = typeof metadata?.artist === "string" ? metadata.artist.trim() : "";
+	                const spotifyProfile = await getCurrentSpotifyProfile();
 	
 		            if (typeof Utils !== "undefined" && Utils.requireDiscordAuth) {
 		                await Utils.requireDiscordAuth(I18n.t('syncCreator.loginRequired'));
@@ -1739,7 +1799,11 @@
 	                    provider,
 	                    syncData,
 	                    ...(title ? { title } : {}),
-	                    ...(artist ? { artist } : {})
+	                    ...(artist ? { artist } : {}),
+	                    ...(spotifyProfile?.id ? {
+	                        spotifyUserId: spotifyProfile.id,
+	                        ...(spotifyProfile.displayName ? { spotifyDisplayName: spotifyProfile.displayName } : {})
+	                    } : {})
 	                })
             });
 

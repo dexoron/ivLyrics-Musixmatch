@@ -158,6 +158,22 @@ function getCreatorProfileUiTheme() {
 	}
 }
 
+function getCreatorPublicProfileUrl(profileData, contributor) {
+	const rawIdentifier = profileData?.account?.username
+		|| profileData?.nickname
+		|| profileData?.userHash
+		|| contributor?.userHash;
+	const identifier = typeof rawIdentifier === "string"
+		? rawIdentifier.replace(/^@+/, "").trim()
+		: "";
+
+	if (!identifier) {
+		return null;
+	}
+
+	return `https://lyrics.ivl.is/@${encodeURIComponent(identifier)}`;
+}
+
 const CREATOR_PROFILE_PAGE_SIZE = 12;
 
 function createCreatorProfileShell(contributor, options = {}) {
@@ -240,6 +256,7 @@ const SyncCreatorProfileModal = react.memo(({
 	const isOwnProfile = !!profileData.viewer?.isOwnProfile;
 	const avatarFailed = !!avatarUrl && failedAvatarUrl === avatarUrl;
 	const subtitle = handle || (account?.displayName && account.displayName !== displayName ? account.displayName : null);
+	const publicProfileUrl = getCreatorPublicProfileUrl(profileData, contributor);
 	const likeButtonLabel = likePending ? "..." : liked ? copy.liked : copy.like;
 	const likeButtonTitle = !profileData.viewer?.authenticated && !isOwnProfile
 		? copy.likeLoginRequired
@@ -339,24 +356,43 @@ const SyncCreatorProfileModal = react.memo(({
 				react.createElement(
 					"div",
 					{ className: "lyrics-creator-profile-name-row" },
-					react.createElement("h2", { className: "lyrics-creator-profile-name" }, displayName),
 					react.createElement(
-						"button",
-						{
-							type: "button",
-							className: `lyrics-creator-profile-like-inline ${liked ? "is-liked" : ""} ${likePending ? "is-loading" : ""}`.trim(),
-							onClick: onToggleLike,
-							disabled: likePending || !canLike,
-							title: likeButtonTitle,
-							"aria-label": likeButtonLabel
-						},
-						likeIcon,
-						react.createElement("span", null, likeButtonLabel)
+						"div",
+						{ className: "lyrics-creator-profile-title-block" },
+						react.createElement("h2", { className: "lyrics-creator-profile-name" }, displayName),
+						subtitle && react.createElement("div", { className: "lyrics-creator-profile-handle" }, subtitle)
+					),
+					react.createElement(
+						"div",
+						{ className: "lyrics-creator-profile-actions" },
+						react.createElement(
+							"button",
+							{
+								type: "button",
+								className: `lyrics-creator-profile-like-inline ${liked ? "is-liked" : ""} ${likePending ? "is-loading" : ""}`.trim(),
+								onClick: onToggleLike,
+								disabled: likePending || !canLike,
+								title: likeButtonTitle,
+								"aria-label": likeButtonLabel
+							},
+							likeIcon,
+							react.createElement("span", null, likeButtonLabel)
+						),
+						publicProfileUrl && react.createElement(
+							"a",
+							{
+								className: "lyrics-creator-profile-public-link",
+								href: publicProfileUrl,
+								target: "_blank",
+								rel: "noopener noreferrer",
+								title: copy.openProfile
+							},
+							copy.openProfile
+						)
 					)
 				),
-				subtitle && react.createElement("div", { className: "lyrics-creator-profile-handle" }, subtitle),
-				hasLoadedProfileData
-					? react.createElement(
+			hasLoadedProfileData
+				? react.createElement(
 						"div",
 						{ className: "lyrics-creator-profile-stats" },
 						react.createElement(

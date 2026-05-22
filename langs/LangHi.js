@@ -710,7 +710,7 @@ window.LANG_HI = {
   "creatorProfile": {
     "title": "सिंक निर्माता",
     "anonymous": "अनाम",
-    "openProfile": "निर्माता प्रोफ़ाइल खोलें",
+    "openProfile": "प्रोफ़ाइल पेज",
     "loading": "निर्माता प्रोफ़ाइल लोड हो रही है...",
     "loadFailed": "निर्माता प्रोफ़ाइल लोड नहीं हो सकी।",
     "back": "वापस",

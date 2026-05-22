@@ -710,7 +710,7 @@ window.LANG_FA = {
   "creatorProfile": {
     "title": "سازنده همگام‌سازی",
     "anonymous": "ناشناس",
-    "openProfile": "باز کردن پروفایل سازنده",
+    "openProfile": "صفحه پروفایل",
     "loading": "در حال بارگذاری پروفایل سازنده...",
     "loadFailed": "بارگذاری پروفایل سازنده ناموفق بود.",
     "back": "بازگشت",

@@ -710,7 +710,7 @@ window.LANG_DE = {
   "creatorProfile": {
     "title": "Sync-Ersteller",
     "anonymous": "Anonym",
-    "openProfile": "Erstellerprofil öffnen",
+    "openProfile": "Profilseite",
     "loading": "Erstellerprofil wird geladen...",
     "loadFailed": "Erstellerprofil konnte nicht geladen werden.",
     "back": "Zurück",

@@ -710,7 +710,7 @@ window.LANG_BN = {
   "creatorProfile": {
     "title": "সিঙ্ক নির্মাতা",
     "anonymous": "নামহীন",
-    "openProfile": "নির্মাতার প্রোফাইল খুলুন",
+    "openProfile": "প্রোফাইল পৃষ্ঠা",
     "loading": "নির্মাতার প্রোফাইল লোড হচ্ছে...",
     "loadFailed": "নির্মাতার প্রোফাইল লোড করা যায়নি।",
     "back": "ফিরে যান",

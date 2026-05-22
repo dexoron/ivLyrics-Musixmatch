@@ -710,7 +710,7 @@ window.LANG_SV = {
   "creatorProfile": {
     "title": "Sync Creator",
     "anonymous": "Anonym",
-    "openProfile": "Öppna skaparprofilen",
+    "openProfile": "Profilsida",
     "loading": "Laddar skaparprofil...",
     "loadFailed": "Det gick inte att läsa in skaparprofilen.",
     "back": "Tillbaka",

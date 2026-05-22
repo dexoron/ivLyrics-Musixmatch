@@ -710,7 +710,7 @@ window.LANG_RU = {
   "creatorProfile": {
     "title": "Автор синхронизации",
     "anonymous": "Аноним",
-    "openProfile": "Открыть профиль автора",
+    "openProfile": "Страница профиля",
     "loading": "Загрузка профиля автора...",
     "loadFailed": "Не удалось загрузить профиль автора.",
     "back": "Назад",

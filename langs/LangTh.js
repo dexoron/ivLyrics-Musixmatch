@@ -710,7 +710,7 @@ window.LANG_TH = {
   "creatorProfile": {
     "title": "ผู้สร้างซิงก์",
     "anonymous": "ไม่ระบุชื่อ",
-    "openProfile": "เปิดโปรไฟล์ผู้สร้าง",
+    "openProfile": "หน้าโปรไฟล์",
     "loading": "กำลังโหลดโปรไฟล์ผู้สร้าง...",
     "loadFailed": "ไม่สามารถโหลดโปรไฟล์ผู้สร้างได้",
     "back": "ย้อนกลับ",

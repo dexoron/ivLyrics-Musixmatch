@@ -710,7 +710,7 @@ window.LANG_AR = {
   "creatorProfile": {
     "title": "صانع المزامنة",
     "anonymous": "مجهول",
-    "openProfile": "فتح ملف الصانع",
+    "openProfile": "صفحة الملف الشخصي",
     "loading": "جار تحميل ملف الصانع...",
     "loadFailed": "تعذر تحميل ملف الصانع.",
     "back": "رجوع",

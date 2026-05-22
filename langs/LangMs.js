@@ -710,7 +710,7 @@ window.LANG_MS = {
   "creatorProfile": {
     "title": "Profil Pembuat Senada",
     "anonymous": "Tanpa Nama",
-    "openProfile": "Buka Profil Pembuat",
+    "openProfile": "Halaman profil",
     "loading": "Memuatkan profil pembuat...",
     "loadFailed": "Gagal memuatkan profil pembuat.",
     "back": "Kembali",

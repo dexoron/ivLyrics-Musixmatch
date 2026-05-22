@@ -710,7 +710,7 @@ window.LANG_JA = {
   "creatorProfile": {
     "title": "同期制作者",
     "anonymous": "匿名",
-    "openProfile": "制作者プロフィールを開く",
+    "openProfile": "プロフィールページ",
     "loading": "制作者プロフィールを読み込み中...",
     "loadFailed": "制作者プロフィールを読み込めませんでした。",
     "back": "戻る",

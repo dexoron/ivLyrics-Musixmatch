@@ -710,7 +710,7 @@ window.LANG_FR = {
   "creatorProfile": {
     "title": "Créateur de synchro",
     "anonymous": "Anonyme",
-    "openProfile": "Ouvrir le profil du créateur",
+    "openProfile": "Page de profil",
     "loading": "Chargement du profil du créateur...",
     "loadFailed": "Impossible de charger le profil du créateur.",
     "back": "Retour",
