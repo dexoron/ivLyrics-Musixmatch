@@ -1237,6 +1237,47 @@
                     }
                 }
 
+                let sourceDirectLookupAttempted = false;
+                let cachedSourceDirectPreviewCandidate = null;
+                const getSourceDirectPreviewCandidate = async () => {
+                    if (sourceDirectLookupAttempted) return cachedSourceDirectPreviewCandidate;
+                    sourceDirectLookupAttempted = true;
+
+                    if (!getSyncDataLrclibId(syncDataSource)) return null;
+
+                    try {
+                        const directCandidate = decorateDirectCandidate(
+                            await fetchLrclibCandidateById(syncDataSource, headers),
+                            syncDataSource,
+                            trackDurationSec
+                        );
+                        cachedSourceDirectPreviewCandidate = buildDirectPreviewCandidate(directCandidate);
+                    } catch (e) {
+                        window.__ivLyricsDebugLog?.('[LR-DEBUG] Failed to restore LRCLIB sync-data source:', e?.message || e);
+                        cachedSourceDirectPreviewCandidate = null;
+                    }
+                    return cachedSourceDirectPreviewCandidate;
+                };
+
+                const buildSourceDirectSearchResult = (directPreviewCandidate) => ({
+                    success: true,
+                    error: null,
+                    candidates: [directPreviewCandidate],
+                    selectedCandidateKey: directPreviewCandidate.candidateKey,
+                    selectedSource: 'source-direct',
+                    searchMode: 'source-direct',
+                    totalResults: 1,
+                    usedFallbackQuery: false,
+                    syncDataLineCount: syncDataLineCharCounts?.length || 0,
+                    directLrclibId: getSyncDataLrclibId(syncDataSource),
+                    englishTitle: null,
+                    englishArtist: null
+                });
+
+                const sourceDirectPreviewCandidate = await getSourceDirectPreviewCandidate();
+                if (sourceDirectPreviewCandidate) {
+                    return buildSourceDirectSearchResult(sourceDirectPreviewCandidate);
+                }
                 const runSearch = async (params, label) => {
                     const query = new URLSearchParams();
                     if (params.track_name) query.set('track_name', params.track_name);
@@ -1698,25 +1739,12 @@
                 }
 
                 if (!body && getSyncDataLrclibId(syncDataSource)) {
-                    const directCandidate = decorateDirectCandidate(
-                        await fetchLrclibCandidateById(syncDataSource, headers),
-                        syncDataSource,
-                        trackDurationSec
-                    );
-                    const directPreviewCandidate = buildDirectPreviewCandidate(directCandidate);
+                    const directPreviewCandidate = await getSourceDirectPreviewCandidate();
 
                     if (directPreviewCandidate) {
                         return {
-                            success: true,
-                            error: null,
-                            candidates: [directPreviewCandidate],
-                            selectedCandidateKey: directPreviewCandidate.candidateKey,
-                            selectedSource: 'source-direct',
-                            searchMode: 'source-direct',
-                            totalResults: 1,
+                            ...buildSourceDirectSearchResult(directPreviewCandidate),
                             usedFallbackQuery: !!(englishSearchFlow || primarySearchFlow)?.usedFallbackQuery,
-                            syncDataLineCount: syncDataLineCharCounts?.length || 0,
-                            directLrclibId: getSyncDataLrclibId(syncDataSource),
                             englishTitle: englishMetadata?.title || null,
                             englishArtist: englishMetadata?.artist || null
                         };
