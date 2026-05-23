@@ -13,6 +13,23 @@ const SYNC_CREATOR_SPEAKER_OPTIONS = [
 	...Array.from({ length: 5 }, (_, index) => `FEMALE ${index + 1}`),
 	...Array.from({ length: 5 }, (_, index) => `DUET ${index + 1}`)
 ];
+const SYNC_CREATOR_SPEAKER_TEXT_COLORS = {
+	'MALE 1': '#e6f2ff',
+	'MALE 2': '#d7ecff',
+	'MALE 3': '#edf7ff',
+	'MALE 4': '#dbe7ff',
+	'MALE 5': '#e2f8ff',
+	'FEMALE 1': '#ffe7ef',
+	'FEMALE 2': '#ffe0e8',
+	'FEMALE 3': '#fff0f5',
+	'FEMALE 4': '#ffdfe0',
+	'FEMALE 5': '#fbe5ff',
+	'DUET 1': '#eadfff',
+	'DUET 2': '#e2d2ff',
+	'DUET 3': '#f0e8ff',
+	'DUET 4': '#dec9ff',
+	'DUET 5': '#e9dcff'
+};
 const SYNC_CREATOR_DEFAULT_SPEAKER = 'MALE 1';
 const SYNC_CREATOR_DEFAULT_KIND = 'vocal';
 const SYNC_CREATOR_MAX_MERGED_LINES = 5;
@@ -220,6 +237,10 @@ const normalizeSyncCreatorSpeaker = (value) => {
 		.toUpperCase();
 	return SYNC_CREATOR_SPEAKER_OPTIONS.includes(normalized) ? normalized : '';
 };
+
+const getSyncCreatorSpeakerTextColor = (value) => (
+	SYNC_CREATOR_SPEAKER_TEXT_COLORS[normalizeSyncCreatorSpeaker(value)] || 'var(--spice-text)'
+);
 
 const isSyncCreatorDuetSpeaker = (value) => (
 	String(value || '').trim().toUpperCase().startsWith('DUET ')
@@ -5627,9 +5648,11 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	const getSpeakerTone = (speaker) => {
 		const value = String(speaker || '').toUpperCase();
+		const text = getSyncCreatorSpeakerTextColor(value);
 		if (value.startsWith('FEMALE')) {
 			return {
-				dot: '#ff7aa8',
+				text,
+				dot: text,
 				background: 'rgba(255, 122, 168, 0.105)',
 				border: 'rgba(255, 122, 168, 0.25)',
 				borderActive: 'rgba(255, 122, 168, 0.58)',
@@ -5638,7 +5661,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 		if (value.startsWith('DUET')) {
 			return {
-				dot: '#b493ff',
+				text,
+				dot: text,
 				background: 'rgba(180, 147, 255, 0.105)',
 				border: 'rgba(180, 147, 255, 0.25)',
 				borderActive: 'rgba(180, 147, 255, 0.58)',
@@ -5646,7 +5670,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			};
 		}
 		return {
-			dot: '#6ea8ff',
+			text,
+			dot: text,
 			background: 'rgba(49, 130, 246, 0.105)',
 			border: 'rgba(49, 130, 246, 0.25)',
 			borderActive: TOSS_BLUE_BORDER,
@@ -5673,9 +5698,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							type: 'button',
 							style: {
 								...s.speakerChoice,
+								color: tone.text,
 								background: tone.background,
 								borderColor: isSelected ? tone.borderActive : tone.border,
-								boxShadow: isSelected ? `0 0 0 3px ${tone.ring}` : 'none'
+								boxShadow: isSelected ? `0 0 0 3px ${tone.ring}, 0 10px 24px rgba(0, 0, 0, 0.18)` : 'none'
 							},
 							onClick: () => onSelect(value)
 						},
