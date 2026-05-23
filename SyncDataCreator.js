@@ -525,6 +525,9 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	const { useState, useEffect, useRef, useCallback, useMemo } = react;
 
 	const roundSyncTime = (time) => Math.round(time * 1000) / 1000;
+	const SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC = 0.001;
+	const SYNC_CREATOR_DRAG_INITIAL_BURST_STEPS = 3;
+	const SYNC_CREATOR_DRAG_INTERVAL_MS = 27;
 	const EDGE_INTERPOLATION_GAP_SEC = 0.045;
 	const SYNC_CREATOR_SHORTCUTS = {
 		charForward: { primary: 'sync-creator-char-forward-key', secondary: 'sync-creator-char-forward-alt-key', defaultPrimary: 'right' },
@@ -681,6 +684,27 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			const progress = count === 1 ? 1 : i / (count - 1);
 			target[startIdx + i] = roundSyncTime(startTime + ((safeEndTime - startTime) * interpolationFn(progress)));
 		}
+	};
+	const getLastRecordedSyncIndex = (target) => {
+		if (!Array.isArray(target)) return -1;
+		for (let index = target.length - 1; index >= 0; index--) {
+			if (typeof target[index] === 'number') return index;
+		}
+		return -1;
+	};
+	const getPreviousRecordedSyncTime = (target, beforeIndex) => {
+		if (!Array.isArray(target)) return null;
+		for (let index = Math.min(beforeIndex - 1, target.length - 1); index >= 0; index--) {
+			if (typeof target[index] === 'number') return target[index];
+		}
+		return null;
+	};
+	const getSequentialSyncTime = (rawTime, previousTime = null) => {
+		const safeRawTime = Number.isFinite(rawTime) ? rawTime : 0;
+		if (typeof previousTime !== 'number' || !Number.isFinite(previousTime)) {
+			return roundSyncTime(safeRawTime);
+		}
+		return roundSyncTime(Math.max(safeRawTime, previousTime + SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC));
 	};
 	const estimateSegmentDuration = (startIdx, endIdx, scale = 0.055, maxDuration = 0.26) =>
 		Math.min(maxDuration, Math.max(0.07, (endIdx - startIdx + 1) * scale));
@@ -2665,16 +2689,68 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		const currentTime = Spicetify.Player.getProgress() / 1000;
 		const startIndex = charIndex < 0 ? 0 : charIndex;
+		const hasKeyboardProgress = isKeyboardSyncingRef.current
+			&& Array.isArray(charTimesRef.current)
+			&& charTimesRef.current.length === currentLineChars.length;
+		const nextCharTimes = hasKeyboardProgress
+			? [...charTimesRef.current]
+			: new Array(currentLineChars.length).fill(null);
+
+		if (hasKeyboardProgress) {
+			if (pendingWordSyncRef.current && interpolationEnabledRef.current) {
+				const { startIdx, endIdx, startTime } = pendingWordSyncRef.current;
+				const wordEndTime = Math.max(startTime, currentTime - (WORD_GAP_MS / 1000));
+				applyInterpolatedRangeToCharTimes(nextCharTimes, startIdx, endIdx, startTime, wordEndTime, smoothStepInterpolation);
+			}
+			if (pendingSyllableSyncRef.current && interpolationEnabledRef.current) {
+				const { startIdx, endIdx, startTime } = pendingSyllableSyncRef.current;
+				const endTime = Math.max(startTime, currentTime - EDGE_INTERPOLATION_GAP_SEC);
+				applyInterpolatedRangeToCharTimes(nextCharTimes, startIdx, endIdx, startTime, endTime);
+			}
+		}
 
 		setDragStartTime(currentTime);
 		setDragStartCharIndex(startIndex);
 		setRecordingCharIndex(startIndex);
 		setIsDragging(true);
 
-		charTimesRef.current = new Array(currentLineChars.length).fill(null);
-		for (let i = 0; i <= startIndex; i++) {
-			charTimesRef.current[i] = currentTime;
+		if (hasKeyboardProgress) {
+			const lastRecordedIndex = getLastRecordedSyncIndex(nextCharTimes);
+			if (startIndex <= lastRecordedIndex) {
+				for (let i = startIndex; i < nextCharTimes.length; i++) {
+					nextCharTimes[i] = null;
+				}
+				nextCharTimes[startIndex] = getSequentialSyncTime(currentTime, getPreviousRecordedSyncTime(nextCharTimes, startIndex));
+			} else {
+				let previousTime = getPreviousRecordedSyncTime(nextCharTimes, startIndex + 1);
+				for (let i = lastRecordedIndex + 1; i <= startIndex; i++) {
+					nextCharTimes[i] = getSequentialSyncTime(currentTime, previousTime);
+					previousTime = nextCharTimes[i];
+				}
+			}
+			isKeyboardSyncingRef.current = false;
+			keyboardCharIndexRef.current = -1;
+			pendingWordSyncRef.current = null;
+			pendingSyllableSyncRef.current = null;
+			if (isKeyboardDraggingRef.current) {
+				isKeyboardDraggingRef.current = false;
+			}
+			if (keyboardDragIntervalRef.current) {
+				clearInterval(keyboardDragIntervalRef.current);
+				keyboardDragIntervalRef.current = null;
+			}
+			if (keyboardDragWarmupTimerRef.current) {
+				clearTimeout(keyboardDragWarmupTimerRef.current);
+				keyboardDragWarmupTimerRef.current = null;
+			}
+		} else {
+			let previousTime = null;
+			for (let i = 0; i <= startIndex; i++) {
+				nextCharTimes[i] = getSequentialSyncTime(currentTime, previousTime);
+				previousTime = nextCharTimes[i];
+			}
 		}
+		charTimesRef.current = nextCharTimes;
 	}, [mode, currentLineIndex, lyricsLines.length, currentLineChars.length]);
 
 	const handleDragMove = useCallback((charIndex, e) => {
@@ -2719,7 +2795,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 		for (let i = 0; i < rawChars.length; i++) {
 			const rawTime = typeof rawChars[i] === 'number' ? rawChars[i] : minimumAllowedTime;
-			const normalizedTime = roundSyncTime(Math.max(minimumAllowedTime, rawTime));
+			const minimumForChar = i === 0
+				? minimumAllowedTime
+				: minimumAllowedTime + SYNC_CREATOR_MIN_SEQUENTIAL_STEP_SEC;
+			const normalizedTime = roundSyncTime(Math.max(minimumForChar, rawTime));
 			normalizedChars.push(normalizedTime);
 			minimumAllowedTime = normalizedTime;
 		}
@@ -3108,6 +3187,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 	// 드래그 키(/) 연속 입력을 위한 인터벌 ref
 	const keyboardDragIntervalRef = useRef(null);
+	const keyboardDragWarmupTimerRef = useRef(null);
 	const isKeyboardDraggingRef = useRef(false);
 
 	// 이전 라인 인덱스 추적 (라인 변경 감지용)
@@ -3137,6 +3217,22 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		if (keyboardDragIntervalRef.current) {
 			clearInterval(keyboardDragIntervalRef.current);
 			keyboardDragIntervalRef.current = null;
+		}
+		if (keyboardDragWarmupTimerRef.current) {
+			clearTimeout(keyboardDragWarmupTimerRef.current);
+			keyboardDragWarmupTimerRef.current = null;
+		}
+		isKeyboardDraggingRef.current = false;
+	}, []);
+
+	useEffect(() => () => {
+		if (keyboardDragIntervalRef.current) {
+			clearInterval(keyboardDragIntervalRef.current);
+			keyboardDragIntervalRef.current = null;
+		}
+		if (keyboardDragWarmupTimerRef.current) {
+			clearTimeout(keyboardDragWarmupTimerRef.current);
+			keyboardDragWarmupTimerRef.current = null;
 		}
 		isKeyboardDraggingRef.current = false;
 	}, []);
@@ -3181,6 +3277,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					clearInterval(keyboardDragIntervalRef.current);
 					keyboardDragIntervalRef.current = null;
 				}
+			}
+			if (keyboardDragWarmupTimerRef.current) {
+				clearTimeout(keyboardDragWarmupTimerRef.current);
+				keyboardDragWarmupTimerRef.current = null;
 			}
 		}
 
@@ -3673,34 +3773,40 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 
 				isKeyboardDraggingRef.current = true;
 
-				// 첫 번째 글자 즉시 처리
-				const currentTime = Spicetify.Player.getProgress() / 1000;
-				const result = advanceOneChar(currentTime);
-
-				// 라인이 완료되었으면 드래그 시작하지 않음
-				if (result === -1) {
+				const stopKeyboardDragLoop = () => {
 					isKeyboardDraggingRef.current = false;
-					return;
-				}
-
-				// 30ms 간격으로 연속 진행 (딜레이 없이 즉시 시작)
-				keyboardDragIntervalRef.current = setInterval(() => {
-					if (!isKeyboardDraggingRef.current) {
+					if (keyboardDragIntervalRef.current) {
 						clearInterval(keyboardDragIntervalRef.current);
 						keyboardDragIntervalRef.current = null;
-						return;
+					}
+					if (keyboardDragWarmupTimerRef.current) {
+						clearTimeout(keyboardDragWarmupTimerRef.current);
+						keyboardDragWarmupTimerRef.current = null;
+					}
+				};
+
+				const runKeyboardDragStep = () => {
+					if (!isKeyboardDraggingRef.current) {
+						stopKeyboardDragLoop();
+						return -1;
 					}
 
 					const time = Spicetify.Player.getProgress() / 1000;
-					const res = advanceOneChar(time);
-
-					// 라인 완료시 드래그 종료
-					if (res === -1) {
-						isKeyboardDraggingRef.current = false;
-						clearInterval(keyboardDragIntervalRef.current);
-						keyboardDragIntervalRef.current = null;
+					const result = advanceOneChar(time);
+					if (result === -1) {
+						stopKeyboardDragLoop();
 					}
-				}, 30);
+					return result;
+				};
+
+				// 첫 keydown 안에서 여러 글자를 바로 전진시켜 우측 화살표 1회처럼 멈칫하지 않게 한다.
+				for (let index = 0; index < SYNC_CREATOR_DRAG_INITIAL_BURST_STEPS; index++) {
+					if (runKeyboardDragStep() === -1) {
+						return;
+					}
+				}
+
+				keyboardDragIntervalRef.current = setInterval(runKeyboardDragStep, SYNC_CREATOR_DRAG_INTERVAL_MS);
 			};
 
 			// 드래그 모드 시작 (누르고 있으면 연속으로 빠르게 진행)
@@ -3738,6 +3844,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						if (keyboardDragIntervalRef.current) {
 							clearInterval(keyboardDragIntervalRef.current);
 							keyboardDragIntervalRef.current = null;
+						}
+						if (keyboardDragWarmupTimerRef.current) {
+							clearTimeout(keyboardDragWarmupTimerRef.current);
+							keyboardDragWarmupTimerRef.current = null;
 						}
 					}
 				}
@@ -3799,6 +3909,10 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					clearInterval(keyboardDragIntervalRef.current);
 					keyboardDragIntervalRef.current = null;
 				}
+				if (keyboardDragWarmupTimerRef.current) {
+					clearTimeout(keyboardDragWarmupTimerRef.current);
+					keyboardDragWarmupTimerRef.current = null;
+				}
 			}
 		};
 
@@ -3811,12 +3925,6 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			document.removeEventListener('keydown', handleKeyDown, true);
 			document.removeEventListener('keypress', handleKeyPress, true);
 			document.removeEventListener('keyup', handleKeyUp, true);
-			// 정리시 드래그 인터벌도 정리
-			if (keyboardDragIntervalRef.current) {
-				clearInterval(keyboardDragIntervalRef.current);
-				keyboardDragIntervalRef.current = null;
-			}
-			isKeyboardDraggingRef.current = false;
 		};
 	}, [mode, currentLineIndex, activeParallelTargetId, lyricsLines.length, currentLineChars, currentLineEffectiveSyllableSegments, lineCharOffsets, autoScroll, commitCurrentLineSync, advanceAfterCompletedTarget, isCurrentSyncTargetMetaComplete, showMissingMetaToast]);
 
