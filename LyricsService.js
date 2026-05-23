@@ -1569,7 +1569,9 @@
                 const fetchPromise = (async () => {
                     // provider가 legacy인 경우 (Spicetify-custom-apps 호환)
                     const queryProvider = provider === 'legacy' ? 'spotify' : provider;
-                    const response = await fetch(`${API_BASE}/lyrics/sync-data?trackId=${trackId}&provider=${queryProvider}`);
+                    const response = await fetch(`${API_BASE}/lyrics/sync-data?trackId=${trackId}&provider=${queryProvider}`, {
+                        cache: 'no-store'
+                    });
 
                     if (!response.ok) {
                         if (response.status === 404) return null;
@@ -4249,7 +4251,9 @@
                 // 하지만 호출하는 쪽에서 이미 처리가 되어있어야 함.
                 // 여기서는 있는 그대로 호출.
 
-                const response = await fetch(`https://lyrics.api.ivl.is/lyrics/sync-data?trackId=${trackId}&provider=${provider}`);
+                const response = await fetch(`https://lyrics.api.ivl.is/lyrics/sync-data?trackId=${trackId}&provider=${provider}`, {
+                    cache: 'no-store'
+                });
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.provider === provider) {

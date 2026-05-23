@@ -2519,7 +2519,7 @@ const Prefetcher = {
             youtubeApiUrl += `&trackArtists=${encodeURIComponent(spotifyData.artists.join(', '))}`;
           }
         }
-        const response = await fetch(youtubeApiUrl);
+        const response = await fetch(youtubeApiUrl, { cache: "no-store" });
         const data = await response.json();
 
         if (data.success) {

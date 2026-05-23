@@ -266,6 +266,7 @@ const VideoBackground = ({ trackUri, firstLyricTime, brightness, blurAmount, cov
                 }
 
                 const res = await fetch(youtubeUrl, {
+                    cache: "no-store",
                     headers: Utils.getApiHeaders({
                         "X-ivLyrics-Client": "ivLyrics",
                         "X-ivLyrics-Request-Version": "2",
