@@ -2006,6 +2006,7 @@ window.LANG_TH = {
     "lrclibIdInvalid": "กรุณาใส่ LRCLIB ID ที่ถูกต้อง",
     "lrclibIdLoadSuccess": "โหลดเนื้อเพลงจาก LRCLIB ID แล้ว",
     "lrclibIdLoadError": "โหลดเนื้อเพลงจาก LRCLIB ID ไม่สำเร็จ",
+    "lrclibIdCopied": "คัดลอก LRCLIB ID แล้ว",
     "lrclibSearchQueryLabel": "ค้นหา LRCLIB",
     "lrclibSearchQueryPlaceholder": "ชื่อเพลงหรือศิลปิน",
     "lrclibSearchButton": "ค้นหา",

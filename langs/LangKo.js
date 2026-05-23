@@ -2006,6 +2006,7 @@ window.LANG_KO = {
     "lrclibIdInvalid": "올바른 LRCLIB ID를 입력하세요",
     "lrclibIdLoadSuccess": "LRCLIB ID로 가사를 불러왔습니다",
     "lrclibIdLoadError": "LRCLIB ID로 가사를 불러오지 못했습니다",
+    "lrclibIdCopied": "LRCLIB ID를 복사했습니다",
     "lrclibSearchQueryLabel": "LRCLIB 검색",
     "lrclibSearchQueryPlaceholder": "곡 제목 또는 아티스트",
     "lrclibSearchButton": "검색",

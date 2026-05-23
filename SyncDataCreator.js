@@ -4603,6 +4603,30 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		}
 	}, [lyricsText]);
 
+	const getLrclibCandidateId = useCallback((candidate) => {
+		const id = candidate?.id ?? candidate?.lrclibId;
+		if (id === undefined || id === null) return '';
+		return String(id).trim();
+	}, []);
+
+	const copyLrclibCandidateId = useCallback(async (candidateOrId, event = null) => {
+		event?.preventDefault?.();
+		event?.stopPropagation?.();
+
+		const id = typeof candidateOrId === 'object'
+			? getLrclibCandidateId(candidateOrId)
+			: String(candidateOrId || '').trim();
+		if (!id) return;
+
+		try {
+			await navigator.clipboard.writeText(id);
+			Toast.success(I18n.t('syncCreator.lrclibIdCopied') || 'Copied LRCLIB ID');
+		} catch (err) {
+			console.error('[SyncDataCreator] LRCLIB ID copy error:', err);
+			Toast.error((I18n.t('syncCreator.copyError') || 'Copy failed') + ': ' + err.message);
+		}
+	}, [getLrclibCandidateId]);
+
 	const formatTime = useCallback((ms) => {
 		const totalSeconds = Math.floor(ms / 1000);
 		return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
@@ -4789,7 +4813,8 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			boxShadow: `0 0 0 3px ${TOSS_BLUE_RING}`
 		},
 		candidateItemApplied: { background: 'rgba(49, 130, 246, 0.18)', borderColor: TOSS_BLUE_BORDER },
-		candidateTitle: { fontSize: '13px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.005em' },
+		candidateTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minWidth: 0 },
+		candidateTitle: { fontSize: '13px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.005em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 		candidateSubtitle: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '3px' },
 		candidateMetaRow: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' },
 		candidateBadge: {
@@ -4799,6 +4824,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			background: 'rgba(49, 130, 246, 0.11)',
 			color: '#d8eaff',
 			letterSpacing: '0.02em', textTransform: 'uppercase'
+		},
+		candidateIdBadge: {
+			display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+			flexShrink: 0, padding: '3px 8px', borderRadius: '999px',
+			fontSize: '10px', fontWeight: '800',
+			background: 'rgba(49, 130, 246, 0.16)',
+			border: `1px solid ${TOSS_BLUE_BORDER}`,
+			color: '#8fc1ff', cursor: 'copy',
+			letterSpacing: '0', textTransform: 'none', lineHeight: 1.2
 		},
 		candidatePreview: {
 			minHeight: '0',
@@ -4812,6 +4846,15 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 		candidatePreviewTitle: { fontSize: '14px', fontWeight: '700', color: 'var(--spice-text)', letterSpacing: '-0.01em' },
 		candidatePreviewSubtitle: { fontSize: '11px', color: 'var(--spice-subtext)', marginTop: '3px' },
 		candidatePreviewActions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+		candidateIdButton: {
+			display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+			flexShrink: 0, padding: '7px 11px', borderRadius: '999px',
+			fontSize: '11px', fontWeight: '800',
+			background: 'rgba(49, 130, 246, 0.16)',
+			border: `1px solid ${TOSS_BLUE_BORDER}`,
+			color: '#8fc1ff', cursor: 'copy',
+			letterSpacing: '0', lineHeight: 1
+		},
 		candidatePreviewText: {
 			margin: 0, whiteSpace: 'pre-wrap',
 			fontSize: '12px', lineHeight: 1.6,
@@ -5957,6 +6000,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 			lrclibCandidates.map((candidate, index) => {
 				const isPreviewing = previewLrclibCandidate?.candidateKey === candidate.candidateKey;
 				const isApplied = selectedLrclibCandidateKey === candidate.candidateKey;
+				const candidateId = getLrclibCandidateId(candidate);
 				let itemStyle = { ...s.candidateItem };
 				if (isPreviewing) itemStyle = { ...itemStyle, ...s.candidateItemActive };
 				if (isApplied) itemStyle = { ...itemStyle, ...s.candidateItemApplied };
@@ -5967,7 +6011,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 					style: itemStyle,
 					onClick: () => setPreviewLrclibCandidateKey(candidate.candidateKey)
 				},
-					react.createElement('div', { style: s.candidateTitle }, `${index + 1}. ${candidate.trackName || candidate.name || trackName}`),
+					react.createElement('div', { style: s.candidateTitleRow },
+						react.createElement('span', { style: s.candidateTitle }, `${index + 1}. ${candidate.trackName || candidate.name || trackName}`),
+						candidateId && react.createElement('span', {
+							style: s.candidateIdBadge,
+							title: `${I18n.t('syncCreator.lrclibIdLabel') || 'LRCLIB ID'}: ${candidateId}`,
+							onClick: (event) => copyLrclibCandidateId(candidateId, event)
+						}, `ID ${candidateId}`)
+					),
 					react.createElement('div', { style: s.candidateSubtitle }, `${candidate.artistName || artistName} · ${formatSeconds(Number(candidate.duration || 0))}`),
 					react.createElement('div', { style: s.candidateMetaRow },
 						candidate.syncLineExactMatch && react.createElement('span', { style: { ...s.candidateBadge, color: '#8fc1ff' } }, I18n.t('syncCreator.lrclibBadgeExact') || 'Exact'),
@@ -5989,6 +6040,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 							react.createElement('div', { style: s.candidatePreviewSubtitle }, `${previewLrclibCandidate.artistName || artistName} · ${previewLrclibCandidate.albumName || ''}`.replace(/\s·\s$/, ''))
 						),
 						react.createElement('div', { style: s.candidatePreviewActions },
+							getLrclibCandidateId(previewLrclibCandidate) && react.createElement('button', {
+								type: 'button',
+								style: s.candidateIdButton,
+								title: `${I18n.t('syncCreator.lrclibIdLabel') || 'LRCLIB ID'}: ${getLrclibCandidateId(previewLrclibCandidate)}`,
+								onClick: (event) => copyLrclibCandidateId(previewLrclibCandidate, event)
+							}, `ID ${getLrclibCandidateId(previewLrclibCandidate)}`),
 							react.createElement('button', {
 								type: 'button',
 								style: { ...s.secondaryBtn, opacity: selectedLrclibCandidateKey === previewLrclibCandidate.candidateKey ? 0.7 : 1 },
@@ -6362,6 +6419,7 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 				lrclibCandidates.map((candidate, index) => {
 					const isPreviewing = previewLrclibCandidate?.candidateKey === candidate.candidateKey;
 					const isApplied = selectedLrclibCandidateKey === candidate.candidateKey;
+					const candidateId = getLrclibCandidateId(candidate);
 					let itemStyle = { ...s.candidateItem };
 					if (isPreviewing) itemStyle = { ...itemStyle, ...s.candidateItemActive };
 					if (isApplied) itemStyle = { ...itemStyle, ...s.candidateItemApplied };
@@ -6372,7 +6430,14 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 						style: itemStyle,
 						onClick: () => setPreviewLrclibCandidateKey(candidate.candidateKey)
 					},
-						react.createElement('div', { style: s.candidateTitle }, `${index + 1}. ${candidate.trackName || candidate.name || trackName}`),
+						react.createElement('div', { style: s.candidateTitleRow },
+							react.createElement('span', { style: s.candidateTitle }, `${index + 1}. ${candidate.trackName || candidate.name || trackName}`),
+							candidateId && react.createElement('span', {
+								style: s.candidateIdBadge,
+								title: `${I18n.t('syncCreator.lrclibIdLabel') || 'LRCLIB ID'}: ${candidateId}`,
+								onClick: (event) => copyLrclibCandidateId(candidateId, event)
+							}, `ID ${candidateId}`)
+						),
 						react.createElement('div', { style: s.candidateSubtitle },
 							`${candidate.artistName || artistName} · ${formatSeconds(Number(candidate.duration || 0))}`
 						),
@@ -6398,6 +6463,12 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 								)
 							),
 							react.createElement('div', { style: s.candidatePreviewActions },
+								getLrclibCandidateId(previewLrclibCandidate) && react.createElement('button', {
+									type: 'button',
+									style: s.candidateIdButton,
+									title: `${I18n.t('syncCreator.lrclibIdLabel') || 'LRCLIB ID'}: ${getLrclibCandidateId(previewLrclibCandidate)}`,
+									onClick: (event) => copyLrclibCandidateId(previewLrclibCandidate, event)
+								}, `ID ${getLrclibCandidateId(previewLrclibCandidate)}`),
 								react.createElement('button', {
 									type: 'button',
 									style: { ...s.secondaryBtn, opacity: selectedLrclibCandidateKey === previewLrclibCandidate.candidateKey ? 0.7 : 1 },

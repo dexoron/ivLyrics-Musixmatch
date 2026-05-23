@@ -2005,6 +2005,7 @@ window.LANG_DE = {
     "lrclibIdInvalid": "Gib eine gültige LRCLIB-ID ein",
     "lrclibIdLoadSuccess": "Lyrics per LRCLIB-ID geladen",
     "lrclibIdLoadError": "Lyrics konnten per LRCLIB-ID nicht geladen werden",
+    "lrclibIdCopied": "LRCLIB-ID kopiert",
     "lrclibSearchQueryLabel": "LRCLIB-Suche",
     "lrclibSearchQueryPlaceholder": "Songtitel oder Künstler",
     "lrclibSearchButton": "Suchen",

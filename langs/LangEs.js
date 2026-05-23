@@ -2006,6 +2006,7 @@ window.LANG_ES = {
     "lrclibIdInvalid": "Introduce un ID de LRCLIB válido",
     "lrclibIdLoadSuccess": "Letra cargada por ID de LRCLIB",
     "lrclibIdLoadError": "No se pudo cargar la letra por ID de LRCLIB",
+    "lrclibIdCopied": "ID de LRCLIB copiado",
     "lrclibSearchQueryLabel": "Búsqueda en LRCLIB",
     "lrclibSearchQueryPlaceholder": "Título o artista",
     "lrclibSearchButton": "Buscar",

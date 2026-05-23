@@ -2005,6 +2005,7 @@ window.LANG_HI = {
     "lrclibIdInvalid": "मान्य LRCLIB ID दर्ज करें",
     "lrclibIdLoadSuccess": "LRCLIB ID से बोल लोड हो गए",
     "lrclibIdLoadError": "LRCLIB ID से बोल लोड नहीं हो सके",
+    "lrclibIdCopied": "LRCLIB ID कॉपी हो गया",
     "lrclibSearchQueryLabel": "LRCLIB खोज",
     "lrclibSearchQueryPlaceholder": "गीत का नाम या कलाकार",
     "lrclibSearchButton": "खोजें",

@@ -2006,6 +2006,7 @@ window.LANG_ZH_CN = {
     "lrclibIdInvalid": "请输入有效的 LRCLIB ID",
     "lrclibIdLoadSuccess": "已通过 LRCLIB ID 加载歌词",
     "lrclibIdLoadError": "无法通过 LRCLIB ID 加载歌词",
+    "lrclibIdCopied": "已复制 LRCLIB ID",
     "lrclibSearchQueryLabel": "LRCLIB 搜索",
     "lrclibSearchQueryPlaceholder": "歌曲名或艺术家",
     "lrclibSearchButton": "搜索",

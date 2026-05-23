@@ -2006,6 +2006,7 @@ window.LANG_EN = {
     "lrclibIdInvalid": "Enter a valid LRCLIB ID",
     "lrclibIdLoadSuccess": "Loaded lyrics from LRCLIB ID",
     "lrclibIdLoadError": "Failed to load lyrics from LRCLIB ID",
+    "lrclibIdCopied": "Copied LRCLIB ID",
     "lrclibSearchQueryLabel": "LRCLIB Search",
     "lrclibSearchQueryPlaceholder": "Song title or artist",
     "lrclibSearchButton": "Search",

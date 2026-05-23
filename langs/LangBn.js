@@ -2006,6 +2006,7 @@ window.LANG_BN = {
     "lrclibIdInvalid": "সঠিক LRCLIB ID লিখুন",
     "lrclibIdLoadSuccess": "LRCLIB ID দিয়ে লিরিক্স লোড হয়েছে",
     "lrclibIdLoadError": "LRCLIB ID দিয়ে লিরিক্স লোড করা যায়নি",
+    "lrclibIdCopied": "LRCLIB ID কপি করা হয়েছে",
     "lrclibSearchQueryLabel": "LRCLIB অনুসন্ধান",
     "lrclibSearchQueryPlaceholder": "গানের নাম বা শিল্পী",
     "lrclibSearchButton": "অনুসন্ধান",

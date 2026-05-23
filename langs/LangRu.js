@@ -2006,6 +2006,7 @@ window.LANG_RU = {
     "lrclibIdInvalid": "Введите корректный ID LRCLIB",
     "lrclibIdLoadSuccess": "Текст загружен по ID LRCLIB",
     "lrclibIdLoadError": "Не удалось загрузить текст по ID LRCLIB",
+    "lrclibIdCopied": "ID LRCLIB скопирован",
     "lrclibSearchQueryLabel": "Поиск LRCLIB",
     "lrclibSearchQueryPlaceholder": "Название песни или исполнитель",
     "lrclibSearchButton": "Искать",

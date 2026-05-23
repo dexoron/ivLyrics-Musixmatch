@@ -2006,6 +2006,7 @@ window.LANG_VI = {
     "lrclibIdInvalid": "Nhập ID LRCLIB hợp lệ",
     "lrclibIdLoadSuccess": "Đã tải lời bài hát bằng ID LRCLIB",
     "lrclibIdLoadError": "Không thể tải lời bài hát bằng ID LRCLIB",
+    "lrclibIdCopied": "Đã sao chép ID LRCLIB",
     "lrclibSearchQueryLabel": "Tìm kiếm LRCLIB",
     "lrclibSearchQueryPlaceholder": "Tên bài hát hoặc nghệ sĩ",
     "lrclibSearchButton": "Tìm kiếm",

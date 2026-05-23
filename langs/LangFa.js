@@ -2005,6 +2005,7 @@ window.LANG_FA = {
     "lrclibIdInvalid": "یک شناسه معتبر LRCLIB وارد کنید",
     "lrclibIdLoadSuccess": "متن ترانه با شناسه LRCLIB بارگذاری شد",
     "lrclibIdLoadError": "بارگذاری متن ترانه با شناسه LRCLIB ناموفق بود",
+    "lrclibIdCopied": "شناسه LRCLIB کپی شد",
     "lrclibSearchQueryLabel": "جستجوی LRCLIB",
     "lrclibSearchQueryPlaceholder": "نام آهنگ یا هنرمند",
     "lrclibSearchButton": "جستجو",

@@ -1697,6 +1697,32 @@
                     }
                 }
 
+                if (!body && getSyncDataLrclibId(syncDataSource)) {
+                    const directCandidate = decorateDirectCandidate(
+                        await fetchLrclibCandidateById(syncDataSource, headers),
+                        syncDataSource,
+                        trackDurationSec
+                    );
+                    const directPreviewCandidate = buildDirectPreviewCandidate(directCandidate);
+
+                    if (directPreviewCandidate) {
+                        return {
+                            success: true,
+                            error: null,
+                            candidates: [directPreviewCandidate],
+                            selectedCandidateKey: directPreviewCandidate.candidateKey,
+                            selectedSource: 'source-direct',
+                            searchMode: 'source-direct',
+                            totalResults: 1,
+                            usedFallbackQuery: !!(englishSearchFlow || primarySearchFlow)?.usedFallbackQuery,
+                            syncDataLineCount: syncDataLineCharCounts?.length || 0,
+                            directLrclibId: getSyncDataLrclibId(syncDataSource),
+                            englishTitle: englishMetadata?.title || null,
+                            englishArtist: englishMetadata?.artist || null
+                        };
+                    }
+                }
+
                 if (!body) {
                     const finalFlow = englishSearchFlow || primarySearchFlow;
                     return {

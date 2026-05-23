@@ -2005,6 +2005,7 @@ window.LANG_SV = {
     "lrclibIdInvalid": "Ange ett giltigt LRCLIB-ID",
     "lrclibIdLoadSuccess": "Texten lästes in från LRCLIB-ID",
     "lrclibIdLoadError": "Kunde inte läsa in texten från LRCLIB-ID",
+    "lrclibIdCopied": "LRCLIB-ID kopierat",
     "lrclibSearchQueryLabel": "LRCLIB-sökning",
     "lrclibSearchQueryPlaceholder": "Låttitel eller artist",
     "lrclibSearchButton": "Sök",

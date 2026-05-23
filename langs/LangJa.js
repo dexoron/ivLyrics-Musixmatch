@@ -2006,6 +2006,7 @@ window.LANG_JA = {
     "lrclibIdInvalid": "有効なLRCLIB IDを入力してください",
     "lrclibIdLoadSuccess": "LRCLIB IDから歌詞を読み込みました",
     "lrclibIdLoadError": "LRCLIB IDから歌詞を読み込めませんでした",
+    "lrclibIdCopied": "LRCLIB IDをコピーしました",
     "lrclibSearchQueryLabel": "LRCLIB検索",
     "lrclibSearchQueryPlaceholder": "曲名またはアーティスト",
     "lrclibSearchButton": "検索",

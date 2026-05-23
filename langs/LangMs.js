@@ -2015,6 +2015,7 @@ window.LANG_MS = {
     "lrclibIdInvalid": "Masukkan ID LRCLIB yang sah",
     "lrclibIdLoadSuccess": "Lirik dimuatkan daripada ID LRCLIB",
     "lrclibIdLoadError": "Gagal memuatkan lirik daripada ID LRCLIB",
+    "lrclibIdCopied": "ID LRCLIB disalin",
     "lrclibSearchQueryLabel": "Carian LRCLIB",
     "lrclibSearchQueryPlaceholder": "Tajuk lagu atau artis",
     "lrclibSearchButton": "Cari",

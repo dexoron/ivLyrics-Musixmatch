@@ -2006,6 +2006,7 @@ window.LANG_FR = {
     "lrclibIdInvalid": "Saisissez un ID LRCLIB valide",
     "lrclibIdLoadSuccess": "Paroles chargées via l’ID LRCLIB",
     "lrclibIdLoadError": "Impossible de charger les paroles via l’ID LRCLIB",
+    "lrclibIdCopied": "ID LRCLIB copié",
     "lrclibSearchQueryLabel": "Recherche LRCLIB",
     "lrclibSearchQueryPlaceholder": "Titre ou artiste",
     "lrclibSearchButton": "Rechercher",

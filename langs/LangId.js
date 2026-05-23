@@ -2005,6 +2005,7 @@ window.LANG_ID = {
     "lrclibIdInvalid": "Masukkan ID LRCLIB yang valid",
     "lrclibIdLoadSuccess": "Lirik dimuat dari ID LRCLIB",
     "lrclibIdLoadError": "Gagal memuat lirik dari ID LRCLIB",
+    "lrclibIdCopied": "ID LRCLIB disalin",
     "lrclibSearchQueryLabel": "Pencarian LRCLIB",
     "lrclibSearchQueryPlaceholder": "Judul lagu atau artis",
     "lrclibSearchButton": "Cari",
