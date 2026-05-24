@@ -1534,7 +1534,7 @@ window.LANG_ZH_TW = {
           "desc": "一鍵更新",
           "info": "開啟 ivLyrics 更新頁面。頁面會嘗試自動啟動更新器，並在需要時顯示手動更新連結。",
           "unsupportedInfo": "此平台不支援一鍵更新。按下按鈕即可複製安裝指令。",
-          "button": "前往更新",
+          "button": "更新",
           "opening": "正在開啟 ivLyrics 更新頁面。",
           "failed": "無法開啟更新頁面。",
           "unsupportedCopied": "此處不支援一鍵更新，因此已複製安裝指令。"

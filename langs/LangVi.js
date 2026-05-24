@@ -1534,7 +1534,7 @@ window.LANG_VI = {
           "desc": "Cập nhật một lần nhấp",
           "info": "Mở trang cập nhật ivLyrics. Trang này sẽ thử chạy trình cập nhật tự động và hiển thị liên kết cập nhật thủ công nếu cần.",
           "unsupportedInfo": "Cập nhật một lần nhấp không khả dụng trên nền tảng này. Nhấn nút để sao chép lệnh cài đặt.",
-          "button": "Đi đến cập nhật",
+          "button": "Cập nhật",
           "opening": "Đang mở trang cập nhật ivLyrics.",
           "failed": "Không thể mở trang cập nhật.",
           "unsupportedCopied": "Cập nhật một lần nhấp không khả dụng ở đây, nên lệnh cài đặt đã được sao chép."

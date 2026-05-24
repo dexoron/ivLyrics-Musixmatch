@@ -1534,7 +1534,7 @@ window.LANG_PT = {
           "desc": "Atualização com um clique",
           "info": "Abre a página de atualização do ivLyrics. Ela tentará iniciar o atualizador automaticamente e mostrará um link manual se necessário.",
           "unsupportedInfo": "A atualização com um clique não está disponível nesta plataforma. Pressione o botão para copiar o comando de instalação.",
-          "button": "Ir para atualização",
+          "button": "Atualizar",
           "opening": "Abrindo a página de atualização do ivLyrics.",
           "failed": "Falha ao abrir a página de atualização.",
           "unsupportedCopied": "A atualização com um clique não está disponível aqui, então o comando de instalação foi copiado."

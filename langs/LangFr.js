@@ -1534,7 +1534,7 @@ window.LANG_FR = {
           "desc": "Mise à jour en un clic",
           "info": "Ouvre la page de mise à jour ivLyrics. Elle essaiera de lancer l’outil de mise à jour automatiquement et affichera un lien manuel si nécessaire.",
           "unsupportedInfo": "La mise à jour en un clic n’est pas disponible sur cette plateforme. Appuyez sur le bouton pour copier la commande d’installation.",
-          "button": "Aller à la mise à jour",
+          "button": "Mettre à jour",
           "opening": "Ouverture de la page de mise à jour ivLyrics.",
           "failed": "Impossible d’ouvrir la page de mise à jour.",
           "unsupportedCopied": "La mise à jour en un clic n’est pas disponible ici, la commande d’installation a donc été copiée."

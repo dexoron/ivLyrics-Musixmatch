@@ -1534,7 +1534,7 @@ window.LANG_EN = {
           "desc": "One-click update",
           "info": "Open the ivLyrics update page. It will try to start the updater automatically and show a manual update link if needed.",
           "unsupportedInfo": "One-click update is not available on this platform. Press the button to copy the install command.",
-          "button": "Go to update",
+          "button": "Update",
           "opening": "Opening the ivLyrics update page.",
           "failed": "Failed to open the update page.",
           "unsupportedCopied": "One-click update is not available here, so the install command was copied."

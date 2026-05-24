@@ -1534,7 +1534,7 @@ window.LANG_DE = {
           "desc": "Ein-Klick-Update",
           "info": "Öffnet die ivLyrics-Update-Seite. Die Seite versucht, den Updater automatisch zu starten, und zeigt bei Bedarf einen manuellen Update-Link.",
           "unsupportedInfo": "Das Ein-Klick-Update ist auf dieser Plattform nicht verfügbar. Drücke die Taste, um den Installationsbefehl zu kopieren.",
-          "button": "Zur Aktualisierung",
+          "button": "Aktualisieren",
           "opening": "Die ivLyrics-Update-Seite wird geöffnet.",
           "failed": "Die Update-Seite konnte nicht geöffnet werden.",
           "unsupportedCopied": "Das Ein-Klick-Update ist hier nicht verfügbar, daher wurde der Installationsbefehl kopiert."

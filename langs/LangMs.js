@@ -1534,7 +1534,7 @@ window.LANG_MS = {
           "desc": "Kemas kini satu klik",
           "info": "Buka halaman kemas kini ivLyrics. Halaman ini akan cuba menjalankan pengemas kini secara automatik dan memaparkan pautan manual jika perlu.",
           "unsupportedInfo": "Kemas kini satu klik tidak tersedia pada platform ini. Tekan butang untuk menyalin arahan pemasangan.",
-          "button": "Pergi ke kemas kini",
+          "button": "Kemas kini",
           "opening": "Membuka halaman kemas kini ivLyrics.",
           "failed": "Gagal membuka halaman kemas kini.",
           "unsupportedCopied": "Kemas kini satu klik tidak tersedia di sini, jadi arahan pemasangan telah disalin."

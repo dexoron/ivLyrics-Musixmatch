@@ -1534,7 +1534,7 @@ window.LANG_SV = {
           "desc": "Uppdatering med ett klick",
           "info": "Öppnar ivLyrics uppdateringssida. Sidan försöker starta uppdateraren automatiskt och visar en manuell uppdateringslänk vid behov.",
           "unsupportedInfo": "Uppdatering med ett klick är inte tillgänglig på den här plattformen. Tryck på knappen för att kopiera installationskommandot.",
-          "button": "Gå till uppdatering",
+          "button": "Uppdatera",
           "opening": "Öppnar ivLyrics uppdateringssida.",
           "failed": "Kunde inte öppna uppdateringssidan.",
           "unsupportedCopied": "Uppdatering med ett klick är inte tillgänglig här, så installationskommandot kopierades."

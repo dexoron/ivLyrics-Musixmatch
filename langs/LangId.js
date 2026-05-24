@@ -1534,7 +1534,7 @@ window.LANG_ID = {
           "desc": "Pembaruan sekali klik",
           "info": "Buka halaman pembaruan ivLyrics. Halaman ini akan mencoba menjalankan updater otomatis dan menampilkan tautan pembaruan manual jika diperlukan.",
           "unsupportedInfo": "Pembaruan sekali klik tidak tersedia di platform ini. Tekan tombol untuk menyalin perintah instalasi.",
-          "button": "Ke pembaruan",
+          "button": "Perbarui",
           "opening": "Membuka halaman pembaruan ivLyrics.",
           "failed": "Gagal membuka halaman pembaruan.",
           "unsupportedCopied": "Pembaruan sekali klik tidak tersedia di sini, jadi perintah instalasi telah disalin."
