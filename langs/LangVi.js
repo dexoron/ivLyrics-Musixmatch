@@ -1530,6 +1530,15 @@ window.LANG_VI = {
           "button": "Kiểm tra cập nhật",
           "checking": "Đang kiểm tra..."
         },
+        "protocol": {
+          "desc": "Cập nhật một lần nhấp",
+          "info": "Chạy ivLyrics Updater đã đăng ký. Nếu không có gì mở ra, hãy sao chép lệnh cài đặt và chạy thủ công.",
+          "unsupportedInfo": "Cập nhật một lần nhấp không khả dụng trên nền tảng này. Nhấn nút để sao chép lệnh cài đặt.",
+          "button": "Chạy trình cập nhật",
+          "opening": "Đang mở ivLyrics Updater.",
+          "failed": "Không thể mở trình cập nhật.",
+          "unsupportedCopied": "Cập nhật một lần nhấp không khả dụng ở đây, nên lệnh cài đặt đã được sao chép."
+        },
         "copied": "Đã sao chép",
         "installCopied": "Đã sao chép lệnh cài đặt",
         "copyFailed": "Sao chép thất bại"

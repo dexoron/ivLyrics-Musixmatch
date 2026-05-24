@@ -1530,6 +1530,15 @@ window.LANG_ID = {
           "button": "Cek Pembaruan",
           "checking": "Memeriksa..."
         },
+        "protocol": {
+          "desc": "Pembaruan sekali klik",
+          "info": "Menjalankan ivLyrics Updater yang terdaftar. Jika tidak ada yang terbuka, salin perintah instalasi dan jalankan secara manual.",
+          "unsupportedInfo": "Pembaruan sekali klik tidak tersedia di platform ini. Tekan tombol untuk menyalin perintah instalasi.",
+          "button": "Jalankan updater",
+          "opening": "Membuka ivLyrics Updater.",
+          "failed": "Gagal membuka updater.",
+          "unsupportedCopied": "Pembaruan sekali klik tidak tersedia di sini, jadi perintah instalasi telah disalin."
+        },
         "copied": "Disalin",
         "installCopied": "Perintah instalasi disalin",
         "copyFailed": "Gagal menyalin"

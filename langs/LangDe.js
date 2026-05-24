@@ -1530,6 +1530,15 @@ window.LANG_DE = {
           "button": "Prüfen",
           "checking": "Prüfe..."
         },
+        "protocol": {
+          "desc": "Ein-Klick-Update",
+          "info": "Startet den registrierten ivLyrics Updater. Wenn nichts geöffnet wird, kopiere den Installationsbefehl und führe ihn manuell aus.",
+          "unsupportedInfo": "Das Ein-Klick-Update ist auf dieser Plattform nicht verfügbar. Drücke die Taste, um den Installationsbefehl zu kopieren.",
+          "button": "Updater starten",
+          "opening": "ivLyrics Updater wird geöffnet.",
+          "failed": "Der Updater konnte nicht geöffnet werden.",
+          "unsupportedCopied": "Das Ein-Klick-Update ist hier nicht verfügbar, daher wurde der Installationsbefehl kopiert."
+        },
         "copied": "Kopiert",
         "installCopied": "Installationsbefehl kopiert",
         "copyFailed": "Kopieren fehlgeschlagen"

@@ -1530,6 +1530,15 @@ window.LANG_KO = {
           "button": "업데이트 확인",
           "checking": "확인 중..."
         },
+        "protocol": {
+          "desc": "자동 업데이트",
+          "info": "설치 시 등록된 ivLyrics Updater로 업데이트 스크립트를 실행합니다. 아무 창도 열리지 않으면 설치 명령어를 복사해 수동으로 실행하세요.",
+          "unsupportedInfo": "이 플랫폼에서는 자동 업데이트를 사용할 수 없습니다. 버튼을 누르면 설치 명령어를 복사합니다.",
+          "button": "업데이트 실행",
+          "opening": "ivLyrics Updater를 여는 중입니다.",
+          "failed": "업데이트 도우미를 열지 못했습니다.",
+          "unsupportedCopied": "이 플랫폼에서는 자동 업데이트를 사용할 수 없어 설치 명령어를 복사했습니다."
+        },
         "copied": "복사됨",
         "installCopied": "설치 명령어가 복사되었습니다",
         "copyFailed": "복사에 실패했습니다"

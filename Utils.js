@@ -1311,10 +1311,39 @@ const Utils = {
   getInstallCommand() {
     const commands = {
       windows: "iwr -useb https://ivlis.kr/ivLyrics/install.ps1 | iex",
-      mac: "curl -fsSL https://ivlis.kr/ivLyrics/install.sh | sh",
-      linux: "curl -fsSL https://ivlis.kr/ivLyrics/install.sh | sh",
+      mac: "curl -fsSL https://ivlis.kr/ivLyrics/install.sh | bash",
+      linux: "curl -fsSL https://ivlis.kr/ivLyrics/install.sh | bash",
     };
     return commands[this.detectPlatform()];
+  },
+
+  /**
+   * Whether the one-click local updater protocol is supported on this platform.
+   * Windows uses HKCU URL protocol registration, macOS uses a local app bundle,
+   * and Linux uses xdg-mime with a desktop entry.
+   */
+  canUseUpdaterProtocol() {
+    return ["windows", "mac", "linux"].includes(this.detectPlatform());
+  },
+
+  /**
+   * Open the local updater protocol. The protocol handler must only accept a
+   * small action whitelist and must never execute command text from the URL.
+   */
+  openUpdaterProtocol(action = "update") {
+    const allowedActions = new Set(["update", "open-log"]);
+    const safeAction = allowedActions.has(String(action || "").toLowerCase())
+      ? String(action).toLowerCase()
+      : "update";
+    const url = `ivlyrics-updater://${safeAction}`;
+
+    try {
+      window.open(url, "_blank");
+      return true;
+    } catch (error) {
+      console.error("[Utils] Failed to open updater protocol:", error);
+      return false;
+    }
   },
 
   /**

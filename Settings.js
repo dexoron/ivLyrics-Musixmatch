@@ -13546,6 +13546,33 @@ const ConfigModal = ({
                 }
               },
             },
+            {
+              desc: I18n.t("settingsAdvanced.aboutTab.update.protocol.desc"),
+              info: Utils.canUseUpdaterProtocol()
+                ? I18n.t("settingsAdvanced.aboutTab.update.protocol.info")
+                : I18n.t("settingsAdvanced.aboutTab.update.protocol.unsupportedInfo"),
+              key: "open-updater",
+              text: I18n.t("settingsAdvanced.aboutTab.update.protocol.button"),
+              type: ConfigButton,
+              onChange: async () => {
+                if (Utils.canUseUpdaterProtocol()) {
+                  const opened = Utils.openUpdaterProtocol("update");
+                  if (opened) {
+                    Toast.success(I18n.t("settingsAdvanced.aboutTab.update.protocol.opening"));
+                  } else {
+                    Toast.error(I18n.t("settingsAdvanced.aboutTab.update.protocol.failed"));
+                  }
+                  return;
+                }
+
+                const copied = await Utils.copyToClipboard(Utils.getInstallCommand());
+                if (copied) {
+                  Toast.success(I18n.t("settingsAdvanced.aboutTab.update.protocol.unsupportedCopied"));
+                } else {
+                  Toast.error(I18n.t("settingsAdvanced.aboutTab.update.copyFailed"));
+                }
+              },
+            },
           ],
           onChange: () => { },
         }),

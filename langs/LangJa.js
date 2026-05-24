@@ -1530,6 +1530,15 @@ window.LANG_JA = {
           "button": "アップデートを確認",
           "checking": "確認中..."
         },
+        "protocol": {
+          "desc": "ワンクリック更新",
+          "info": "登録済みの ivLyrics Updater を実行します。何も開かない場合は、インストールコマンドをコピーして手動で実行してください。",
+          "unsupportedInfo": "このプラットフォームではワンクリック更新を利用できません。ボタンを押すとインストールコマンドをコピーします。",
+          "button": "アップデーターを実行",
+          "opening": "ivLyrics Updater を開いています。",
+          "failed": "アップデーターを開けませんでした。",
+          "unsupportedCopied": "ここではワンクリック更新を利用できないため、インストールコマンドをコピーしました。"
+        },
         "copied": "コピー済み",
         "installCopied": "インストールコマンドがコピーされました",
         "copyFailed": "コピーに失敗しました"

@@ -1530,6 +1530,15 @@ window.LANG_IT = {
           "button": "Controlla ora",
           "checking": "Verifica in corso..."
         },
+        "protocol": {
+          "desc": "Aggiornamento con un clic",
+          "info": "Esegue ivLyrics Updater registrato. Se non si apre nulla, copia il comando di installazione ed eseguilo manualmente.",
+          "unsupportedInfo": "L’aggiornamento con un clic non è disponibile su questa piattaforma. Premi il pulsante per copiare il comando di installazione.",
+          "button": "Esegui updater",
+          "opening": "Apertura di ivLyrics Updater.",
+          "failed": "Impossibile aprire l’updater.",
+          "unsupportedCopied": "L’aggiornamento con un clic non è disponibile qui, quindi il comando di installazione è stato copiato."
+        },
         "copied": "Copiato",
         "installCopied": "Comando installazione copiato",
         "copyFailed": "Copia fallita"

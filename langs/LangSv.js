@@ -1530,6 +1530,15 @@ window.LANG_SV = {
           "button": "Sök efter uppdateringar",
           "checking": "Kontrollerar..."
         },
+        "protocol": {
+          "desc": "Uppdatering med ett klick",
+          "info": "Kör den registrerade ivLyrics Updater. Om inget öppnas, kopiera installationskommandot och kör det manuellt.",
+          "unsupportedInfo": "Uppdatering med ett klick är inte tillgänglig på den här plattformen. Tryck på knappen för att kopiera installationskommandot.",
+          "button": "Kör uppdateraren",
+          "opening": "Öppnar ivLyrics Updater.",
+          "failed": "Kunde inte öppna uppdateraren.",
+          "unsupportedCopied": "Uppdatering med ett klick är inte tillgänglig här, så installationskommandot kopierades."
+        },
         "copied": "Kopierade",
         "installCopied": "Installationskommandot har kopierats",
         "copyFailed": "Kopieringen misslyckades"

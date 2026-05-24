@@ -75,6 +75,7 @@ curl -fsSL https://ivlis.kr/ivLyrics/install.sh | bash
 ```
 
 You can use the same command to update the app.
+Automatic installation also registers the `ivlyrics-updater://` helper on Windows, macOS, and Linux so the in-app update button can run the updater.
 
 #### Uninstall
 

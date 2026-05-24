@@ -1530,6 +1530,15 @@ window.LANG_ZH_CN = {
           "button": "检查更新",
           "checking": "检查中..."
         },
+        "protocol": {
+          "desc": "一键更新",
+          "info": "运行已注册的 ivLyrics Updater。如果没有任何窗口打开，请复制安装命令并手动运行。",
+          "unsupportedInfo": "此平台不支持一键更新。点击按钮可复制安装命令。",
+          "button": "运行更新器",
+          "opening": "正在打开 ivLyrics Updater。",
+          "failed": "无法打开更新器。",
+          "unsupportedCopied": "此处不支持一键更新，因此已复制安装命令。"
+        },
         "copied": "已复制",
         "installCopied": "安装命令已复制",
         "copyFailed": "复制失败"

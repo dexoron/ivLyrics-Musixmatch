@@ -1530,6 +1530,15 @@ window.LANG_FR = {
           "button": "Vérifier",
           "checking": "Vérification..."
         },
+        "protocol": {
+          "desc": "Mise à jour en un clic",
+          "info": "Lance le ivLyrics Updater enregistré. Si rien ne s’ouvre, copiez la commande d’installation et exécutez-la manuellement.",
+          "unsupportedInfo": "La mise à jour en un clic n’est pas disponible sur cette plateforme. Appuyez sur le bouton pour copier la commande d’installation.",
+          "button": "Lancer la mise à jour",
+          "opening": "Ouverture de ivLyrics Updater.",
+          "failed": "Impossible d’ouvrir l’outil de mise à jour.",
+          "unsupportedCopied": "La mise à jour en un clic n’est pas disponible ici, la commande d’installation a donc été copiée."
+        },
         "copied": "Copié",
         "installCopied": "Commande d'installation copiée",
         "copyFailed": "Échec de la copie"

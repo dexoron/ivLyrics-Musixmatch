@@ -78,6 +78,7 @@ curl -fsSL https://ivlis.kr/ivLyrics/install.sh | bash
 ```
 
 업데이트도 동일한 명령어로 가능합니다.
+자동 설치를 사용하면 Windows, macOS, Linux에서 `ivlyrics-updater://` 업데이트 도우미가 함께 등록되어 앱 안의 업데이트 버튼으로도 실행할 수 있습니다.
 
 #### 삭제 방법
 

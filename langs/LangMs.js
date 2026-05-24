@@ -1530,6 +1530,15 @@ window.LANG_MS = {
           "button": "Semak Kemas Kini",
           "checking": "Memeriksa..."
         },
+        "protocol": {
+          "desc": "Kemas kini satu klik",
+          "info": "Menjalankan ivLyrics Updater yang telah didaftarkan. Jika tiada apa-apa terbuka, salin arahan pemasangan dan jalankan secara manual.",
+          "unsupportedInfo": "Kemas kini satu klik tidak tersedia pada platform ini. Tekan butang untuk menyalin arahan pemasangan.",
+          "button": "Jalankan pengemas kini",
+          "opening": "Membuka ivLyrics Updater.",
+          "failed": "Gagal membuka pengemas kini.",
+          "unsupportedCopied": "Kemas kini satu klik tidak tersedia di sini, jadi arahan pemasangan telah disalin."
+        },
         "copied": "Disalin",
         "installCopied": "Perintah pemasangan telah disalin",
         "copyFailed": "Gagal menyalin"

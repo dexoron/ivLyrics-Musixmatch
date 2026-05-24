@@ -1530,6 +1530,15 @@ window.LANG_EN = {
           "button": "Check for Updates",
           "checking": "Checking..."
         },
+        "protocol": {
+          "desc": "One-click update",
+          "info": "Runs the registered ivLyrics Updater. If nothing opens, copy the install command and run it manually.",
+          "unsupportedInfo": "One-click update is not available on this platform. Press the button to copy the install command.",
+          "button": "Run updater",
+          "opening": "Opening ivLyrics Updater.",
+          "failed": "Failed to open the updater.",
+          "unsupportedCopied": "One-click update is not available here, so the install command was copied."
+        },
         "copied": "Copied",
         "installCopied": "Install command copied",
         "copyFailed": "Copy failed"

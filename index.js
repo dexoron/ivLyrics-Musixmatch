@@ -431,6 +431,7 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const installCommand = Utils.getInstallCommand();
   const platformName = Utils.getPlatformName();
+  const canUseUpdaterProtocol = Utils.canUseUpdaterProtocol();
 
   const handleCopy = async () => {
     const success = await Utils.copyToClipboard(installCommand);
@@ -440,6 +441,15 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
       setTimeout(() => setCopied(false), 2500);
     } else {
       Toast.error(I18n.t("notifications.copyFailed"));
+    }
+  };
+
+  const handleOpenUpdater = () => {
+    const opened = Utils.openUpdaterProtocol("update");
+    if (opened) {
+      Toast.success(I18n.t("settingsAdvanced.aboutTab.update.protocol.opening"));
+    } else {
+      Toast.error(I18n.t("settingsAdvanced.aboutTab.update.protocol.failed"));
     }
   };
 
@@ -598,6 +608,28 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
       react.createElement(
         "div",
         { style: { display: "flex", gap: "8px", marginTop: "12px" } },
+        canUseUpdaterProtocol &&
+        react.createElement(
+          "button",
+          {
+            onClick: handleOpenUpdater,
+            className: "lyrics-update-button-primary",
+            style: {
+              flex: 1,
+              background: "rgba(74, 222, 128, 0.16)",
+              border: "1px solid rgba(74, 222, 128, 0.35)",
+              color: "rgba(220, 252, 231, 0.95)",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: "600",
+              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+              letterSpacing: "-0.01em",
+            },
+          },
+          I18n.t("settingsAdvanced.aboutTab.update.protocol.button")
+        ),
         react.createElement(
           "button",
           {
