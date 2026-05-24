@@ -1327,15 +1327,11 @@ const Utils = {
   },
 
   /**
-   * Open the local updater protocol. The protocol handler must only accept a
-   * small action whitelist and must never execute command text from the URL.
+   * Open the public update bridge page. Spotify's internal webview can block
+   * custom protocol navigation, so the browser page performs the protocol jump.
    */
-  openUpdaterProtocol(action = "update") {
-    const allowedActions = new Set(["update", "open-log"]);
-    const safeAction = allowedActions.has(String(action || "").toLowerCase())
-      ? String(action).toLowerCase()
-      : "update";
-    const url = `ivlyrics-updater://${safeAction}`;
+  openUpdaterProtocol() {
+    const url = "https://lyrics.ivl.is/update";
 
     try {
       window.open(url, "_blank");
