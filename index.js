@@ -427,69 +427,156 @@ const hasInstrumentalMarker = (lyrics = []) => {
 
 // Update Banner Component - Fluent Design Style
 const UpdateBanner = ({ updateInfo, onDismiss }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const updatePageUrl = "https://lyrics.ivl.is/update";
 
-  const actionButtonStyle = {
-    flex: 1,
-    background: "rgba(255, 255, 255, 0.08)",
-    border: "1px solid rgba(255, 255, 255, 0.15)",
-    color: "rgba(255, 255, 255, 0.9)",
-    padding: "10px 16px",
-    borderRadius: "8px",
+  const linkBaseStyle = {
+    minHeight: "44px",
+    padding: "0 18px",
+    borderRadius: "12px",
     textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "600",
-    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-    display: "flex",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "-0.01em",
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    letterSpacing: "-0.01em",
+    transition: "transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
   };
 
   return react.createElement(
     "div",
     {
       className: "ivLyrics-update-banner",
+      onClick: onDismiss,
       style: {
-        background: "rgba(255, 255, 255, 0.05)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
-        borderRadius: "12px",
-        margin: "12px 16px",
-        backdropFilter: "blur(40px) saturate(180%)",
-        WebkitBackdropFilter: "blur(40px) saturate(180%)",
-        boxShadow:
-          "0 8px 32px 0 rgba(0, 0, 0, 0.18), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)",
-        animation: "slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-        position: "relative",
-        zIndex: "var(--iv-layer-update-banner, 1000)",
-        overflow: "hidden",
-        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        position: "fixed",
+        inset: 0,
+        zIndex: "var(--iv-layer-update-banner, 10000)",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px",
+        background: "rgba(8, 10, 16, 0.42)",
+        backdropFilter: "blur(22px) saturate(140%)",
+        WebkitBackdropFilter: "blur(22px) saturate(140%)",
+        animation: "ivlyricsSoftFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
     react.createElement(
       "div",
       {
+        onClick: (event) => event.stopPropagation(),
         style: {
-          padding: "16px 20px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "16px",
+          width: "min(430px, 100%)",
+          position: "relative",
+          padding: "26px",
+          borderRadius: "22px",
+          background: "rgba(18, 22, 30, 0.9)",
+          border: "1px solid rgba(255, 255, 255, 0.14)",
+          boxShadow:
+            "0 24px 80px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+          color: "rgba(255, 255, 255, 0.94)",
+          overflow: "hidden",
+          animation: "ivlyricsSoftRiseIn 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
         },
       },
       react.createElement(
         "div",
-        { style: { flex: 1, minWidth: 0 } },
+        {
+          style: {
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            background:
+              "linear-gradient(135deg, rgba(74, 222, 128, 0.16), transparent 38%), radial-gradient(circle at 82% 0%, rgba(56, 189, 248, 0.18), transparent 32%)",
+          },
+        }
+      ),
+      react.createElement(
+        "button",
+        {
+          onClick: onDismiss,
+          className: "lyrics-update-button-close",
+          style: {
+            position: "absolute",
+            top: "14px",
+            right: "14px",
+            width: "34px",
+            height: "34px",
+            borderRadius: "50%",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            background: "rgba(255, 255, 255, 0.08)",
+            color: "rgba(255, 255, 255, 0.68)",
+            cursor: "pointer",
+            fontSize: "20px",
+            lineHeight: "1",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 1,
+          },
+        },
+        "×"
+      ),
+      react.createElement(
+        "div",
+        { style: { position: "relative", zIndex: 1 } },
         react.createElement(
           "div",
           {
             style: {
-              fontSize: "15px",
-              fontWeight: "600",
-              color: "rgba(255, 255, 255, 0.95)",
-              marginBottom: "6px",
+              width: "48px",
+              height: "48px",
+              borderRadius: "16px",
+              display: "grid",
+              placeItems: "center",
+              marginBottom: "18px",
+              background: "rgba(74, 222, 128, 0.16)",
+              border: "1px solid rgba(74, 222, 128, 0.28)",
+              color: "rgba(220, 252, 231, 0.96)",
+            },
+          },
+          react.createElement("svg", {
+            width: 24,
+            height: 24,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 2,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            dangerouslySetInnerHTML: {
+              __html:
+                '<path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path><path d="M12 7v5l3 2"></path>',
+            },
+          })
+        ),
+        react.createElement(
+          "div",
+          {
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "5px 9px",
+              borderRadius: "999px",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              color: "rgba(255, 255, 255, 0.66)",
+              fontSize: "12px",
+              fontWeight: "700",
+              marginBottom: "12px",
+            },
+          },
+          `${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
+        ),
+        react.createElement(
+          "div",
+          {
+            style: {
+              fontSize: "24px",
+              fontWeight: "800",
+              lineHeight: "1.18",
               letterSpacing: "-0.01em",
+              marginBottom: "10px",
             },
           },
           I18n.t("notifications.updateAvailable")
@@ -498,117 +585,56 @@ const UpdateBanner = ({ updateInfo, onDismiss }) => {
           "div",
           {
             style: {
-              fontSize: "13px",
-              color: "rgba(255, 255, 255, 0.6)",
-              lineHeight: "1.5",
+              fontSize: "14px",
+              color: "rgba(255, 255, 255, 0.66)",
+              lineHeight: "1.6",
+              marginBottom: "22px",
             },
           },
-          `${I18n.t("update.versionChange")} ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
-        )
-      ),
-      react.createElement(
-        "div",
-        { style: { display: "flex", gap: "8px", alignItems: "center" } },
-        react.createElement(
-          "button",
-          {
-            onClick: () => setIsExpanded(!isExpanded),
-            className: "lyrics-update-button-primary",
-            style: {
-              background: "rgba(255, 255, 255, 0.15)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              color: "rgba(255, 255, 255, 0.95)",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: "600",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-              backdropFilter: "blur(10px)",
-              letterSpacing: "-0.01em",
-            },
-          },
-          isExpanded ? I18n.t("update.collapse") : I18n.t("update.expand")
+          I18n.t("settingsAdvanced.aboutTab.update.protocol.info")
         ),
         react.createElement(
-          "button",
+          "div",
           {
-            onClick: onDismiss,
-            className: "lyrics-update-button-close",
             style: {
-              background: "transparent",
-              border: "none",
-              color: "rgba(255, 255, 255, 0.5)",
-              cursor: "pointer",
-              fontSize: "20px",
-              padding: "4px 8px",
-              borderRadius: "6px",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-              lineHeight: "1",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: "10px",
             },
           },
-          "×"
-        )
-      )
-    ),
-    isExpanded &&
-    react.createElement(
-      "div",
-      {
-        style: {
-          padding: "0 20px 20px 20px",
-          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-          animation: "expandDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-        },
-      },
-      react.createElement(
-        "div",
-        {
-          style: {
-            marginTop: "16px",
-            background: "rgba(0, 0, 0, 0.2)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: "8px",
-            padding: "12px 14px",
-            marginBottom: "12px",
-            color: "rgba(255, 255, 255, 0.72)",
-            fontSize: "13px",
-            lineHeight: "1.6",
-          },
-        },
-        I18n.t("settingsAdvanced.aboutTab.update.protocol.info")
-      ),
-      react.createElement(
-        "div",
-        { style: { display: "flex", gap: "8px", marginTop: "12px" } },
-        react.createElement(
-          "a",
-          {
-            href: updatePageUrl,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            className: "lyrics-update-button-primary",
-            style: {
-              ...actionButtonStyle,
-              background: "rgba(74, 222, 128, 0.16)",
-              border: "1px solid rgba(74, 222, 128, 0.35)",
-              color: "rgba(220, 252, 231, 0.95)",
+          react.createElement(
+            "a",
+            {
+              href: updatePageUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              className: "lyrics-update-button-primary",
+              style: {
+                ...linkBaseStyle,
+                width: "100%",
+                background: "rgba(74, 222, 128, 0.94)",
+                border: "1px solid rgba(187, 247, 208, 0.48)",
+                color: "#07130b",
+              },
             },
-          },
-          I18n.t("settingsAdvanced.aboutTab.update.protocol.button")
-        ),
-        react.createElement(
-          "a",
-          {
-            href: updateInfo.releaseUrl,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            style: actionButtonStyle,
-          },
-          I18n.t("update.releaseNotes")
+            I18n.t("settingsAdvanced.aboutTab.update.protocol.button")
+          ),
+          react.createElement(
+            "a",
+            {
+              href: updateInfo.releaseUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+              style: {
+                ...linkBaseStyle,
+                width: "100%",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "rgba(255, 255, 255, 0.82)",
+              },
+            },
+            I18n.t("update.releaseNotes")
+          )
         )
       )
     )
