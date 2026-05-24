@@ -415,8 +415,28 @@ Return ONLY valid JSON. Do not add any text before or after the JSON.
 6. Do NOT add any explanation outside the JSON`;
     }
 
-    function buildLyricsStudyPrompt({ title, artist, targetLang, sourceLang = 'auto', lines = [], category = 'lines', chunkIndex = 1, chunkTotal = 1 }) {
+    function buildLyricsStudyPrompt({ title, artist, targetLang, sourceLang = 'auto', lines = [], category = 'lines', difficulty = 'normal', chunkIndex = 1, chunkTotal = 1 }) {
         const langInfo = getLangInfo(targetLang || 'ko');
+        const normalizedDifficulty = ['easy', 'normal', 'hard', 'native'].includes(String(difficulty || '').toLowerCase()) ? String(difficulty || '').toLowerCase() : 'normal';
+        const difficultyMap = {
+            easy: {
+                label: 'Easy',
+                guidance: 'Assume a beginner or lower-intermediate learner. Use short explanations, define common words, avoid jargon, and make quiz distractors clearly distinguishable.'
+            },
+            normal: {
+                label: 'Normal',
+                guidance: 'Assume an intermediate learner. Balance natural meaning, useful grammar, vocabulary nuance, and practical examples.'
+            },
+            hard: {
+                label: 'Hard',
+                guidance: 'Assume an advanced learner. Include finer nuance, grammar contrasts, register, collocation, and more challenging quiz distractors.'
+            },
+            native: {
+                label: 'Native-level',
+                guidance: 'Assume a near-native learner. Explain subtle tone, implication, idiom, literary compression, rhythm, and natural alternatives without simplifying too much.'
+            }
+        };
+        const difficultyInfo = difficultyMap[normalizedDifficulty] || difficultyMap.normal;
         const pronunciationGuide = [
             `Use one pronunciation style across every chunk: IPA-style phonetic transcription in Latin/IPA symbols.`,
             `Wrap it in /.../ for phonemic pronunciation or [...] for close phonetic detail.`,
@@ -433,7 +453,7 @@ Return ONLY valid JSON. Do not add any text before or after the JSON.
             summary: `Create only a compact learning-focused song summary. Explain the emotional situation, speaker attitude, and 2-3 language-learning takeaways. Do not create line notes, expressions, or quiz items.`,
             lines: `Create line-level learning cards for every provided lyric line. Keep each explanation short but specific. Include reading and pronunciation when useful. Include 1-2 grammar/pattern notes for each line that has a reusable structure; each note must explain how the pattern works in this lyric.`,
             expressions: `Create only 1-2 vocabulary expansion cards from words or short phrases that actually appear in the provided lyrics. Prefer practical items where learners benefit from alternatives, related words, or forms such as tense, base form, past participle, polite/casual form, particles, or collocations. Do not list many key phrases.`,
-            quiz: `Create only 2-4 multiple-choice quiz items from the provided lyrics. Test meaning, nuance, grammar, or expression usage, not trivia. Distractors must be plausible. Each question must include a lineIndex and should show the actual lyric phrase instead of referring to a line number. Include reading and pronunciation if the question quotes a lyric.`
+            quiz: `Create only 2-4 choice-based quiz items from the provided lyrics. Mix formats using the type field: meaning, blank, usage, rewrite, and grammar. Include fill-in-the-blank items where the question contains ____ and the choices are candidate words or short phrases. Include practical transfer items that ask how a lyric expression would be used or rephrased in everyday conversation, work email, meeting, or other non-lyric context. Do not make every question a literal lyric translation. Distractors must be plausible. Each question must include a lineIndex and should show the actual lyric phrase instead of referring to a line number. Include reading and pronunciation if the question quotes a lyric.`
         };
         const outputShapes = {
             summary: `{
@@ -459,7 +479,7 @@ Return ONLY valid JSON. Do not add any text before or after the JSON.
 }`,
             quiz: `{
   "quiz": [
-    { "type": "multipleChoice", "question": "question in ${langInfo.native}", "choices": ["A", "B", "C", "D"], "answerIndex": 0, "explanation": "why in ${langInfo.native}", "lineIndex": 0, "reading": "optional", "pronunciation": "optional" }
+    { "type": "meaning|blank|usage|rewrite|grammar", "question": "question in ${langInfo.native}; for blank type include ____ where the missing word/phrase goes", "choices": ["A", "B", "C", "D"], "answerIndex": 0, "explanation": "why in ${langInfo.native}", "lineIndex": 0, "reading": "optional", "pronunciation": "optional" }
   ]
 }`
         };
@@ -471,11 +491,14 @@ Detected/source language: ${sourceLang}
 Song: ${title || ''}
 Artist: ${artist || ''}
 Category: ${normalizedCategory}
+Difficulty: ${difficultyInfo.label}
+Difficulty guidance: ${difficultyInfo.guidance}
 Chunk: ${chunkIndex}/${chunkTotal}
 
 Rules:
 - Return ONLY valid JSON. No markdown, no code fences, no extra text.
 - Write every human-readable explanation, meaning, question, and quiz explanation in ${langInfo.native}.
+- Match the selected difficulty. Easy should be simpler and more scaffolded; hard/native-level should include deeper nuance and more demanding quiz distractors.
 - Keep original lyric fragments short. Do not quote long lyric passages.
 - Preserve original line indexes exactly.
 - Do not refer to "line 3", "3rd line", "N번째 줄", or similar labels. Show the actual lyric phrase when a specific lyric matters.
@@ -488,6 +511,11 @@ Rules:
 - When a word or phrase has nuance, explain the contrast with the literal meaning or a more common alternative.
 - For the expressions category, output expansion cards, not a long list of key phrases. Base each item on a lyric word or short phrase and include alternatives/forms/relatedWords only when useful.
 - For quiz items, vary answerIndex. Do not place every correct answer at choices[0].
+- For quiz items, vary the type field. Do not make all items meaning questions; use blank, usage, rewrite, and grammar when the lyric supports them.
+- For blank type, put ____ directly in the question and make choices short words or phrases that fit the blank.
+- For blank type, include enough context in the question itself because the full original lyric line may be hidden while the learner answers.
+- For quiz items, include some practical transfer questions when possible: how to say the idea naturally in everyday speech, how to soften it, or how to adapt it for workplace/formal writing.
+- Repeated lyric phrases should produce at most one quiz item across the whole pack. If the same sentence or chorus line appears again, skip it and choose a different lyric phrase.
 - If a line is too simple, keep its explanation short.
 - Generate only the requested category. Omit unrelated top-level keys.
 

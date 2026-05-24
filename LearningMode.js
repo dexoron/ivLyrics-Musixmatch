@@ -24,6 +24,7 @@
     const DB_NAME = "ivLyricsLearningMode";
     const DB_VERSION = 1;
     const THEME_STORAGE_KEY = "ivLyrics:learningMode:theme";
+    const DIFFICULTY_STORAGE_KEY = "ivLyrics:learningMode:difficulty";
     const PROMPT_VERSION = "lyrics-study-v6-2026-05-24";
     const MAX_STUDY_LINES = 80;
     const MAX_STUDY_CHARS = 8000;
@@ -38,9 +39,27 @@
     const STUDY_CHUNK_RETRY_MIN_LINES = 1;
     const STUDY_CONCURRENT_REQUESTS = 3;
     const MAX_EXPRESSION_EXPANSIONS = 5;
+    const MAX_QUIZ_ITEMS = 12;
+    const MAX_QUIZ_CANDIDATES = 36;
+    const QUIZ_TYPES = {
+        meaning: { key: "quizTypeMeaning", fallback: "뜻 맞히기" },
+        blank: { key: "quizTypeBlank", fallback: "빈칸 채우기" },
+        usage: { key: "quizTypeUsage", fallback: "상황 활용" },
+        rewrite: { key: "quizTypeRewrite", fallback: "문장 바꾸기" },
+        grammar: { key: "quizTypeGrammar", fallback: "문법 선택" }
+    };
     const DEFAULT_LYRIC_PLAY_MS = 6500;
     const MIN_LYRIC_PLAY_MS = 1000;
     const MAX_LYRIC_PLAY_MS = 15000;
+    const PLAYBACK_END_REWIND_RATIO = 0.985;
+    const PLAYBACK_END_REWIND_COOLDOWN_MS = 2500;
+    const STUDY_DIFFICULTIES = ["easy", "normal", "hard", "native"];
+    const STUDY_DIFFICULTY_LABELS = {
+        easy: "Easy",
+        normal: "Normal",
+        hard: "Hard",
+        native: "Native-level"
+    };
 
     const state = window[MODULE_KEY] || (window[MODULE_KEY] = {
         initialized: false,
@@ -54,7 +73,9 @@
             lastProgress: 0,
             progressTimer: null,
             songChangeHandler: null,
-            restoring: false
+            restoring: false,
+            lastRewindAt: 0,
+            lastRewindUri: ""
         },
         lyricPlaybackTimer: null,
         speechResumeTimer: null,
@@ -81,7 +102,9 @@
         lastProgress: 0,
         progressTimer: null,
         songChangeHandler: null,
-        restoring: false
+        restoring: false,
+        lastRewindAt: 0,
+        lastRewindUri: ""
     };
     state.generation ||= {
         jobId: 0,
@@ -114,6 +137,45 @@
         return "light";
     };
 
+    const normalizeStudyDifficulty = (value) => {
+        const normalized = String(value || "").trim().toLowerCase();
+        return STUDY_DIFFICULTIES.includes(normalized) ? normalized : "normal";
+    };
+
+    const getInitialStudyDifficulty = () => {
+        try {
+            return normalizeStudyDifficulty(localStorage.getItem(DIFFICULTY_STORAGE_KEY));
+        } catch (error) {
+            return "normal";
+        }
+    };
+
+    const getStudyDifficultyLabel = (difficulty) => {
+        const normalized = normalizeStudyDifficulty(difficulty);
+        return t(`difficulty${normalized[0].toUpperCase()}${normalized.slice(1)}`, STUDY_DIFFICULTY_LABELS[normalized]);
+    };
+
+    const normalizeQuizType = (value) => {
+        const normalized = String(value || "").trim().toLowerCase().replace(/[_\s-]+/g, "");
+        if (normalized === "blank" || normalized === "fillblank" || normalized === "fillintheblank" || normalized === "cloze") return "blank";
+        if (normalized === "usage" || normalized === "context" || normalized === "situation" || normalized === "transfer") return "usage";
+        if (normalized === "rewrite" || normalized === "rephrase" || normalized === "paraphrase") return "rewrite";
+        if (normalized === "grammar" || normalized === "form" || normalized === "structure") return "grammar";
+        return "meaning";
+    };
+
+    const getQuizTypeLabel = (type) => {
+        const config = QUIZ_TYPES[normalizeQuizType(type)] || QUIZ_TYPES.meaning;
+        return t(config.key, config.fallback);
+    };
+
+    const QUIZ_BLANK_MARKER_PATTERN = /(__+|\[blank\]|\{blank\}|<blank>)/i;
+    const shouldShowQuizSource = (quiz) => {
+        if (!quiz?.sourceText) return false;
+        if (normalizeQuizType(quiz.type) === "blank") return false;
+        return !QUIZ_BLANK_MARKER_PATTERN.test(String(quiz.question || ""));
+    };
+
     const notify = () => {
         for (const listener of state.listeners) {
             try {
@@ -126,6 +188,20 @@
 
     const getCurrentPlayerUri = () =>
         window.Spicetify?.Player?.data?.item?.uri || "";
+
+    const getCurrentPlayerDuration = () => {
+        const values = [
+            window.Spicetify?.Player?.getDuration?.(),
+            window.Spicetify?.Player?.data?.item?.duration?.milliseconds,
+            window.Spicetify?.Player?.data?.item?.metadata?.duration_ms,
+            window.Spicetify?.Player?.data?.item?.duration_ms
+        ];
+        for (const value of values) {
+            const duration = Number(value);
+            if (Number.isFinite(duration) && duration > 0) return duration;
+        }
+        return 0;
+    };
 
     const setRepeatMode = (mode) => {
         try {
@@ -194,28 +270,32 @@
         }
     };
 
-    const restoreLockedTrack = () => {
+    const rewindCurrentTrackNearEnd = () => {
         const guard = state.playbackGuard;
-        if (!state.open) {
-            disablePlaybackGuard();
-            return;
-        }
-        if (!guard.enabled || guard.restoring || !guard.lockedUri) return;
-
         const currentUri = getCurrentPlayerUri();
-        if (!currentUri || currentUri === guard.lockedUri) return;
+        if (!state.open || !guard.enabled || !currentUri) return;
 
-        guard.restoring = true;
+        const duration = getCurrentPlayerDuration();
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
+        let progress = 0;
         try {
-            window.Spicetify?.Player?.playUri?.(guard.lockedUri);
-            setTimeout(() => {
-                seekPlayer(guard.lastProgress || 0);
-                guard.restoring = false;
-            }, 350);
+            progress = Number(window.Spicetify?.Player?.getProgress?.() || 0);
         } catch (error) {
-            guard.restoring = false;
-            console.warn("[LearningMode] failed to restore locked track:", error);
+            progress = 0;
         }
+        if (!Number.isFinite(progress) || progress <= 0) return;
+
+        const isNearEnd = progress >= duration * PLAYBACK_END_REWIND_RATIO
+            || duration - progress <= 1200;
+        if (!isNearEnd) return;
+
+        const now = Date.now();
+        if (guard.lastRewindUri === currentUri && now - guard.lastRewindAt < PLAYBACK_END_REWIND_COOLDOWN_MS) return;
+
+        guard.lastRewindUri = currentUri;
+        guard.lastRewindAt = now;
+        seekPlayer(0);
     };
 
     const enablePlaybackGuard = () => {
@@ -226,38 +306,16 @@
         }
 
         guard.enabled = true;
-        guard.previousRepeat = null;
-        try {
-            guard.previousRepeat = window.Spicetify?.Player?.getRepeat?.();
-        } catch (error) {
-            guard.previousRepeat = null;
-        }
         lockPlaybackTo(getCurrentPlayerUri());
-        setRepeatMode(2);
 
         guard.progressTimer = setInterval(() => {
             if (!guard.enabled) return;
-            if (getCurrentPlayerUri() === guard.lockedUri) {
-                try {
-                    guard.lastProgress = window.Spicetify?.Player?.getProgress?.() || guard.lastProgress || 0;
-                } catch (error) { }
-            }
-        }, 1000);
-
-        guard.songChangeHandler = () => {
             if (!state.open) {
                 disablePlaybackGuard();
                 return;
             }
-            setTimeout(() => {
-                if (!state.open) {
-                    disablePlaybackGuard();
-                    return;
-                }
-                restoreLockedTrack();
-            }, 80);
-        };
-        window.Spicetify?.Player?.addEventListener?.("songchange", guard.songChangeHandler);
+            rewindCurrentTrackNearEnd();
+        }, 500);
     };
 
     const disablePlaybackGuard = () => {
@@ -282,6 +340,8 @@
         guard.lockedUri = "";
         guard.lastProgress = 0;
         guard.restoring = false;
+        guard.lastRewindAt = 0;
+        guard.lastRewindUri = "";
     };
 
     const open = () => {
@@ -639,10 +699,12 @@
             || "ko";
     };
 
-    const buildCacheKey = ({ trackUri, lyricsHash, targetLang }) => {
+    const buildCacheKey = ({ trackUri, lyricsHash, targetLang, difficulty = "normal" }) => {
         const trackId = getTrackId(trackUri);
         if (!trackId || !lyricsHash || !targetLang) return "";
-        return `${trackId}:${lyricsHash}:${targetLang}:${PROMPT_VERSION}`;
+        const normalizedDifficulty = normalizeStudyDifficulty(difficulty);
+        const difficultyPart = normalizedDifficulty === "normal" ? "" : `${normalizedDifficulty}:`;
+        return `${trackId}:${lyricsHash}:${targetLang}:${difficultyPart}${PROMPT_VERSION}`;
     };
 
     const createDb = (() => {
@@ -764,6 +826,41 @@
         };
     };
 
+    const normalizeQuizComparableText = (value) => String(value || "")
+        .normalize("NFKC")
+        .toLowerCase()
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/[\"'`“”‘’「」『』,.;:!?！？。、，、·・()[\]{}<>/\\|~～_+=-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const extractQuotedQuizText = (value) => {
+        const text = String(value || "");
+        const match = text.match(/[\"“”'‘’「『](.*?)[\"“”'‘’」』]/);
+        return match?.[1] || "";
+    };
+
+    const dedupeQuizItems = (items, maxItems = MAX_QUIZ_ITEMS) => {
+        const seenSources = new Set();
+        const seenQuestions = new Set();
+        const result = [];
+
+        for (const item of asArray(items)) {
+            const sourceKey = normalizeQuizComparableText(item.sourceText || extractQuotedQuizText(item.question));
+            const questionKey = normalizeQuizComparableText(item.question);
+
+            if (sourceKey && seenSources.has(sourceKey)) continue;
+            if (!sourceKey && questionKey && seenQuestions.has(questionKey)) continue;
+
+            result.push(item);
+            if (sourceKey) seenSources.add(sourceKey);
+            if (questionKey) seenQuestions.add(questionKey);
+            if (result.length >= maxItems) break;
+        }
+
+        return result;
+    };
+
     const normalizeGrammarItem = (item) => {
         if (!item) return null;
         if (typeof item === "string") {
@@ -836,7 +933,7 @@
     const getReading = (item) =>
         String(item?.reading || item?.hiragana || item?.furigana || item?.kana || "").trim();
 
-    const normalizeStudyPack = ({ raw, sourceLines = [], trackId, trackUri, title, artist, provider, targetLang, lyricsHash, cacheKey, omittedCount }) => {
+    const normalizeStudyPack = ({ raw, sourceLines = [], trackId, trackUri, title, artist, provider, targetLang, difficulty = "normal", lyricsHash, cacheKey, omittedCount }) => {
         const sourceByIndex = new Map(
             asArray(sourceLines)
                 .map((line) => [Number(line?.index), String(line?.text || "").trim()])
@@ -922,7 +1019,7 @@
             };
         }).filter((item) => item.expression);
 
-        const quiz = asArray(raw?.quiz).map((item, index) => {
+        const quiz = dedupeQuizItems(asArray(raw?.quiz).map((item, index) => {
             const choices = asArray(item?.choices).map((choice) => String(choice).trim()).filter(Boolean).slice(0, 4);
             const answerIndex = Number(item?.answerIndex);
             const lineIndex = Number.isFinite(Number(item?.lineIndex)) ? Number(item.lineIndex) : null;
@@ -930,7 +1027,7 @@
             const shuffled = shuffleQuizChoices(choices, answerIndex, `${cacheKey}:${index}:${item?.question || ""}`);
             return {
                 id: String(item?.id || `quiz-${index}`),
-                type: String(item?.type || "multipleChoice"),
+                type: normalizeQuizType(item?.type),
                 question: String(item?.question || "").trim(),
                 choices: shuffled.choices,
                 answerIndex: shuffled.answerIndex >= 0 ? shuffled.answerIndex : 0,
@@ -942,7 +1039,7 @@
                 pronunciation: getPronunciation(item) || lineMeta.pronunciation || "",
                 reading: getReading(item) || lineMeta.reading || ""
             };
-        }).filter((item) => item.question && item.choices.length >= 2);
+        }).filter((item) => item.question && item.choices.length >= 2));
 
         return {
             cacheKey,
@@ -952,6 +1049,8 @@
             artist,
             provider: provider || "",
             targetLang,
+            difficulty: normalizeStudyDifficulty(difficulty),
+            quizDifficulty: normalizeStudyDifficulty(raw?.quizDifficulty || difficulty),
             lyricsHash,
             promptVersion: PROMPT_VERSION,
             summary: String(raw?.summary || "").trim(),
@@ -982,6 +1081,30 @@
                 };
             })
         };
+    };
+
+    const normalizeStudyHistory = (packs) => {
+        const seen = new Set();
+        return asArray(packs)
+            .filter((pack) => pack?.cacheKey && (pack.trackUri || pack.trackId))
+            .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
+            .filter((pack) => {
+                if (seen.has(pack.cacheKey)) return false;
+                seen.add(pack.cacheKey);
+                return true;
+            })
+            .map((pack) => ({
+                cacheKey: pack.cacheKey,
+                trackId: pack.trackId || getTrackId(pack.trackUri),
+                trackUri: pack.trackUri || (pack.trackId ? `spotify:track:${pack.trackId}` : ""),
+                title: String(pack.title || "").trim(),
+                artist: String(pack.artist || "").trim(),
+                targetLang: pack.targetLang || "",
+                difficulty: normalizeStudyDifficulty(pack.difficulty),
+                quizCount: Array.isArray(pack.quiz) ? pack.quiz.length : 0,
+                lineCount: Array.isArray(pack.lines) ? pack.lines.length : 0,
+                updatedAt: pack.updatedAt || pack.createdAt || 0
+            }));
     };
 
     const mergeStudyResponses = (responses) => {
@@ -1022,7 +1145,7 @@
 
         merged.lines.sort((a, b) => a.index - b.index);
         merged.keyExpressions = merged.keyExpressions.slice(0, MAX_EXPRESSION_EXPANSIONS);
-        merged.quiz = merged.quiz.slice(0, 12);
+        merged.quiz = merged.quiz.slice(0, MAX_QUIZ_CANDIDATES);
         return merged;
     };
 
@@ -1086,6 +1209,7 @@
         artist,
         provider,
         targetLang,
+        difficulty = "normal",
         lyricsHash,
         cacheKey,
         force = false
@@ -1104,6 +1228,7 @@
             artist,
             provider,
             targetLang,
+            difficulty: normalizeStudyDifficulty(difficulty),
             sourceLang: getSourceLanguage(limited.lines)
         };
 
@@ -1171,6 +1296,7 @@
                         artist,
                         provider,
                         targetLang,
+                        difficulty,
                         lyricsHash,
                         cacheKey,
                         omittedCount: limited.omittedCount
@@ -1237,6 +1363,7 @@
                     artist,
                     provider,
                     targetLang,
+                    difficulty,
                     lyricsHash,
                     cacheKey,
                     omittedCount: limited.omittedCount
@@ -1281,6 +1408,182 @@
 
         setGenerationState({ promise });
 
+        return promise;
+    };
+
+    const startQuizGenerationJob = ({
+        normalizedLyrics,
+        basePack,
+        trackId,
+        trackUri,
+        title,
+        artist,
+        provider,
+        targetLang,
+        difficulty = "normal",
+        lyricsHash,
+        cacheKey
+    }) => {
+        if (!basePack) return Promise.resolve(null);
+
+        const activeGeneration = getGenerationSnapshot();
+        if (activeGeneration.status === "loading" && activeGeneration.cacheKey === cacheKey && activeGeneration.promise) {
+            notifyGeneration();
+            return activeGeneration.promise;
+        }
+
+        const jobId = (Number(activeGeneration.jobId) || 0) + 1;
+        const limited = getLimitedLines(normalizedLyrics);
+        const requestParams = {
+            trackId,
+            title,
+            artist,
+            provider,
+            targetLang,
+            difficulty: normalizeStudyDifficulty(difficulty),
+            sourceLang: getSourceLanguage(limited.lines)
+        };
+        const chunks = buildStudyChunks(limited.lines, QUIZ_CHUNK_LINES, QUIZ_CHUNK_CHARS)
+            .filter((chunk) => chunk.length > 0);
+        const requestTotal = Math.max(1, chunks.length);
+        let completedRequests = 0;
+
+        setGenerationState({
+            jobId,
+            cacheKey,
+            trackId,
+            status: "loading",
+            pack: basePack,
+            error: "",
+            loadingText: t("loadingQuizOnly", "퀴즈만 다시 만드는 중... ({current}/{total})")
+                .replace("{current}", "0")
+                .replace("{total}", String(requestTotal)),
+            progress: { done: 0, total: requestTotal },
+            promise: null
+        });
+
+        const promise = (async () => {
+            try {
+                const isCurrentJob = () => getGenerationSnapshot().jobId === jobId;
+                const rawParts = [];
+                let nextChunkIndex = 0;
+
+                const buildPackWithQuiz = (quizParts) => {
+                    const raw = mergeStudyResponses(quizParts);
+                    const quizPack = normalizeStudyPack({
+                        raw,
+                        sourceLines: limited.lines,
+                        trackId,
+                        trackUri,
+                        title,
+                        artist,
+                        provider,
+                        targetLang,
+                        difficulty,
+                        lyricsHash,
+                        cacheKey,
+                        omittedCount: limited.omittedCount
+                    });
+                    return {
+                        ...basePack,
+                        trackUri: basePack.trackUri || trackUri,
+                        difficulty: normalizeStudyDifficulty(difficulty),
+                        quizDifficulty: normalizeStudyDifficulty(difficulty),
+                        quiz: quizPack.quiz,
+                        updatedAt: Date.now()
+                    };
+                };
+
+                const publishPartialPack = () => {
+                    if (!isCurrentJob() || rawParts.length === 0) return;
+                    const partialPack = buildPackWithQuiz(rawParts);
+                    setGenerationState({
+                        status: "loading",
+                        pack: partialPack,
+                        error: "",
+                        progress: { done: completedRequests, total: requestTotal }
+                    });
+                };
+
+                const runNextChunk = async () => {
+                    while (nextChunkIndex < chunks.length) {
+                        const index = nextChunkIndex;
+                        nextChunkIndex += 1;
+                        if (!isCurrentJob()) return;
+
+                        setGenerationState({
+                            loadingText: t("loadingQuizOnly", "퀴즈만 다시 만드는 중... ({current}/{total})")
+                                .replace("{current}", String(index + 1))
+                                .replace("{total}", String(chunks.length))
+                        });
+
+                        const rawPart = await requestStudyChunkWithRetry({
+                            ...requestParams,
+                            category: "quiz"
+                        }, chunks[index], {
+                            chunkIndex: index + 1,
+                            chunkTotal: chunks.length
+                        });
+
+                        if (!isCurrentJob()) return;
+                        rawParts.push(rawPart);
+                        completedRequests += 1;
+                        publishPartialPack();
+                    }
+                };
+
+                if (chunks.length === 0) {
+                    throw new Error(t("noLyrics", "학습할 가사가 없습니다."));
+                }
+
+                const workerCount = Math.min(STUDY_CONCURRENT_REQUESTS, chunks.length);
+                await Promise.all(Array.from({ length: workerCount }, () => runNextChunk()));
+                if (!isCurrentJob()) return null;
+
+                const nextPack = buildPackWithQuiz(rawParts);
+                if (!nextPack.quiz.length) {
+                    throw new Error(t("quizRegenerateFailed", "퀴즈를 다시 만들지 못했습니다."));
+                }
+
+                await dbPut("studyPacks", nextPack);
+                await dbPut("progress", {
+                    cacheKey,
+                    trackId,
+                    answers: {},
+                    score: 0,
+                    total: nextPack.quiz.length,
+                    updatedAt: Date.now()
+                });
+
+                if (!isCurrentJob()) return nextPack;
+
+                setGenerationState({
+                    status: "ready",
+                    pack: nextPack,
+                    error: "",
+                    loadingText: "",
+                    progress: { done: requestTotal, total: requestTotal },
+                    promise: null
+                });
+                window.Toast?.success?.(t("quizRegenerated", "새 퀴즈를 만들었습니다."));
+                return nextPack;
+            } catch (quizError) {
+                if (getGenerationSnapshot().jobId === jobId) {
+                    console.warn("[LearningMode] quiz generation failed:", quizError);
+                    setGenerationState({
+                        status: "error",
+                        pack: basePack,
+                        error: quizError?.message || t("quizRegenerateFailed", "퀴즈를 다시 만들지 못했습니다."),
+                        loadingText: "",
+                        progress: { done: 0, total: 0 },
+                        promise: null
+                    });
+                }
+                throw quizError;
+            }
+        })();
+
+        setGenerationState({ promise });
         return promise;
     };
 
@@ -1385,6 +1688,19 @@
         react.createElement("span", null, t("playLyric", "가사 재생"))
     );
 
+    const BlankQuestion = ({ text = "" }) => {
+        const parts = String(text || "").split(/(__+|\[blank\]|\{blank\}|<blank>)/gi);
+        return react.createElement("div", { className: "ivlyrics-study-blank-question" },
+            parts.map((part, index) => {
+                const isBlank = /^(__+|\[blank\]|\{blank\}|<blank>)$/i.test(part);
+                return react.createElement("span", {
+                    key: `${index}-${part}`,
+                    className: isBlank ? "blank" : ""
+                }, isBlank ? "____" : part);
+            })
+        );
+    };
+
     const StudyPanel = react.memo(({
         trackUri = "",
         title = "",
@@ -1408,6 +1724,9 @@
         const [savedWordFeedback, setSavedWordFeedback] = useState({});
         const [eventLineIndex, setEventLineIndex] = useState(activeLineIndex || 0);
         const [studyTheme, setStudyTheme] = useState(getInitialStudyTheme);
+        const [studyDifficulty, setStudyDifficulty] = useState(getInitialStudyDifficulty);
+        const [quizDifficulty, setQuizDifficulty] = useState(getInitialStudyDifficulty);
+        const [studyHistory, setStudyHistory] = useState([]);
         const generationRef = useRef(0);
 
         const normalizedLyrics = useMemo(() => normalizeLyrics(lyrics), [lyrics]);
@@ -1418,8 +1737,8 @@
         const targetLang = useMemo(() => getTargetLanguage(), [isOpen, trackUri]);
         const trackId = useMemo(() => getTrackId(trackUri), [trackUri]);
         const cacheKey = useMemo(
-            () => buildCacheKey({ trackUri, lyricsHash, targetLang }),
-            [trackUri, lyricsHash, targetLang]
+            () => buildCacheKey({ trackUri, lyricsHash, targetLang, difficulty: studyDifficulty }),
+            [trackUri, lyricsHash, targetLang, studyDifficulty]
         );
         const displayedLineIndex = Number.isFinite(eventLineIndex) ? eventLineIndex : activeLineIndex || 0;
         const hasLyrics = normalizedLyrics.length > 0;
@@ -1432,6 +1751,14 @@
                 } catch (error) { }
                 return next;
             });
+        }, []);
+
+        const selectStudyDifficulty = useCallback((difficulty) => {
+            const next = normalizeStudyDifficulty(difficulty);
+            setStudyDifficulty(next);
+            try {
+                localStorage.setItem(DIFFICULTY_STORAGE_KEY, next);
+            } catch (error) { }
         }, []);
 
         useEffect(() => () => {
@@ -1461,6 +1788,9 @@
             setError(generation.error || "");
             setLoadingText(generation.loadingText || "");
             setGenerationProgress(generation.progress || { done: 0, total: 0 });
+            if (generation.pack) {
+                setStudyHistory((prev) => normalizeStudyHistory([generation.pack, ...prev]));
+            }
         }), [cacheKey]);
 
         useEffect(() => {
@@ -1489,16 +1819,29 @@
                 setWordQuery("");
                 setSavedWordFeedback({});
 
-                if (!cacheKey || !trackId) {
-                    setWordbook([]);
-                    return;
-                }
-
                 try {
-                    const [cachedPack, progress, words] = await Promise.all([
+                    const [words, packs] = await Promise.all([
+                        dbGetAll("wordbook"),
+                        dbGetAll("studyPacks")
+                    ]);
+
+                    if (cancelled) return;
+
+                    setWordbook(words
+                        .map((word) => ({
+                            ...word,
+                            pronunciation: normalizePronunciation(word.pronunciation || word.phonetic || word.romanization || word.romaji)
+                        }))
+                        .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)));
+                    setStudyHistory(normalizeStudyHistory(packs));
+
+                    if (!cacheKey || !trackId) {
+                        return;
+                    }
+
+                    const [cachedPack, progress] = await Promise.all([
                         dbGet("studyPacks", cacheKey),
-                        dbGet("progress", cacheKey),
-                        dbGetAll("wordbook")
+                        dbGet("progress", cacheKey)
                     ]);
 
                     if (cancelled) return;
@@ -1523,12 +1866,6 @@
                             setQuizStep(savedQuizTotal);
                         }
                     }
-                    setWordbook(words
-                        .map((word) => ({
-                            ...word,
-                            pronunciation: normalizePronunciation(word.pronunciation || word.phonetic || word.romanization || word.romaji)
-                        }))
-                        .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)));
                 } catch (loadError) {
                     if (!cancelled) {
                         console.warn("[LearningMode] failed to load local state:", loadError);
@@ -1561,6 +1898,11 @@
             }
             setQuizStep((step) => Math.min(Math.max(step, 0), total));
         }, [pack?.quiz?.length, cacheKey]);
+
+        useEffect(() => {
+            if (!pack?.cacheKey) return;
+            setQuizDifficulty(normalizeStudyDifficulty(pack.quizDifficulty || pack.difficulty || studyDifficulty));
+        }, [pack?.cacheKey]);
 
         const filteredWordbook = useMemo(() => {
             const query = wordQuery.trim().toLowerCase();
@@ -1761,11 +2103,63 @@
                 artist,
                 provider,
                 targetLang,
+                difficulty: studyDifficulty,
                 lyricsHash,
                 cacheKey,
                 force
             }).catch(() => {});
-        }, [artist, cacheKey, hasLyrics, lyricsHash, normalizedLyrics, provider, targetLang, title, trackId, trackUri]);
+        }, [artist, cacheKey, hasLyrics, lyricsHash, normalizedLyrics, provider, studyDifficulty, targetLang, title, trackId, trackUri]);
+
+        const regenerateQuiz = useCallback(() => {
+            if (!pack || !hasLyrics || !cacheKey || !trackId) {
+                window.Toast?.error?.(t("noQuiz", "생성된 퀴즈가 없습니다."));
+                return;
+            }
+
+            if (typeof window.AIAddonManager?.generateLyricsStudy !== "function" || getEnabledStudyProviderCount() === 0) {
+                window.Toast?.error?.(t("noProvider", "설정에서 학습을 지원하는 AI 제공자를 활성화해주세요."));
+                return;
+            }
+
+            setActiveTab("quiz");
+            setAnswers({});
+            setQuizStep(0);
+            startQuizGenerationJob({
+                normalizedLyrics,
+                basePack: pack,
+                trackId,
+                trackUri,
+                title,
+                artist,
+                provider,
+                targetLang,
+                difficulty: quizDifficulty,
+                lyricsHash,
+                cacheKey
+            }).catch(() => {});
+        }, [artist, cacheKey, hasLyrics, lyricsHash, normalizedLyrics, pack, provider, quizDifficulty, targetLang, title, trackId, trackUri]);
+
+        const openHistoryItem = useCallback((item) => {
+            if (!item) return;
+            selectStudyDifficulty(item.difficulty || "normal");
+            setActiveTab("explain");
+
+            const uri = item.trackUri || (item.trackId ? `spotify:track:${item.trackId}` : "");
+            if (!uri) {
+                window.Toast?.error?.(t("historyMissingTrack", "이 곡으로 이동할 수 없습니다."));
+                return;
+            }
+
+            if (uri === getCurrentPlayerUri()) return;
+
+            clearLyricPlaybackTimer();
+            try {
+                window.Spicetify?.Player?.playUri?.(uri);
+            } catch (historyError) {
+                console.warn("[LearningMode] failed to open history track:", historyError);
+                window.Toast?.error?.(t("historyPlayFailed", "곡으로 이동하지 못했습니다."));
+            }
+        }, [selectStudyDifficulty]);
 
         const answerQuiz = useCallback((quizIndex, choiceIndex) => {
             if (!pack?.quiz?.[quizIndex]) return;
@@ -1885,6 +2279,11 @@
             : totalQuiz > 0
                 ? Math.round((answeredValues.length / totalQuiz) * 100)
                 : (pack ? 100 : 0);
+        const difficultyOptions = STUDY_DIFFICULTIES.map((id) => ({
+            id,
+            label: getStudyDifficultyLabel(id)
+        }));
+        const historyCount = studyHistory.length;
 
         return react.createElement("aside", {
             className: `ivlyrics-study-panel theme-${studyTheme}`,
@@ -1924,7 +2323,8 @@
                     react.createElement("div", { className: "ivlyrics-study-tabs", role: "tablist" },
                         react.createElement(TabButton, { id: "explain", activeTab, onSelect: setActiveTab }, t("tabExplain", "오늘의 해설")),
                         react.createElement(TabButton, { id: "quiz", activeTab, onSelect: setActiveTab }, t("tabQuiz", "퀴즈")),
-                        react.createElement(TabButton, { id: "words", activeTab, onSelect: setActiveTab }, t("tabWords", "단어장"))
+                        react.createElement(TabButton, { id: "words", activeTab, onSelect: setActiveTab }, t("tabWords", "단어장")),
+                        react.createElement(TabButton, { id: "history", activeTab, onSelect: setActiveTab }, t("tabHistory", "학습 기록"))
                     ),
                     react.createElement("div", { className: "ivlyrics-study-rail-card" },
                         react.createElement("span", null, t("lessonProgress", "진행")),
@@ -1955,17 +2355,38 @@
                                 react.createElement("strong", null, wordbook.length)
                             )
                         ),
+                        react.createElement("div", { className: "ivlyrics-study-difficulty" },
+                            react.createElement("div", { className: "ivlyrics-study-difficulty-head" },
+                                react.createElement("span", null, t("difficulty", "난이도")),
+                                react.createElement("small", null, t("difficultyHint", "생성 전에 원하는 설명 깊이를 고르세요."))
+                            ),
+                            react.createElement("div", { className: "ivlyrics-study-difficulty-options" },
+                                difficultyOptions.map((item) => react.createElement("button", {
+                                    key: item.id,
+                                    type: "button",
+                                    className: studyDifficulty === item.id ? "active" : "",
+                                    onClick: () => selectStudyDifficulty(item.id),
+                                    disabled: status === "loading"
+                                }, item.label))
+                            )
+                        ),
                         react.createElement("button", {
                             type: "button",
                             className: "ivlyrics-study-secondary",
                             onClick: () => generateStudy({ force: Boolean(pack) }),
                             disabled: status === "loading" || !hasLyrics
-                        }, pack ? t("regenerate", "다시 생성") : t("generate", "생성"))
+                        }, pack ? t("regenerate", "다시 생성") : t("generate", "생성")),
+                        pack && react.createElement("button", {
+                            type: "button",
+                            className: "ivlyrics-study-secondary subtle",
+                            onClick: regenerateQuiz,
+                            disabled: status === "loading" || !hasLyrics
+                        }, t("quizRegenerate", "새 문제 만들기"))
                     )
                 ),
                 react.createElement("main", { className: "ivlyrics-study-stage" },
-                    !hasLyrics && react.createElement(EmptyState, null, t("noLyrics", "학습할 가사가 없습니다.")),
-                    hasLyrics && !pack && status !== "loading" && react.createElement(EmptyState, null,
+                    !hasLyrics && activeTab !== "history" && react.createElement(EmptyState, null, t("noLyrics", "학습할 가사가 없습니다.")),
+                    hasLyrics && activeTab !== "history" && !pack && status !== "loading" && react.createElement(EmptyState, null,
                         react.createElement("p", null, t("empty", "현재 곡의 학습 데이터가 없습니다.")),
                         react.createElement("button", {
                             type: "button",
@@ -1973,7 +2394,7 @@
                             onClick: () => generateStudy()
                         }, t("generate", "생성"))
                     ),
-                    status === "loading" && !pack && react.createElement(EmptyState, null,
+                    status === "loading" && activeTab !== "history" && !pack && react.createElement(EmptyState, null,
                         react.createElement("div", { className: "ivlyrics-study-spinner" }),
                         react.createElement("p", null, loadingText || t("loading", "가사를 분석하는 중..."))
                     ),
@@ -1981,6 +2402,43 @@
                     status === "loading" && pack && react.createElement("div", { className: "ivlyrics-study-loading-banner" },
                         react.createElement("div", { className: "ivlyrics-study-spinner" }),
                         react.createElement("p", null, loadingText || t("loading", "가사를 분석하는 중..."))
+                    ),
+                    activeTab === "history" && react.createElement("div", { className: "ivlyrics-study-section ivlyrics-study-history" },
+                        react.createElement("section", { className: "ivlyrics-study-wordbook-hero ivlyrics-study-history-hero" },
+                            react.createElement("div", null,
+                                react.createElement("span", null, t("tabHistory", "학습 기록")),
+                                react.createElement("h3", null, t("studyHistoryTitle", "생성한 곡"))
+                            ),
+                            react.createElement("strong", null,
+                                t("studyHistoryCount", "{count}곡").replace("{count}", historyCount)
+                            )
+                        ),
+                        studyHistory.length === 0 && react.createElement(EmptyState, null, t("studyHistoryEmpty", "아직 생성한 학습 곡이 없습니다.")),
+                        studyHistory.length > 0 && react.createElement("div", { className: "ivlyrics-study-history-grid" },
+                            studyHistory.map((item) => {
+                                const isCurrent = item.cacheKey === cacheKey;
+                                return react.createElement("article", {
+                                    key: item.cacheKey,
+                                    className: `ivlyrics-study-history-card${isCurrent ? " active" : ""}`
+                                },
+                                    react.createElement("button", {
+                                        type: "button",
+                                        onClick: () => openHistoryItem(item)
+                                    },
+                                        react.createElement("div", null,
+                                            react.createElement("strong", null, item.title || t("unknownSong", "제목 없음")),
+                                            item.artist && react.createElement("span", null, item.artist)
+                                        ),
+                                        react.createElement("div", { className: "ivlyrics-study-history-meta" },
+                                            isCurrent && react.createElement("em", { className: "current" }, t("studyHistoryCurrent", "현재 학습")),
+                                            react.createElement("em", null, getStudyDifficultyLabel(item.difficulty)),
+                                            react.createElement("em", null, `${item.quizCount} ${t("tabQuiz", "퀴즈")}`),
+                                            item.updatedAt && react.createElement("em", null, new Date(item.updatedAt).toLocaleDateString())
+                                        )
+                                    )
+                                );
+                            })
+                        )
                     ),
                     pack && activeTab === "explain" && react.createElement("div", { className: "ivlyrics-study-section" },
                         currentLineStudy && react.createElement("section", { className: "ivlyrics-study-card ivlyrics-study-current" },
@@ -2147,9 +2605,33 @@
                         )
                     ),
                     pack && activeTab === "quiz" && react.createElement("div", { className: "ivlyrics-study-section ivlyrics-study-quiz-stage" },
+                        react.createElement("div", { className: "ivlyrics-study-quiz-tools" },
+                            react.createElement("div", { className: "ivlyrics-study-quiz-difficulty" },
+                                react.createElement("span", null, t("difficulty", "난이도")),
+                                react.createElement("div", { className: "ivlyrics-study-difficulty-options compact" },
+                                    difficultyOptions.map((item) => react.createElement("button", {
+                                        key: `quiz-${item.id}`,
+                                        type: "button",
+                                        className: quizDifficulty === item.id ? "active" : "",
+                                        onClick: () => setQuizDifficulty(item.id),
+                                        disabled: status === "loading"
+                                    }, item.label))
+                                )
+                            ),
+                            react.createElement("button", {
+                                type: "button",
+                                className: "ivlyrics-study-secondary subtle",
+                                onClick: regenerateQuiz,
+                                disabled: status === "loading" || !hasLyrics
+                            }, t("quizRegenerate", "새 문제 만들기"))
+                        ),
                         totalQuiz > 0 && react.createElement("div", { className: "ivlyrics-study-quiz-topline" },
                             react.createElement("div", null,
-                                react.createElement("span", { className: "ivlyrics-study-quiz-badge" }, t("quizType", "뜻 맞히기")),
+                                react.createElement("span", { className: "ivlyrics-study-quiz-badge" },
+                                    quizFinished
+                                        ? t("quizResult", "결과")
+                                        : getQuizTypeLabel(currentQuiz?.type)
+                                ),
                                 react.createElement("span", null,
                                     quizFinished
                                         ? t("quizResult", "결과")
@@ -2166,7 +2648,15 @@
                                 react.createElement("div", { style: { width: `${quizProgressPercent}%` } })
                             )
                         ),
-                        totalQuiz === 0 && react.createElement(EmptyState, null, t("noQuiz", "생성된 퀴즈가 없습니다.")),
+                        totalQuiz === 0 && react.createElement(EmptyState, null,
+                            react.createElement("p", null, t("noQuiz", "생성된 퀴즈가 없습니다.")),
+                            react.createElement("button", {
+                                type: "button",
+                                className: "ivlyrics-study-primary",
+                                onClick: regenerateQuiz,
+                                disabled: status === "loading"
+                            }, t("quizRegenerate", "새 문제 만들기"))
+                        ),
                         quizFinished && totalQuiz > 0 && react.createElement("section", {
                             className: "ivlyrics-study-card ivlyrics-study-quiz-result"
                         },
@@ -2245,6 +2735,12 @@
                                 }, t("quizRetryWrong", "오답 다시 풀기")),
                                 react.createElement("button", {
                                     type: "button",
+                                    className: "ivlyrics-study-secondary",
+                                    onClick: regenerateQuiz,
+                                    disabled: status === "loading"
+                                }, t("quizRegenerate", "새 문제 만들기")),
+                                react.createElement("button", {
+                                    type: "button",
                                     className: "ivlyrics-study-primary dark",
                                     onClick: resetQuiz
                                 }, t("quizRetry", "다시 풀기"))
@@ -2255,13 +2751,16 @@
                             className: [
                                 "ivlyrics-study-card",
                                 "ivlyrics-study-quiz",
+                                `quiz-type-${normalizeQuizType(currentQuiz.type)}`,
                                 currentQuizAnswer?.correct ? "is-correct" : "",
                                 currentQuizAnswer && !currentQuizAnswer.correct ? "is-wrong" : ""
                             ].filter(Boolean).join(" ")
-                        },
+                        }, 
                             react.createElement("div", { className: "ivlyrics-study-quiz-prompt" },
-                                react.createElement("p", null, currentQuiz.question),
-                                currentQuiz.sourceText && react.createElement("div", { className: "ivlyrics-study-source-card compact" },
+                                normalizeQuizType(currentQuiz.type) === "blank"
+                                    ? react.createElement(BlankQuestion, { text: currentQuiz.question })
+                                    : react.createElement("p", null, currentQuiz.question),
+                                shouldShowQuizSource(currentQuiz) && react.createElement("div", { className: "ivlyrics-study-source-card compact" },
                                     react.createElement("div", { className: "ivlyrics-study-source-head" },
                                         react.createElement("span", null, t("sourceLine", "가사 원문")),
                                         Number.isFinite(Number(currentQuiz.startTime)) && react.createElement(LyricPlayButton, {
@@ -3110,6 +3609,99 @@
   line-height: 1;
 }
 
+.ivlyrics-study-difficulty {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.ivlyrics-study-difficulty-head {
+  display: grid;
+  gap: 3px;
+}
+
+.ivlyrics-study-difficulty-head span {
+  color: var(--lm-text-1);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ivlyrics-study-difficulty-head small {
+  color: var(--lm-text-3);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ivlyrics-study-difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ivlyrics-study-difficulty-options button {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--lm-text-2);
+  background: var(--lm-surface-2);
+  border: 1px solid var(--lm-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ivlyrics-study-difficulty-options button.active {
+  color: #1c4700;
+  background: #d7ffb8;
+  border-color: #58cc02;
+  box-shadow: inset 0 -2px 0 rgba(88, 167, 0, 0.22);
+}
+
+.ivlyrics-study-difficulty-options button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.ivlyrics-study-difficulty-options.compact {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ivlyrics-study-difficulty-options.compact button {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.ivlyrics-study-quiz-tools {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: var(--lm-surface);
+  border: 1px solid var(--lm-border);
+  border-radius: 12px;
+  box-shadow: var(--lm-shadow-sm);
+}
+
+.ivlyrics-study-quiz-difficulty {
+  display: grid;
+  gap: 8px;
+  min-width: min(460px, 100%);
+}
+
+.ivlyrics-study-quiz-difficulty > span {
+  color: var(--lm-text-2);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ivlyrics-study-quiz-tools > .ivlyrics-study-secondary {
+  width: auto;
+  min-width: 150px;
+}
+
 .ivlyrics-study-stage {
   min-width: 0;
   min-height: 0;
@@ -3578,6 +4170,19 @@
   font-weight: 900;
 }
 
+.ivlyrics-study-quiz.quiz-type-blank {
+  background: #fffdf7;
+}
+
+.ivlyrics-study-quiz.quiz-type-usage,
+.ivlyrics-study-quiz.quiz-type-rewrite {
+  background: #f7fbff;
+}
+
+.ivlyrics-study-quiz.quiz-type-grammar {
+  background: #fffaf0;
+}
+
 .ivlyrics-study-quiz-score-row {
   display: flex;
   align-items: center;
@@ -3638,6 +4243,28 @@
   color: #8a94a3;
   font-size: 18px;
   font-weight: 900;
+}
+
+.ivlyrics-study-blank-question {
+  margin: 0;
+  color: #18202c;
+  font-size: clamp(28px, 4vw, 50px);
+  line-height: 1.18;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.ivlyrics-study-blank-question .blank {
+  display: inline-flex;
+  align-items: center;
+  min-width: 3.2em;
+  justify-content: center;
+  margin: 0 0.12em;
+  color: #0875c9;
+  background: #e3f2ff;
+  border-bottom: 5px solid #1cb0f6;
+  border-radius: 8px 8px 4px 4px;
+  line-height: 1.05;
 }
 
 .ivlyrics-study-quiz-prompt .ivlyrics-study-source-card {
@@ -4002,6 +4629,10 @@
   width: min(1040px, 100%);
 }
 
+.ivlyrics-study-history {
+  width: min(1040px, 100%);
+}
+
 .ivlyrics-study-wordbook-hero {
   display: flex;
   justify-content: space-between;
@@ -4034,6 +4665,82 @@
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 15px;
+}
+
+.ivlyrics-study-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ivlyrics-study-history-card {
+  min-width: 0;
+}
+
+.ivlyrics-study-history-card button {
+  width: 100%;
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  color: #172018;
+  background: #ffffff;
+  border: 1px solid #dce6d8;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--lm-shadow-sm);
+}
+
+.ivlyrics-study-history-card.active button {
+  border-color: #58cc02;
+  box-shadow: 0 0 0 3px rgba(88, 204, 2, 0.16), var(--lm-shadow-sm);
+}
+
+.ivlyrics-study-history-card strong {
+  display: block;
+  color: #172018;
+  font-size: 18px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ivlyrics-study-history-card span {
+  display: block;
+  margin-top: 6px;
+  color: #4d5a52;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.ivlyrics-study-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ivlyrics-study-history-meta em {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  color: var(--lm-text-2);
+  background: var(--lm-surface-2);
+  border: 1px solid var(--lm-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.ivlyrics-study-history-meta em.current {
+  color: #1c4700;
+  background: #d7ffb8;
+  border-color: #9de16b;
 }
 
 .ivlyrics-study-word-tools {
@@ -4419,6 +5126,49 @@
   border-color: #58cc02;
 }
 
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-difficulty-options button {
+  color: var(--lm-text-2);
+  background: var(--lm-surface-2);
+  border-color: var(--lm-border);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-difficulty-options button.active {
+  color: #d9f99d;
+  background: #173b1f;
+  border-color: #58cc02;
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-card button {
+  color: var(--lm-text-1);
+  background: var(--lm-surface);
+  border-color: var(--lm-border);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-card.active button {
+  border-color: #58cc02;
+  box-shadow: 0 0 0 3px rgba(88, 204, 2, 0.16), var(--lm-shadow-sm);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-card strong {
+  color: var(--lm-text-1);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-card span {
+  color: var(--lm-text-2);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-meta em {
+  color: var(--lm-text-2);
+  background: var(--lm-surface-2);
+  border-color: var(--lm-border);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-history-meta em.current {
+  color: #d9f99d;
+  background: #173b1f;
+  border-color: #58cc02;
+}
+
 .ivlyrics-study-panel.theme-dark .ivlyrics-study-source-card,
 .ivlyrics-study-panel.theme-dark .ivlyrics-study-source-inline,
 .ivlyrics-study-panel.theme-dark .ivlyrics-study-word-source,
@@ -4463,6 +5213,26 @@
   color: var(--lm-text-1);
   background: var(--lm-surface);
   border-color: var(--lm-border);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-quiz.quiz-type-blank,
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-quiz.quiz-type-grammar {
+  background: #1f1c13;
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-quiz.quiz-type-usage,
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-quiz.quiz-type-rewrite {
+  background: #162536;
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-blank-question {
+  color: var(--lm-text-1);
+}
+
+.ivlyrics-study-panel.theme-dark .ivlyrics-study-blank-question .blank {
+  color: #dbeafe;
+  background: #164b7f;
+  border-bottom-color: #60a5fa;
 }
 
 .ivlyrics-study-panel.theme-dark .ivlyrics-study-choice.correct {
@@ -4662,10 +5432,16 @@
     width: auto;
   }
 
+  .ivlyrics-study-rail-card .ivlyrics-study-difficulty,
+  .ivlyrics-study-rail-card .ivlyrics-study-rail-stats {
+    grid-column: 1 / -1;
+  }
+
   .ivlyrics-study-choice-grid,
   .ivlyrics-study-result-stats,
   .ivlyrics-study-review-answers,
-  .ivlyrics-study-word-grid {
+  .ivlyrics-study-word-grid,
+  .ivlyrics-study-history-grid {
     grid-template-columns: 1fr;
   }
 
