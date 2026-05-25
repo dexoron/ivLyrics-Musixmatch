@@ -1034,10 +1034,6 @@ window.LANG_VI = {
         "label": "Bật lời bài hát Panel",
         "desc": "Hiển thị lời bài hát hiện tại trong bảng Đang phát"
       },
-      "lines": {
-        "label": "Số dòng lời",
-        "desc": "Số dòng lời bài hát hiển thị trên panel (Mặc định: 5)"
-      },
       "fontScale": {
         "label": "Tỷ lệ cỡ chữ tổng thể",
         "desc": "Tỷ lệ kích thước tổng thể của lời bài hát trên panel (50%-200%)"

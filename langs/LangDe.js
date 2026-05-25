@@ -1034,10 +1034,6 @@ window.LANG_DE = {
         "label": "Panel-Songtext aktivieren",
         "desc": "Zeigt den aktuellen Songtext im Panel an"
       },
-      "lines": {
-        "label": "Anzahl Zeilen",
-        "desc": "Anzahl der angezeigten Zeilen (Standard: 5)"
-      },
       "fontScale": {
         "label": "Schriftgrößen-Skalierung",
         "desc": "Skalierung der gesamten Schriftgröße (50%-200%)"

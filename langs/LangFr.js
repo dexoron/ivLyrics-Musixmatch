@@ -1034,10 +1034,6 @@ window.LANG_FR = {
         "label": "Activer paroles panneau",
         "desc": "Affiche les paroles actuelles dans le panneau latéral"
       },
-      "lines": {
-        "label": "Nombre de lignes",
-        "desc": "Nombre de lignes à afficher (Défaut: 5)"
-      },
       "fontScale": {
         "label": "Échelle de police globale",
         "desc": "Ratio de taille global pour le panneau (50%-200%)"

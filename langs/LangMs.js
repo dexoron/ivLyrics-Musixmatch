@@ -1034,10 +1034,6 @@ window.LANG_MS = {
         "label": "Aktifkan Lirik Panel",
         "desc": "Paparkan lirik semasa pada panel Sedang Dimainkan"
       },
-      "lines": {
-        "label": "Bilangan Baris Lirik",
-        "desc": "Bilangan baris lirik untuk dipaparkan pada panel (Lalai: 5)"
-      },
       "fontScale": {
         "label": "Skala Saiz Fon Keseluruhan",
         "desc": "Nisbah saiz keseluruhan lirik panel (50%-200%)"

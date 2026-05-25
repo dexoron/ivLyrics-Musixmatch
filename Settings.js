@@ -3279,7 +3279,7 @@ const NowPlayingPanelPreview = () => {
   const [phoneticFont, setPhoneticFont] = useState(CONFIG.visual["panel-lyrics-phonetic-font"] || "");
   const [translationFont, setTranslationFont] = useState(CONFIG.visual["panel-lyrics-translation-font"] || "");
   const [fontScale, setFontScale] = useState(parseInt(CONFIG.visual["panel-font-scale"], 10) || 100);
-  const [originalSize, setOriginalSize] = useState(parseInt(CONFIG.visual["panel-lyrics-original-size"], 10) || 18);
+  const [originalSize, setOriginalSize] = useState(parseInt(CONFIG.visual["panel-lyrics-original-size"], 10) || 26);
   const [phoneticSize, setPhoneticSize] = useState(parseInt(CONFIG.visual["panel-lyrics-phonetic-size"], 10) || 13);
   const [translationSize, setTranslationSize] = useState(parseInt(CONFIG.visual["panel-lyrics-translation-size"], 10) || 13);
 
@@ -3304,7 +3304,7 @@ const NowPlayingPanelPreview = () => {
       if (name === "panel-lyrics-phonetic-font") setPhoneticFont(value || "");
       if (name === "panel-lyrics-translation-font") setTranslationFont(value || "");
       if (name === "panel-font-scale") setFontScale(parseInt(value, 10) || 100);
-      if (name === "panel-lyrics-original-size") setOriginalSize(parseInt(value, 10) || 18);
+      if (name === "panel-lyrics-original-size") setOriginalSize(parseInt(value, 10) || 26);
       if (name === "panel-lyrics-phonetic-size") setPhoneticSize(parseInt(value, 10) || 13);
       if (name === "panel-lyrics-translation-size") setTranslationSize(parseInt(value, 10) || 13);
       // 배경 설정

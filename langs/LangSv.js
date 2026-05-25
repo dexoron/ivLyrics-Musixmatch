@@ -1034,10 +1034,6 @@ window.LANG_SV = {
         "label": "Aktivera paneltexter",
         "desc": "Visa aktuella sångtexter i panelen Spelas nu"
       },
-      "lines": {
-        "label": "Antal rader",
-        "desc": "Antal sångtextrader som ska visas i panelen (standard: 5)"
-      },
       "fontScale": {
         "label": "Global teckensnittsskala",
         "desc": "Skalförhållande för paneltexttext (50%-200%)"

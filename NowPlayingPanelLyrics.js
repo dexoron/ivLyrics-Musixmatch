@@ -78,7 +78,7 @@
     const DEFAULT_FONT_SCALE = 100; // 폰트 크기 배율 (50% ~ 200%)
     const DEFAULT_FONT_FAMILY = "Pretendard Variable";
     const DEFAULT_PANEL_WIDTH = 280;
-    const DEFAULT_ORIGINAL_SIZE = 18;
+    const DEFAULT_ORIGINAL_SIZE = 26;
     const DEFAULT_PHONETIC_SIZE = 13;
     const DEFAULT_TRANSLATION_SIZE = 13;
     // 배경 기본값
@@ -299,6 +299,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 .ivlyrics-panel-header {
   display: flex !important;
   align-items: center !important;
+  justify-content: flex-end !important;
   position: absolute !important;
   top: 14px !important;
   left: 16px !important;
@@ -678,7 +679,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   display: -webkit-box !important;
   -webkit-line-clamp: 2 !important;
   -webkit-box-orient: vertical !important;
-  font-size: calc(var(--ivlyrics-panel-original-size, 18px) * var(--ivlyrics-font-scale, 1)) !important;
+  font-size: calc(var(--ivlyrics-panel-original-size, 26px) * var(--ivlyrics-font-scale, 1)) !important;
   font-weight: 700 !important;
   color: rgba(255, 255, 255, 0.7) !important;
   line-height: 1.4 !important;
@@ -731,11 +732,11 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   gap: 0px !important;
   width: 100% !important;
   min-width: 0 !important;
-  font-size: calc(var(--ivlyrics-panel-original-size, 18px) * var(--ivlyrics-font-scale, 1)) !important;
+  font-size: calc(var(--ivlyrics-panel-original-size, 26px) * var(--ivlyrics-font-scale, 1)) !important;
   font-weight: 700 !important;
   line-height: 1.4 !important;
   font-family: var(--ivlyrics-panel-original-font) !important;
-  max-height: calc(var(--ivlyrics-panel-original-size, 18px) * var(--ivlyrics-font-scale, 1) * 2.85) !important;
+  max-height: calc(var(--ivlyrics-panel-original-size, 26px) * var(--ivlyrics-font-scale, 1) * 2.85) !important;
   overflow: hidden !important;
 }
 
@@ -1114,7 +1115,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   position: relative !important;
   display: inline-block !important;
   color: rgba(255, 255, 255, 0.5) !important;
-  transition: color 0.15s ease, transform 0.15s ease !important;
+  transition: color 0.15s ease !important;
   transform-origin: center bottom !important;
 }
 
@@ -1123,7 +1124,7 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   display: inline-block !important;
   white-space: pre !important;
   color: rgba(255, 255, 255, 0.5) !important;
-  transition: color 0.15s ease, transform 0.15s ease !important;
+  transition: color 0.15s ease !important;
   transform-origin: center bottom !important;
   vertical-align: baseline !important;
   unicode-bidi: isolate !important;
@@ -1138,7 +1139,8 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 .ivlyrics-panel-karaoke-word.sung,
 .ivlyrics-panel-karaoke-text-run-segment.sung {
   color: #ffffff !important;
-  animation: ivlyrics-bounce 0.2s ease-out forwards !important;
+  animation: none !important;
+  transform: none !important;
 }
 
 /* 노래방 라인 활성 시 단어 기본 색상 더 밝게 */

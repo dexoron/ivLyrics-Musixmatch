@@ -1034,10 +1034,6 @@ window.LANG_PT = {
         "label": "Ativar Letra no Painel",
         "desc": "Exibe a letra atual no painel 'Tocando Agora'"
       },
-      "lines": {
-        "label": "Linhas de Letra",
-        "desc": "Número de linhas para exibir no painel (Padrão: 5)"
-      },
       "fontScale": {
         "label": "Escala Geral da Fonte",
         "desc": "Proporção do tamanho geral da fonte do painel (50%-200%)"

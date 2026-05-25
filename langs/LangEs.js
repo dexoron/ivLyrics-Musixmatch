@@ -1034,10 +1034,6 @@ window.LANG_ES = {
         "label": "Activar letras en panel",
         "desc": "Muestra las letras actuales en el panel de reproducción"
       },
-      "lines": {
-        "label": "Número de líneas",
-        "desc": "Líneas de letras a mostrar en el panel (Por defecto: 5)"
-      },
       "fontScale": {
         "label": "Escala de fuente global",
         "desc": "Proporción de tamaño general del texto (50%-200%)"

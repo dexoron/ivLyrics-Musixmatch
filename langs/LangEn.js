@@ -1034,10 +1034,6 @@ window.LANG_EN = {
         "label": "Enable Panel Lyrics",
         "desc": "Display current lyrics in the Now Playing panel"
       },
-      "lines": {
-        "label": "Number of Lines",
-        "desc": "Number of lyrics lines to display in the panel (Default: 5)"
-      },
       "fontScale": {
         "label": "Global Font Scale",
         "desc": "Scale ratio for panel lyrics text (50%-200%)"

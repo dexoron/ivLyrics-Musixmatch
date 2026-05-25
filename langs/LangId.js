@@ -1034,10 +1034,6 @@ window.LANG_ID = {
         "label": "Aktifkan Lirik Panel",
         "desc": "Tampilkan lirik saat ini di panel Sedang Diputar"
       },
-      "lines": {
-        "label": "Jumlah Baris Lirik",
-        "desc": "Jumlah baris lirik yang ditampilkan di panel (Default: 5)"
-      },
       "fontScale": {
         "label": "Skala Ukuran Font Keseluruhan",
         "desc": "Rasio ukuran keseluruhan lirik panel (50%-200%)"

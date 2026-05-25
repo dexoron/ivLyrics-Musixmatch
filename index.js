@@ -1403,7 +1403,7 @@ const CONFIG = {
     "panel-lyrics-translation-font":
       StorageManager.getItem("ivLyrics:visual:panel-lyrics-translation-font") || "",
     "panel-lyrics-original-size":
-      StorageManager.getItem("ivLyrics:visual:panel-lyrics-original-size") || "18",
+      StorageManager.getItem("ivLyrics:visual:panel-lyrics-original-size") || "26",
     "panel-lyrics-phonetic-size":
       StorageManager.getItem("ivLyrics:visual:panel-lyrics-phonetic-size") || "13",
     "panel-lyrics-translation-size":

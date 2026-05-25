@@ -1034,10 +1034,6 @@ window.LANG_IT = {
         "label": "Abilita testo nel pannello",
         "desc": "Mostra il testo corrente nel pannello 'In riproduzione'"
       },
-      "lines": {
-        "label": "Numero di righe",
-        "desc": "Numero di righe da mostrare nel pannello (Default: 5)"
-      },
       "fontScale": {
         "label": "Scala dimensione font globale",
         "desc": "Rapporto dimensione totale del testo nel pannello (50%-200%)"
