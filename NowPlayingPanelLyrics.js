@@ -319,11 +319,8 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
 
 /* 가사 래퍼 - 슬라이드 업 애니메이션 */
 .ivlyrics-panel-lyrics-wrapper {
-  display: grid !important;
+  display: block !important;
   flex: 1 1 auto !important;
-  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) !important;
-  align-items: stretch !important;
-  gap: 4px !important;
   height: 100% !important;
   max-height: 100% !important;
   min-height: 0 !important;
@@ -331,6 +328,42 @@ body.${PANEL_ACTIVE_BODY_CLASS} [data-testid="lyrics-npv-section"] {
   position: relative !important;
   mask-image: none !important;
   -webkit-mask-image: none !important;
+}
+
+.ivlyrics-panel-lines-stack {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--ivlyrics-panel-line-stack-gap, 34px) !important;
+  transform: translateY(var(--ivlyrics-panel-stack-y, 0px)) !important;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  will-change: transform !important;
+}
+
+.ivlyrics-panel-line-cell {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.ivlyrics-panel-line-cell .ivlyrics-panel-line {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  animation: none !important;
+}
+
+.ivlyrics-panel-line-cell .ivlyrics-panel-line.vocal-stack {
+  flex-basis: auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 .ivlyrics-panel-context-lines {
@@ -3346,6 +3379,7 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         const containerStyle = useMemo(() => ({
             '--ivlyrics-font-scale': fontScale / 100,
             '--ivlyrics-panel-visible-lines': visibleLineCount,
+            '--ivlyrics-panel-line-stack-gap': `${Math.round(Math.max(24, Math.min(42, panelLineSlotHeight * 0.48)))}px`,
             '--ivlyrics-panel-line-slot-height': `${panelLineSlotHeight}px`,
             '--ivlyrics-panel-effect-line-slot-height': `${Math.round(panelLineSlotHeight * 0.78)}px`,
             '--ivlyrics-panel-vocal-stack-line-height': `${Math.round(panelLineSlotHeight * 2.3)}px`,
@@ -3364,9 +3398,52 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
         ));
         const activeVisibleIndex = visibleLines.findIndex((visLine) => visLine.isActive);
         const currentVisibleIndex = activeVisibleIndex >= 0 ? activeVisibleIndex : Math.floor(visibleLines.length / 2);
-        const topVisibleLines = visibleLines.slice(0, currentVisibleIndex);
-        const currentVisibleLine = visibleLines[currentVisibleIndex] || null;
-        const bottomVisibleLines = visibleLines.slice(currentVisibleIndex + 1);
+        useEffect(() => {
+            const wrapper = scrollRef.current;
+            if (!wrapper) return undefined;
+
+            let frameId = null;
+            const updateStackPosition = () => {
+                frameId = null;
+                const stack = wrapper.querySelector('.ivlyrics-panel-lines-stack');
+                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.current');
+                if (!stack || !currentCell) return;
+
+                const wrapperCenter = wrapper.clientHeight / 2;
+                const currentCenter = currentCell.offsetTop + (currentCell.offsetHeight / 2);
+                const translateY = Math.round(wrapperCenter - currentCenter);
+                stack.style.setProperty('--ivlyrics-panel-stack-y', `${translateY}px`);
+            };
+            const scheduleUpdate = () => {
+                if (frameId !== null) {
+                    cancelAnimationFrame(frameId);
+                }
+                frameId = requestAnimationFrame(updateStackPosition);
+            };
+
+            scheduleUpdate();
+            let observer = null;
+            if (typeof ResizeObserver !== 'undefined') {
+                observer = new ResizeObserver(scheduleUpdate);
+                observer.observe(wrapper);
+                const stack = wrapper.querySelector('.ivlyrics-panel-lines-stack');
+                const currentCell = wrapper.querySelector('.ivlyrics-panel-line-cell.current');
+                if (stack) observer.observe(stack);
+                if (currentCell) observer.observe(currentCell);
+            }
+            if (document.fonts?.ready) {
+                document.fonts.ready.then(scheduleUpdate).catch(() => {});
+            }
+            window.addEventListener('resize', scheduleUpdate);
+
+            return () => {
+                if (frameId !== null) {
+                    cancelAnimationFrame(frameId);
+                }
+                observer?.disconnect?.();
+                window.removeEventListener('resize', scheduleUpdate);
+            };
+        }, [visibleLines, currentVisibleIndex, fontScale, panelLineSlotHeight, instrumentalBreakRevision, textEffectRevision]);
         const renderVisibleLine = (visLine, idx, keyPrefix) => react.createElement(LyricLine, {
             key: `${keyPrefix}-${visLine.index}-${idx}`,
             line: visLine.line,
@@ -3417,14 +3494,15 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 className: "ivlyrics-panel-lyrics-wrapper",
                 ref: scrollRef
             },
-                react.createElement("div", { className: "ivlyrics-panel-context-lines before" },
-                    topVisibleLines.map((visLine, idx) => renderVisibleLine(visLine, idx, "before"))
-                ),
-                react.createElement("div", { className: "ivlyrics-panel-current-line" },
-                    currentVisibleLine && renderVisibleLine(currentVisibleLine, 0, "current")
-                ),
-                react.createElement("div", { className: "ivlyrics-panel-context-lines after" },
-                    bottomVisibleLines.map((visLine, idx) => renderVisibleLine(visLine, idx, "after"))
+                react.createElement("div", { className: "ivlyrics-panel-lines-stack" },
+                    visibleLines.map((visLine, idx) =>
+                        react.createElement("div", {
+                            key: `cell-${visLine.index}-${idx}`,
+                            className: `ivlyrics-panel-line-cell${visLine.isActive ? " current" : ""}`
+                        },
+                            renderVisibleLine(visLine, idx, "stack")
+                        )
+                    )
                 )
             )
         );
