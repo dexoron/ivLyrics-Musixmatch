@@ -4638,24 +4638,30 @@ const SyncDataCreator = ({ trackInfo, initialData, onClose }) => {
 	}, [syncData, lyricsLines, lineCharOffsets, multiVocalMode, trackId, provider, trackName, artistName, onClose, attachSelectedLrclibSource, clearLyricsCachesAfterSyncSubmit, getParallelTemplateForLineData, getMergedLineIndexesForStart, isLineCoveredByMergedPrevious]);
 
 	// 싱크 데이터 내보내기 (JSON 파일로 저장)
-	const exportSyncData = useCallback(() => {
+	const exportSyncData = useCallback(async () => {
 		if (!syncData || !syncData.lines || syncData.lines.length === 0) {
 			Toast.error(I18n.t('syncCreator.noSyncData') || 'No sync data to export');
 			return;
 		}
 
-		const exportData = attachSelectedLrclibSource(syncData);
-		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `sync-${trackId}-${Date.now()}.json`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
+		try {
+			const fileName = `sync-${trackId}-${Date.now()}.json`;
+			const saveTarget = await Utils.requestSaveFileTarget(fileName, {
+				description: 'ivLyrics Sync Data',
+				mimeType: 'application/json',
+				extensions: ['.json'],
+			});
+			if (saveTarget.canceled) return;
 
-		Toast.success(I18n.t('syncCreator.exportSuccess') || 'Exported sync data');
+			const exportData = attachSelectedLrclibSource(syncData);
+			const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			await Utils.saveBlobAs(blob, fileName, saveTarget);
+
+			Toast.success(I18n.t('syncCreator.exportSuccess') || 'Exported sync data');
+		} catch (error) {
+			console.error('[SyncDataCreator] Export error:', error);
+			Toast.error(error?.message || I18n.t('syncCreator.submitError'));
+		}
 	}, [attachSelectedLrclibSource, syncData, trackId]);
 
 	// 싱크 데이터 불러오기 (JSON 파일에서)

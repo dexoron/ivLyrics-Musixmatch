@@ -1295,6 +1295,65 @@ const Utils = {
     }
   },
 
+  async requestSaveFileTarget(fileName, options = {}) {
+    if (typeof window.showSaveFilePicker !== "function") {
+      return { handle: null, canceled: false };
+    }
+
+    const {
+      description = "JSON",
+      mimeType = "application/json",
+      extensions = [".json"],
+    } = options;
+
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [
+          {
+            description,
+            accept: {
+              [mimeType]: extensions,
+            },
+          },
+        ],
+      });
+      return { handle, canceled: false };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return { handle: null, canceled: true };
+      }
+
+      console.warn("[Utils] Save file picker unavailable, falling back to download:", error);
+      return { handle: null, canceled: false };
+    }
+  },
+
+  async saveBlobAs(blob, fileName, saveTarget = null) {
+    const handle = saveTarget?.handle || saveTarget;
+
+    if (handle && typeof handle.createWritable === "function") {
+      const writable = await handle.createWritable();
+      try {
+        await writable.write(blob);
+      } finally {
+        await writable.close();
+      }
+      return "picker";
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    return "download";
+  },
+
   /**
    * Detect platform
    */

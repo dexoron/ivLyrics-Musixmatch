@@ -11538,19 +11538,20 @@ const ConfigModal = ({
                 button.disabled = true;
 
                 try {
+                  const fileName = "ivLyrics-settings.json";
+                  const saveTarget = await Utils.requestSaveFileTarget(fileName, {
+                    description: "ivLyrics Settings",
+                    mimeType: "application/json",
+                    extensions: [".json"],
+                  });
+                  if (saveTarget.canceled) return;
+
                   const cfg = await StorageManager.exportConfig();
                   const serializedConfig = JSON.stringify(cfg, null, 2);
                   const blob = new Blob([serializedConfig], {
                     type: "application/json",
                   });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "ivLyrics-settings.json";
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
+                  await Utils.saveBlobAs(blob, fileName, saveTarget);
 
                   const settingRow = button.closest(".setting-row");
                   let resultContainer = settingRow?.nextElementSibling;
@@ -11833,17 +11834,18 @@ const ConfigModal = ({
                 button.disabled = true;
 
                 try {
+                  const fileName = "ivLyrics-db.json";
+                  const saveTarget = await Utils.requestSaveFileTarget(fileName, {
+                    description: "ivLyrics Database",
+                    mimeType: "application/json",
+                    extensions: [".json"],
+                  });
+                  if (saveTarget.canceled) return;
+
                   const data = await DBExportManager.exportAllDBs();
                   const json = JSON.stringify(data, null, 2);
                   const blob = new Blob([json], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "ivLyrics-db.json";
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
+                  await Utils.saveBlobAs(blob, fileName, saveTarget);
 
                   const settingRow = button.closest(".setting-row");
                   let resultContainer = settingRow?.nextElementSibling;
