@@ -1204,7 +1204,7 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
           I18n.t("settings.lyricsProviders.providerSettings") || "Provider Settings"
         ),
         provider.id === "musixmatch"
-          ? react.createElement(MusixmatchProviderSettings)
+          ? react.createElement(MusixmatchSettings)
           : (SettingsUI ? react.createElement(SettingsUI) : null)
       ),
       // 가사 유형별 필터 토글 영역
@@ -1242,7 +1242,7 @@ const LyricsProviderCard = ({ provider, isEnabled, onToggle, isExpanded, onExpan
 };
 
 // Musixmatch settings rendered directly in Providers menu for stability
-const MusixmatchProviderSettings = () => {
+const MusixmatchSettings = () => {
   const [token, setToken] = useState(
     () => Spicetify.LocalStorage.get("ivLyrics:musixmatch-token") || ""
   );

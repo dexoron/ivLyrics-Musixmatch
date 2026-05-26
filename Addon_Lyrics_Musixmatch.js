@@ -1,8 +1,19 @@
+/**
+ * Musixmatch Lyrics Provider Addon for ivLyrics
+ * Adapted from spicetify/cli lyrics-plus ProviderMusixmatch.js
+ * For personal use only — not for distribution
+ * 
+ * @addon-type lyrics
+ * @id musixmatch
+ * @name Musixmatch
+ * @version 1.0.0
+ * @supports karaoke: true
+ * @supports synced: true
+ * @supports unsynced: true
+ */
+
 // ============================================
-// MusixmatchProvider.js
-// Musixmatch provider for ivLyrics
-// Adapted from spicetify/cli lyrics-plus ProviderMusixmatch.js
-// For personal use only — not for distribution
+// MusixmatchProvider - Core API module
 // ============================================
 
 const MusixmatchProvider = (() => {
@@ -31,7 +42,7 @@ const MusixmatchProvider = (() => {
                 return token;
             }
         } catch (e) {
-            console.warn("[MusixmatchProvider] Failed to fetch new token:", e);
+            console.warn("[Addon_Lyrics_Musixmatch] Failed to fetch new token:", e);
         }
         return null;
     }
@@ -172,7 +183,7 @@ const MusixmatchProvider = (() => {
         } catch (e) {
             // Status 401 or 429 — refresh token and retry once
             if (!retried) {
-                console.warn("[MusixmatchProvider] API error, refreshing token...", e);
+                console.warn("[Addon_Lyrics_Musixmatch] API error, refreshing token...", e);
                 const newToken = await fetchNewToken();
                 if (newToken) {
                     // Replace token in url
@@ -219,7 +230,7 @@ const MusixmatchProvider = (() => {
         }
 
         const topStatus = body?.message?.header?.status_code;
-        console.log("[MusixmatchProvider] findLyrics status", topStatus);
+        console.log("[Addon_Lyrics_Musixmatch] findLyrics status", topStatus);
         if (topStatus !== 200) {
             return { error: `Musixmatch API status ${topStatus}`, uri: info.uri };
         }
@@ -247,7 +258,7 @@ const MusixmatchProvider = (() => {
         const hasLyrics = !!body["track.lyrics.get"]?.message?.body?.lyrics?.lyrics_body;
         const hasSubtitles = !!body["track.subtitles.get"]?.message?.body?.subtitle_list?.length;
         const hasRichsync = !!meta?.track?.has_richsync;
-        console.log("[MusixmatchProvider] findLyrics availability", {
+        console.log("[Addon_Lyrics_Musixmatch] findLyrics availability", {
             hasLyrics,
             hasSubtitles,
             hasRichsync,
@@ -278,7 +289,7 @@ const MusixmatchProvider = (() => {
         try {
             result = await apiGet(finalURL);
         } catch (e) {
-            console.warn("[MusixmatchProvider] getKaraoke failed:", e);
+            console.warn("[Addon_Lyrics_Musixmatch] getKaraoke failed:", e);
             return null;
         }
 
@@ -395,7 +406,7 @@ const MusixmatchProvider = (() => {
                 const uiLang = Spicetify.Locale?.getLocale()?.split("-")[0] || "en";
                 selectedLanguage = uiLang || "en";
                 isAutoSelected = true;
-                console.log("[MusixmatchProvider] auto-selected translation language", {
+                console.log("[Addon_Lyrics_Musixmatch] auto-selected translation language", {
                     trackId,
                     translateSource,
                     selectedLanguage,
@@ -437,13 +448,13 @@ const MusixmatchProvider = (() => {
 
             if (!inList) {
                 if (isExplicit) {
-                    console.log("[MusixmatchProvider] selected language not in list, will still try", {
+                    console.log("[Addon_Lyrics_Musixmatch] selected language not in list, will still try", {
                         selectedLanguage,
                         availableTranslations,
                     });
                 }
                 const fallbackLang = availableTranslations[0];
-                console.log("[MusixmatchProvider] selected language not available, fallback", {
+                console.log("[Addon_Lyrics_Musixmatch] selected language not available, fallback", {
                     selectedLanguage,
                     fallbackLang,
                     availableTranslations,
@@ -477,7 +488,7 @@ const MusixmatchProvider = (() => {
             };
             const mapped = (languageCodeMap && languageCodeMap[selectedLanguage]) || staticIso2ToIso3[selectedLanguage];
             if (mapped) {
-                console.log("[MusixmatchProvider] mapped language code", {
+                console.log("[Addon_Lyrics_Musixmatch] mapped language code", {
                     from: selectedLanguage,
                     to: mapped,
                 });
@@ -485,11 +496,11 @@ const MusixmatchProvider = (() => {
             }
         }
 
-        console.log("[MusixmatchProvider] getTranslation", { trackId, selectedLanguage, availableTranslations });
+        console.log("[Addon_Lyrics_Musixmatch] getTranslation", { trackId, selectedLanguage, availableTranslations });
         if (selectedLanguage === "none") return null;
 
         const token = getToken();
-        console.log("[MusixmatchProvider] getTranslation token present", !!token);
+        console.log("[Addon_Lyrics_Musixmatch] getTranslation token present", !!token);
         const baseURL =
             "https://apic-desktop.musixmatch.com/ws/1.1/crowd.track.translations.get?translation_fields_set=minimal&comment_format=text&format=json&app_id=web-desktop-app-v1.0&";
 
@@ -503,10 +514,10 @@ const MusixmatchProvider = (() => {
             try {
                 const result = await apiGet(finalURL);
                 const statusCode = result?.message?.header?.status_code;
-                console.log("[MusixmatchProvider] getTranslation status", statusCode, "lang", langCode);
+                console.log("[Addon_Lyrics_Musixmatch] getTranslation status", statusCode, "lang", langCode);
                 if (statusCode !== 200) return null;
                 const body = result.message.body;
-                console.log("[MusixmatchProvider] getTranslation list size", body?.translations_list?.length || 0, "lang", langCode);
+                console.log("[Addon_Lyrics_Musixmatch] getTranslation list size", body?.translations_list?.length || 0, "lang", langCode);
                 if (!body.translations_list?.length) return null;
                 const lines = body.translations_list.map(({ translation }) => ({
                     translation: translation.description,
@@ -514,7 +525,7 @@ const MusixmatchProvider = (() => {
                 }));
                 return { lines, language: langCode };
             } catch (e) {
-                console.warn("[MusixmatchProvider] getTranslation failed:", e);
+                console.warn("[Addon_Lyrics_Musixmatch] getTranslation failed:", e);
                 return null;
             }
         };
@@ -522,7 +533,7 @@ const MusixmatchProvider = (() => {
         let translations = await fetchTranslations(selectedLanguage);
         if (!translations && userSelected && storedLanguage !== selectedLanguage && storedLanguage !== "none") {
             // If user explicitly chose a language, retry with original iso-2 code
-            console.log("[MusixmatchProvider] retrying translation with original language", {
+            console.log("[Addon_Lyrics_Musixmatch] retrying translation with original language", {
                 storedLanguage,
                 selectedLanguage,
             });
@@ -555,7 +566,7 @@ const MusixmatchProvider = (() => {
                 }
             }
         } catch (e) {
-            console.warn("[MusixmatchProvider] Failed to parse cached languages", e);
+            console.warn("[Addon_Lyrics_Musixmatch] Failed to parse cached languages", e);
         }
 
         const token = await getOrRefreshToken();
@@ -587,7 +598,7 @@ const MusixmatchProvider = (() => {
                 return languageMap;
             }
         } catch (e) {
-            console.error("[MusixmatchProvider] Failed to fetch languages", e);
+            console.error("[Addon_Lyrics_Musixmatch] Failed to fetch languages", e);
         }
         return {};
     }
@@ -596,7 +607,7 @@ const MusixmatchProvider = (() => {
 
     async function getLyrics(info) {
         try {
-            console.log("[MusixmatchProvider] getLyrics start", {
+            console.log("[Addon_Lyrics_Musixmatch] getLyrics start", {
                 title: info.title,
                 artist: info.artist,
                 album: info.album,
@@ -618,7 +629,7 @@ const MusixmatchProvider = (() => {
             const translation = translationResult?.lines || null;
             const translationLangResolved = translationResult?.language || null;
 
-            console.log("[MusixmatchProvider] raw results", {
+            console.log("[Addon_Lyrics_Musixmatch] raw results", {
                 trackId,
                 hasKaraoke: Array.isArray(karaoke) && karaoke.length,
                 hasSynced: Array.isArray(synced) && synced.length,
@@ -656,7 +667,7 @@ const MusixmatchProvider = (() => {
 
             if (translationMap) {
                 const sampleKeys = Object.keys(translationMap).slice(0, 3);
-                console.log("[MusixmatchProvider] translation map sample", {
+                console.log("[Addon_Lyrics_Musixmatch] translation map sample", {
                     sampleKeys,
                     sampleValues: sampleKeys.map((k) => translationMap[k]),
                 });
@@ -689,7 +700,7 @@ const MusixmatchProvider = (() => {
                         trans = translation[idx].translation;
                     }
                     if (!trans && original) {
-                        console.log("[MusixmatchProvider] no translation match", {
+                        console.log("[Addon_Lyrics_Musixmatch] no translation match", {
                             original,
                             normalized: normalizeLineKey(original),
                         });
@@ -697,7 +708,7 @@ const MusixmatchProvider = (() => {
                     if (trans) matchCount++;
                     return trans ? { ...line, text2: trans } : line;
                 });
-                console.log("[MusixmatchProvider] translation attached", {
+                console.log("[Addon_Lyrics_Musixmatch] translation attached", {
                     totalLines: lines.length,
                     matched: matchCount,
                 });
@@ -723,7 +734,7 @@ const MusixmatchProvider = (() => {
                         trans = translation[idx].translation;
                     }
                     if (!trans && lineText) {
-                        console.log("[MusixmatchProvider] no karaoke translation match", {
+                        console.log("[Addon_Lyrics_Musixmatch] no karaoke translation match", {
                             lineText,
                             normalized: normalizeLineKey(lineText),
                         });
@@ -731,15 +742,15 @@ const MusixmatchProvider = (() => {
                     if (trans) karaokeMatchCount++;
                     return trans ? { ...line, text2: trans } : line;
                 });
-                console.log("[MusixmatchProvider] karaoke translation attached", {
+                console.log("[Addon_Lyrics_Musixmatch] karaoke translation attached", {
                     totalLines: karaoke.length,
                     matched: karaokeMatchCount,
                 });
             }
 
             const translateSource = Spicetify.LocalStorage.get("ivLyrics:visual:translate:translated-lyrics-source") || "auto";
-            console.log("[MusixmatchProvider] translate source", translateSource);
-            console.log("[MusixmatchProvider] sample line", {
+            console.log("[Addon_Lyrics_Musixmatch] translate source", translateSource);
+            console.log("[Addon_Lyrics_Musixmatch] sample line", {
                 syncedSample: syncedWithTrans?.[0],
                 unsyncedSample: unsyncedWithTrans?.[0],
                 karaokeSample: karaokeWithTrans?.[0],
@@ -751,7 +762,7 @@ const MusixmatchProvider = (() => {
                 const fakeKaraokeEnabled = Spicetify.LocalStorage.get("ivLyrics:musixmatch-fake-karaoke-enabled") === "true";
                 if (fakeKaraokeEnabled) {
                     finalKaraoke = createFakeKaraoke(syncedWithTrans);
-                    console.log("[MusixmatchProvider] Applied fake karaoke");
+                    console.log("[Addon_Lyrics_Musixmatch] Applied fake karaoke");
                 }
             }
 
@@ -766,7 +777,7 @@ const MusixmatchProvider = (() => {
                 translationLanguageResolved: translationLangResolved || null,
             };
         } catch (e) {
-            console.error("[MusixmatchProvider] getLyrics failed:", e);
+            console.error("[Addon_Lyrics_Musixmatch] getLyrics failed:", e);
             return { error: e.message, uri: info.uri };
         }
     }
@@ -816,3 +827,49 @@ const MusixmatchProvider = (() => {
 })();
 
 window.MusixmatchProvider = MusixmatchProvider;
+
+// ============================================
+// Register with LyricsAddonManager
+// ============================================
+
+(function registerMusixmatchAddon() {
+    "use strict";
+
+    function tryRegister() {
+        if (!window.LyricsAddonManager) {
+            setTimeout(tryRegister, 300);
+            return;
+        }
+
+        window.LyricsAddonManager.register({
+            id: "musixmatch",
+            name: "Musixmatch",
+            version: "1.0.0",
+            author: "Personal",
+            description: {
+                en: "Fetches lyrics, synced lyrics, karaoke, and human-verified translations from Musixmatch.",
+                ko: "Musixmatch에서 가사, 싱크 가사, 카라오케 및 번역을 가져옵니다.",
+            },
+            supports: {
+                karaoke: true,
+                synced: true,
+                unsynced: true,
+                translation: true,
+            },
+            getLyrics: (info) => window.MusixmatchProvider.getLyrics(info),
+            getSettingsUI: () => null,
+        });
+
+        if (!window.MusixmatchProvider.getToken()) {
+            window.MusixmatchProvider.fetchNewToken().then((token) => {
+                if (token) {
+                    console.log("[Addon_Lyrics_Musixmatch] Initial token fetched successfully");
+                }
+            });
+        }
+
+        console.log("[Addon_Lyrics_Musixmatch] Musixmatch provider registered in LyricsAddonManager");
+    }
+
+    tryRegister();
+})();
